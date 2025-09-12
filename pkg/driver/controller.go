@@ -20,7 +20,7 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/pancli"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )

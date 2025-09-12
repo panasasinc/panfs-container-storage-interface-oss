@@ -23,7 +23,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/utils"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"golang.org/x/crypto/ssh"
 )
 

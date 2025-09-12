@@ -21,7 +21,7 @@ import (
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/stretchr/testify/assert"
 
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/driver"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/driver"
 )
 
 // TestDriver_GetPluginInfo tests the GetPluginInfo method of the Driver.

@@ -19,8 +19,8 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/pancli/mock"
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/utils"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli/mock"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 )

@@ -18,7 +18,7 @@ import (
 	"fmt"
 
 	"github.com/google/uuid"
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/utils"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 )
 
 // Log represents a record of a fake PanFS CLI action for testing purposes.

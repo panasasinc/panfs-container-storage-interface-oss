@@ -20,8 +20,8 @@ import (
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/pancli"
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/utils"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 )
 
 var (

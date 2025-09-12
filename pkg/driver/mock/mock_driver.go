@@ -12,8 +12,8 @@ package mock
 import (
 	reflect "reflect"
 
-	pancli "github.com/panasasinc/panfs-container-storage-interface/pkg/pancli"
-	utils "github.com/panasasinc/panfs-container-storage-interface/pkg/utils"
+	pancli "github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
+	utils "github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	gomock "go.uber.org/mock/gomock"
 )
 

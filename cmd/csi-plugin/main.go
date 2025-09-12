@@ -18,8 +18,8 @@ import (
 	"flag"
 	"os"
 
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/driver"
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/pancli"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/driver"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
 
 	"k8s.io/klog/v2"
 )

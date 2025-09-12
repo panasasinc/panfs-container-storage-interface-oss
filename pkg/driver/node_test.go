@@ -19,7 +19,7 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/panasasinc/panfs-container-storage-interface/pkg/driver/mock"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/driver/mock"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
