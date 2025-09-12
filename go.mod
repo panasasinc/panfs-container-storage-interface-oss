@@ -1,4 +1,4 @@
-module github.com/panasasinc/panfs-container-storage-interface
+module github.com/panasasinc/panfs-container-storage-interface-oss
 
 go 1.24.3
 
