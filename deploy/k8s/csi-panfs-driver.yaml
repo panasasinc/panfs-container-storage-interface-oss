@@ -1,0 +1,793 @@
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# PodDisruptionBudget for the CSI PanFS Controller Server
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: csi-panfs-controller-pdb
+  namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: csi-panfs-controller
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ServiceAccount for the controller server
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-panfs-controller
+  namespace: csi-panfs
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ServiceAccount for the node driver plugin
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: csi-panfs-node
+  namespace: csi-panfs
+---
+# ClusterRole for the controller provisioner sidecar
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-provisioner
+rules:
+  # Allow managing PersistentVolumes for provisioning and deletion
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+  # Allow managing PersistentVolumeClaims for binding and updating
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
+
+  # Allow reading StorageClasses for provisioning decisions
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow emitting and updating Events for resource operations
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+
+  # Allow reading CSINodes for topology and node info
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading Nodes for topology-aware provisioning
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading VolumeAttachments for attach/detach operations
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch"]
+---
+# ClusterRole for the attacher sidecar
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-attacher
+rules:
+  # Allow patching PersistentVolumes for attach/detach operations
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "patch"]
+
+  # Allow reading CSI node information
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow managing VolumeAttachments for attach/detach
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "patch"]
+
+  # Allow updating status of VolumeAttachments
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
+---
+# ClusterRole for the resizer sidecar
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-resizer
+rules:
+  # Allow patching PersistentVolumes for resizing
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "patch"]
+
+  # Allow reading PersistentVolumeClaims for resizing
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading Pods for resizing operations
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow patching PersistentVolumeClaim status for resizing
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims/status"]
+    verbs: ["patch"]
+
+  # Allow managing Events related to resizing
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+---
+# ClusterRole for the node plugin
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-node
+rules:
+  # Allow emitting and updating events
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["get", "list", "watch", "create", "update", "patch"]
+
+  # Allow reading and updating node objects (for NodeID annotation, topology, etc.)
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+---
+# Bind the provisioner ClusterRole to the controller ServiceAccount
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-provisioner-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: csi-panfs-controller
+    namespace: csi-panfs
+roleRef:
+  kind: ClusterRole
+  name: csi-panfs-controller-provisioner
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind the attacher ClusterRole to the controller ServiceAccount
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-attacher-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: csi-panfs-controller
+    namespace: csi-panfs
+roleRef:
+  kind: ClusterRole
+  name: csi-panfs-controller-attacher
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind the resizer ClusterRole to the controller ServiceAccount
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-resizer-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: csi-panfs-controller
+    namespace: csi-panfs
+roleRef:
+  kind: ClusterRole
+  name: csi-panfs-controller-resizer
+  apiGroup: rbac.authorization.k8s.io
+---
+# Node Server ClusterRoleBinding
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-node-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: csi-panfs-node
+    namespace: csi-panfs
+roleRef:
+  kind: ClusterRole
+  name: csi-panfs-node
+  apiGroup: rbac.authorization.k8s.io
+---
+# Namespace Role for leader election and storage capacity tracking
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-provisioner
+  namespace: csi-panfs
+rules:
+  # Allow leader election via leases
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
+
+  # Allow managing CSIStorageCapacity objects for storage capacity tracking
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csistoragecapacities"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Allow reading pods for topology-aware provisioning
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+
+  # Allow reading replicasets for topology-aware provisioning
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
+---
+# Namespace Role for attacher leader election
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-attacher
+  namespace: csi-panfs
+rules:
+  # Allow leader election via leases for attacher sidecar
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
+---
+# Bind the namespace Role to the controller ServiceAccount
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-provisioner-rolebinding
+  namespace: csi-panfs
+subjects:
+  - kind: ServiceAccount
+    name: csi-panfs-controller
+    namespace: csi-panfs
+roleRef:
+  kind: Role
+  name: csi-panfs-controller-provisioner
+  apiGroup: rbac.authorization.k8s.io
+---
+# Bind the attacher Role to the controller ServiceAccount
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-attacher-rolebinding
+  namespace: csi-panfs
+subjects:
+  - kind: ServiceAccount
+    name: csi-panfs-controller
+    namespace: csi-panfs
+roleRef:
+  kind: Role
+  name: csi-panfs-controller-attacher
+  apiGroup: rbac.authorization.k8s.io
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# DaemonSet for the CSI PanFS node plugin
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-panfs-node
+  namespace: csi-panfs
+  labels:
+    app: csi-panfs-node
+    product: com.vdura.csi.panfs
+spec:
+  selector:
+    matchLabels:
+      app: csi-panfs-node
+  updateStrategy:
+    rollingUpdate:
+      maxUnavailable: 100%
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: csi-panfs-node
+        product: com.vdura.csi.panfs
+    spec:
+      # Set pod priority class
+      priorityClassName: system-cluster-critical
+      # Use host networking for node pods
+      hostNetwork: true
+      # Use the specified ServiceAccount for node plugin
+      serviceAccount: csi-panfs-node
+      # Image pull secrets for private registries
+      imagePullSecrets:
+        - name: <IMAGE_PULL_SECRET_NAME> # Change to your secret for private registry with VDURA PanFS CSI Images
+      securityContext:
+        seLinuxOptions:
+          level: s0
+          role: system_r
+          type: container_t
+          user: system_u
+      initContainers:
+        # Init container to create the socket directory
+        - name: get-dfc-bin
+          image: <PANFS_DFC_IMAGE> # Change to your DFC image for PanFS
+          imagePullPolicy: Always
+          command: ["sh", "-c", "cp /usr/sbin/mount.panfs /var/lib/panfs/"] 
+          volumeMounts:
+            - name: dfc-bin
+              mountPath: /var/lib/panfs
+      containers:
+      # CSI node-driver-registrar sidecar
+      - name: csi-driver-registrar
+        image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0
+        imagePullPolicy: IfNotPresent
+        args:
+          - "--v=5"
+          - "--csi-address=$(ADDRESS)"
+          - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+          - "--timeout=60s"
+        resources:
+            limits:
+              cpu: 100m
+              memory: 100Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+        livenessProbe:
+          exec:
+            command:
+            - /csi-node-driver-registrar
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+            - --mode=kubelet-registration-probe
+          initialDelaySeconds: 30
+          timeoutSeconds: 15
+        env:
+          - name: ADDRESS
+            value: /csi/csi.sock
+          - name: DRIVER_REG_SOCK_PATH
+            value: /var/lib/kubelet/plugins/com.vdura.csi.panfs/csi.sock
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /csi
+          - name: registration-dir
+            mountPath: /registration
+      # Main CSI node plugin container
+      - name: csi-panfs-plugin
+        image: <PANFS_CSI_DRIVER_IMAGE> # Change to your PanFS CSI driver image
+        imagePullPolicy: Always
+        args:
+          - "--endpoint=$(CSI_ENDPOINT)"
+          - "--v=5"
+        env:
+          - name: CSI_ENDPOINT
+            value: /csi/csi.sock
+        resources:
+            limits:
+              cpu: 300m
+              memory: 600Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+        livenessProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              - 'test -S $(CSI_ENDPOINT)'
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          privileged: true
+          seLinuxOptions:
+            level: s0
+            role: system_r
+            type: container_t
+            user: system_u
+        volumeMounts:
+          - name: dfc-bin
+            mountPath: /usr/sbin/mount.panfs
+            subPath: mount.panfs
+          - name: socket-dir
+            mountPath: /csi
+          - name: pods-mount-dir
+            mountPath: /var/lib/kubelet
+            mountPropagation: Bidirectional
+          - name: selinux
+            mountPath: /sys/fs/selinux
+            mountPropagation: None
+          - name: selinux-config
+            mountPath: /etc/selinux
+            readOnly: true
+      tolerations:
+        - operator: Exists
+      nodeSelector:
+        node-role.kubernetes.io/worker: ""
+      volumes:
+        # For DFC binary
+        - name: dfc-bin
+          emptyDir: {}
+        # For kubelet plugin registration
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: DirectoryOrCreate
+        # For CSI socket
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/com.vdura.csi.panfs
+            type: DirectoryOrCreate
+        # For mounting volumes
+        - name: pods-mount-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        # SELinux context support
+        - name: selinux
+          hostPath:
+            path: /sys/fs/selinux
+            type: Directory
+        # SELinux configuration
+        - name: selinux-config
+          hostPath:
+            path: /etc/selinux
+            type: Directory
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Deployment for the CSI PanFS controller server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csi-panfs-controller
+  namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    product: com.vdura.csi.panfs
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: csi-panfs-controller
+  template:
+    metadata:
+      labels:
+        app: csi-panfs-controller
+        product: com.vdura.csi.panfs
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - csi-panfs-controller
+              topologyKey: kubernetes.io/hostname
+            weight: 100
+      priorityClassName: system-cluster-critical
+      serviceAccount: csi-panfs-controller
+      imagePullSecrets:
+        - name: <IMAGE_PULL_SECRET_NAME> # Change to your secret for private registry with VDURA PanFS CSI Images
+      containers:
+      - name: csi-provisioner
+        image: k8s.gcr.io/sig-storage/csi-provisioner:v5.3.0
+        imagePullPolicy: IfNotPresent
+        args:
+          - "--v=5"
+          - "--csi-address=$(ADDRESS)"
+          - "--http-endpoint=:8080"
+          - "--timeout=60s"
+          - "--worker-threads=5"
+          - "--retry-interval-start=5s"
+          - "--leader-election"
+        env:
+          - name: ADDRESS
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        ports:
+          - containerPort: 8080
+            name: http-endpoint
+            protocol: TCP
+        resources:
+            limits:
+              cpu: 300m
+              memory: 300Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+        livenessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /healthz/leader-election
+            port: http-endpoint
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 20
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy
+      - name: csi-attacher
+        image: k8s.gcr.io/sig-storage/csi-attacher:v4.9.0
+        imagePullPolicy: IfNotPresent
+        args:
+          - "--v=5"
+          - "--csi-address=$(ADDRESS)"
+          - "--http-endpoint=:8081"
+          - "--timeout=60s"
+          - "--leader-election"
+        env:
+          - name: MY_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: ADDRESS
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        ports:
+          - containerPort: 8081
+            name: http-endpoint
+            protocol: TCP
+        resources:
+            limits:
+              cpu: 200m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+        livenessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /healthz/leader-election
+            port: http-endpoint
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 20
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy
+      - name: csi-resizer
+        image: gcr.io/k8s-staging-sig-storage/csi-resizer:v1.13.2
+        imagePullPolicy: IfNotPresent
+        args:
+          - "--v=5"
+          - "--csi-address=$(ADDRESS)"
+          - "--http-endpoint=:8082"
+          - "--timeout=60s"
+          - "--leader-election"
+        env:
+          - name: ADDRESS
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        ports:
+          - containerPort: 8082
+            name: http-endpoint
+            protocol: TCP
+        resources:
+            limits:
+              cpu: 200m
+              memory: 200Mi
+            requests:
+              cpu: 100m
+              memory: 100Mi
+        livenessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /healthz/leader-election
+            port: http-endpoint
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 20
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy
+      - name: csi-panfs-plugin
+        image: <PANFS_CSI_DRIVER_IMAGE> # Change to your PanFS CSI driver image
+        imagePullPolicy: Always
+        args:
+          - "--endpoint=$(CSI_ENDPOINT)"
+          - "--v=5"
+        env:
+          - name: CSI_ENDPOINT
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        resources:
+            limits:
+              cpu: 300m
+              memory: 600Mi
+            requests:
+              cpu: 100m
+              memory: 200Mi
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy
+        livenessProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              - 'test -S $(CSI_ENDPOINT)'
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+        - name: socket-dir
+          emptyDir: {}
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# CSIDriver object for the PanFS CSI driver
+apiVersion: storage.k8s.io/v1
+kind: CSIDriver
+metadata:
+  name: com.vdura.csi.panfs
+spec:
+  attachRequired: false
+  podInfoOnMount: false
+  fsGroupPolicy: File
+  requiresRepublish: false
+  seLinuxMount: true
+  volumeLifecycleModes:
+    - Persistent
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+# Kernel Module Manager (KMM) Module for PanFS
+apiVersion: kmm.sigs.x-k8s.io/v1beta1
+kind: Module
+metadata:
+  name: panfs
+  namespace: csi-panfs
+  labels:
+    app: panfs-kmm-module
+    product: com.vdura.csi.panfs
+spec:
+  moduleLoader:
+    container:
+      modprobe:
+        moduleName: panfs
+      imagePullPolicy: Always
+      kernelMappings:
+        - literal: <KERNEL_VERSION>         # Change for your Worker Node kernel version in accordance with PANFS_DFC_IMAGE
+          containerImage: <PANFS_DFC_IMAGE> # Change to your DFC image for PanFS
+  imageRepoSecret:
+    name: <IMAGE_PULL_SECRET_NAME> # Change to your secret for private registry with VDURA PanFS CSI Images
+  selector:
+    node-role.kubernetes.io/worker: ""
