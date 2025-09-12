@@ -1,0 +1,84 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+services:
+  plugin_controller:
+    image: ${CSI_IMAGE}
+    platform: linux/amd64
+    command:
+      - -endpoint
+      - /tmp/vdura-csi/controller.sock
+    volumes:
+      - shared-volume:/tmp/vdura-csi
+    environment:
+      CSI_SANITY_MODE: true
+    privileged: true
+    network_mode: host
+    healthcheck:
+      test: test -S /tmp/vdura-csi/controller.sock
+      start_period: 1s
+      timeout: 1s
+      retries: 10
+      interval: 3s
+
+  plugin_node:
+    image: ${CSI_IMAGE}
+    depends_on:
+      - plugin_controller
+    platform: linux/amd64
+    command:
+      - -endpoint
+      - /tmp/vdura-csi/node.sock
+    volumes:
+      - shared-volume:/tmp/vdura-csi
+    environment:
+      CSI_SANITY_MODE: true
+    privileged: true
+    network_mode: host
+    healthcheck:
+      test: test -S /tmp/vdura-csi/node.sock
+      start_period: 1s
+      timeout: 1s
+      retries: 10
+      interval: 3s
+
+  sanity_tests:
+    image: ${CSI_TEST_IMAGE}
+    platform: linux/amd64
+    environment:
+      CSI_ENDPOINT: /tmp/vdura-csi/controller.sock
+      CSI_NODE_ENDPOINT: /tmp/vdura-csi/node.sock
+      CSI_SANITY_MODE: true
+    command: 
+      - sh
+      - -c
+      - |
+        csi-sanity -csi.stagingdir /tmp/csi-test-staging \
+        --csi.controllerendpoint $(printenv CSI_ENDPOINT) \
+        --csi.endpoint $(printenv CSI_NODE_ENDPOINT) \
+        -csi.mountdir /tmp/vdura-csi/sanity-tests \
+        -csi.secrets /tests/csi_secrets.yaml \
+        -ginkgo.v \
+        -ginkgo.poll-progress-after 3s \
+        -ginkgo.seed 0
+    network_mode: host
+    volumes:
+      - shared-volume:/tmp/vdura-csi
+      - ./secrets.yaml:/tests/csi_secrets.yaml
+    depends_on:
+      - plugin_controller
+      - plugin_node
+
+volumes:
+  shared-volume:

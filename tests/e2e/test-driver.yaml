@@ -1,0 +1,41 @@
+StorageClass:
+  FromName: false
+  FromFile: test-sc.yaml
+DriverInfo:
+  Name: com.vdura.csi.panfs
+  Capabilities:
+    persistence: true
+    block: false
+    fsGroup: true
+    selinux: true
+    exec: true
+    snapshotDataSource: false
+    readWriteOncePod: true
+    capReadOnlyMany: true
+    pvcDataSource: false
+    offlineExpansion: true
+    onlineExpansion: true
+    multipods: true
+    RWX: true
+    controllerExpansion: true
+    nodeExpansion: false
+    volumeLimits: false
+  RequiredAccessModes:
+    - ReadWriteMany
+    - ReadWriteOnce
+    - ReadOnlyMany
+  SupportedSizeRange:
+    Min: 1Mi
+    Max: 1Gi
+  SupportedFsType:
+    "": {}
+  StressTestOptions:
+    NumPods: 10
+    NumRestarts: 20
+  PerformanceTestOptions:
+    ProvisioningOptions:
+      VolumeSize: 100Mi
+      Count: 10
+      ExpectedMetrics:
+        AvgLatency: 1200000000000
+        Throughput: 0.01
