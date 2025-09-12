@@ -1,0 +1,103 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: 'Build Docker image'
+description: 'Builds Docker image for CSI driver.'
+inputs:
+  app-version:
+    description: Driver application version
+    default: '0.2.0'
+    required: false
+  build-target:
+    description: Build target in Dockerfile
+    default: 'plugin'
+    required: false
+  github-token:
+    description: GitHub token for authentication
+    required: true
+  image-name:
+    description: Docker image name
+    required: true
+  image-tags:
+    description: Docker image tag(s) space separated
+    default: latest
+    required: true
+  repo-url:
+    description: Container registry repository URL
+    default: 
+    required: true
+  ref:
+    description: Git ref to be built
+    required: true
+
+outputs:
+  image-url:
+    description: Full URL of the built image
+    value: "${{ inputs.repo-url }}/${{ inputs.image-name }}"
+  sha-short:
+    description: Short SHA of the commit used for the image build
+    value: "${{ steps.vars.outputs.sha_short }}"
+  tags:
+    description: Space-separated list of tags for the built image
+    value: "${{ inputs.image-tags }}"
+  tag0:
+    description: First tag of the built image
+    value: ${{ steps.first_tag.outputs.tag0 }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
+
+    - name: Set sha_short
+      id: vars
+      shell: bash
+      run: |
+        echo "::group::Setting SHA Variable"
+        echo "sha_short=$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
+        echo "::endgroup::"
+
+    - name: Set first image tag
+      id: first_tag
+      shell: bash
+      run: |
+        echo "tag0=$(echo '${{ inputs.image-tags }}' | awk '{print $1}')" >> $GITHUB_OUTPUT
+
+    - name: Build ${{ inputs.image-name }} Image
+      env:
+        APP_VERSION: "${{ inputs.app-version }}"
+        CSIDRIVER_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
+        TEST_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
+        REGISTRY: "${{ inputs.repo-url }}"
+      shell: bash
+      run: |
+        echo "::group::Building ${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
+        case "${{ inputs.build-target }}" in
+          plugin) 
+            make build-driver-image
+            ;;
+          tests) 
+            make build-test-image
+            ;;
+        esac
+        for tag in ${{ inputs.image-tags }}; do
+            docker tag \
+              "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}" \
+              "${{ inputs.repo-url }}/${{ inputs.image-name }}:${tag}"
+        done
+        echo "::notice::🐳 Built image ${{ inputs.repo-url }}/${{ inputs.image-name }} (${{ steps.vars.outputs.sha_short }} ${{ inputs.image-tags }})"
+        echo "::endgroup::"

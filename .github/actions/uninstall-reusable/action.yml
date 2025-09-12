@@ -1,0 +1,54 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: 'Uninstall CSI driver and Storage Class'
+description: 'Uninstalls the PanFS CSI driver and Storage Class.'
+inputs:
+  ref:
+    description: Git ref to clone
+    required: true
+    type: string
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
+
+    - name: Install kubectl
+      uses: ./.github/actions/install-kubectl
+
+    - name: Cleanup CSI driver
+      shell: bash
+      run: |
+        echo "::group::Cleaning up CSI driver"
+        kubectl delete -f deploy/k8s/csi-panfs-driver.yaml --wait --ignore-not-found
+        kubectl get secret -n csi-panfs -l owner=helm -o name | xargs -IF kubectl delete -n csi-panfs F
+        make verify
+        echo "::endgroup::"
+
+    - name: Cleanup Storage Class
+      shell: bash
+      run: |
+        echo "::group::Cleaning up Storage Class and Secrets"
+        echo "Cleanup 'csi-panfs-storage-class' Storage Class and Secrets"
+        cat deploy/k8s/csi-panfs-storage-class.yaml | \
+        sed -e "s/<STORAGE_CLASS_NAME>/csi-panfs-storage-class/" | \
+        kubectl delete -f - --wait --ignore-not-found
+
+        echo "Cleanup Storage Classes left after E2E tests"
+        kubectl get storageclass -o name | xargs -IF kubectl delete F --wait --ignore-not-found
+        echo "::endgroup::"

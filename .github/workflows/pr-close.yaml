@@ -1,0 +1,21 @@
+name: Cleanup Pull Request Images
+
+on:
+  pull_request:
+    types: [closed]
+
+jobs:
+  ghcr-cleanup-image:
+    name: ghcr cleanup action
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - name: Delete image
+        uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          packages: ${{ github.event.repository.name }}/panfs-csi-driver
+          delete-untagged: true

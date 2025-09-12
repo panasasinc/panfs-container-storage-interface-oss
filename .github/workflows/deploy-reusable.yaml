@@ -1,0 +1,127 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Deploy CSI Driver
+
+on:
+  workflow_call:
+    inputs:
+      runner-label:
+        description: Label of a runner to run tests on
+        default: ubuntu-latest
+        type: string
+      driver-installation-type:
+        description: Driver installation type
+        default: helm
+        type: string
+      driver-image-url:
+        description: CSI Driver Image URL
+        type: string
+        default: ""
+      kmm-image-url:
+        description: DFC KMM Image URL
+        type: string
+        default: ""
+      realm_user:
+        description: PanFS Realm user
+        required: false
+        type: string
+        default: "dummy_user"
+      realm_address:
+        description: PanFS Realm address
+        required: false
+        type: string
+        default: "panfs-realm.dummy.com"
+      realm_password:
+        description: PanFS Realm password
+        required: false
+        type: string
+        default: "dummy_password"
+      ref:
+        description: Git ref to clone
+        required: true
+        type: string
+
+jobs:
+  deploy-driver-and-sc:
+    runs-on: ${{ inputs.runner-label }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup KinD Cluster
+        if: ${{ inputs.runner-label == 'ubuntu-latest' }}
+        id: kind
+        uses: ./.github/actions/kind
+        with:
+          nodes: |
+            - role: control-plane
+              image: kindest/node:v1.30.13
+            - role: worker
+              image: kindest/node:v1.30.13
+
+      - name: GHCR Auth
+        id: ghcr-auth
+        uses: docker/login-action@v3
+        with:
+          registry: "ghcr.io"
+          username: "${{ github.actor }}"
+          password: "${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Pull CSI Driver Image
+        shell: bash
+        run: |
+          echo "::group:Pull CSI Driver Image"
+          docker pull ${{ inputs.driver-image-url }}
+          echo "::endgroup::"
+
+      - name: Build Stub DFC Image
+        if: ${{ endsWith(inputs.kmm-image-url, ':stub') }}
+        shell: bash
+        run: |
+          echo "::group::Build Stub DFC Image"
+          docker build -t ${{ inputs.kmm-image-url }} -f dfc/Dockerfile.stub ./dfc/
+          echo "::endgroup::"
+          echo "::group::Load Stub DFC Image into Kind cluster"
+          echo "::endgroup::"
+
+      - name: Load CSI Driver an Stub DFC Images into Kind Cluster
+        if: ${{ endsWith(inputs.kmm-image-url, ':stub') }}
+        shell: bash
+        run: |
+          echo "::group::Load CSI Driver Image into Kind cluster"
+          kind load docker-image ${{ inputs.driver-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
+          echo "::endgroup::"
+          echo "::group::Load Stub DFC Image into Kind cluster"
+          kind load docker-image ${{ inputs.kmm-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
+          echo "::endgroup::"
+
+      - name: Deploy CSI Driver
+        uses: ./.github/actions/deploy-reusable
+        with:
+          deployment-target: driver
+          driver-installation-type: "${{ inputs.driver-installation-type }}"
+          driver-image-url: "${{ inputs.driver-image-url }}"
+          kmm-image-url: "${{ inputs.kmm-image-url }}"
+          ref: "${{ github.ref }}"
+
+      - name: Deploy Storage Class
+        uses: ./.github/actions/deploy-reusable
+        with:
+          deployment-target: storageclass
+          driver-installation-type: "${{ inputs.driver-installation-type }}"
+          realm_user: "${{ inputs.realm_user }}"
+          realm_address: "${{ inputs.realm_address }}"
+          realm_password: "${{ inputs.realm_password }}"
+          ref: "${{ github.ref }}"

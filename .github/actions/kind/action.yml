@@ -1,0 +1,86 @@
+name: 'KinD Cluster Setup with PanFS CSI Driver'
+description: 'Sets up a KinD cluster and deploys PanFS CSI Driver with configurable storage class'
+
+inputs:
+  image-pull-secret-name:
+    description: 'Image pull secret name'
+    required: false
+    default: 'gcr-json-key'
+  kind-version:
+    description: 'KinD version'
+    required: false
+    default: 'v0.29.0'
+  cluster-name:
+    description: 'KinD cluster name'
+    required: false
+    default: 'kind-cluster'
+  nodes:
+    description: 'KinD cluster nodes configuration in YAML format'
+    required: false
+    default: |
+      - role: control-plane
+        image: kindest/node:v1.30.13
+      - role: worker
+        image: kindest/node:v1.30.13
+
+outputs:
+  cluster-name:
+    description: 'The name of the KinD cluster'
+    value: ${{ inputs.cluster-name }}
+
+runs:
+  using: 'composite'
+  steps:
+      - uses: actions/checkout@v4
+
+      - name: Touch cluster config file
+        shell: bash
+        run: |
+          cat <<EOF > cluster-config.yaml
+          # kind-cluster.yaml
+          kind: Cluster
+          apiVersion: kind.x-k8s.io/v1alpha4
+          nodes:
+          ${{ inputs.nodes }}
+          EOF
+
+          cat cluster-config.yaml
+
+      - name: Set up KinD cluster
+        uses: helm/kind-action@v1
+        with:
+          version: ${{ inputs.kind-version }}
+          cluster_name: ${{ inputs.cluster-name }}
+          config: "cluster-config.yaml"
+
+      - name: Run kubectl get nodes
+        shell: bash
+        run: |
+          kubectl label node ${{ inputs.cluster-name }}-worker node-role.kubernetes.io/worker=
+
+          echo "Wait for node to be Ready"
+          while true; do
+            kubectl get node ${{ inputs.cluster-name }}-worker --no-headers | grep -wq Ready && break
+            kubectl get node ${{ inputs.cluster-name }}-worker --no-headers
+            sleep 1
+          done
+          echo
+          kubectl get nodes -o wide
+
+      - name: Create csi-panfs namespace & imagePullSecret
+        shell: bash
+        run: |
+          echo "::group::Create csi-panfs namespace"
+          kubectl create namespace csi-panfs --dry-run=client -o yaml | kubectl apply -f -
+          kubectl label namespace csi-panfs pod-security.kubernetes.io/enforce=privileged --overwrite
+          echo "::endgroup::"
+
+          echo "::group::Create imagePullSecret"
+          kubectl create secret docker-registry ${{ inputs.image-pull-secret-name }} \
+            --docker-server="dummy.com" \
+            --docker-username=oauth2accesstoken \
+            --docker-password="dummy_password" \
+            --docker-email=github-actions@users.noreply.github.com \
+            --namespace=csi-panfs \
+            --dry-run=client -o yaml | kubectl apply -f -
+          echo "::endgroup::"

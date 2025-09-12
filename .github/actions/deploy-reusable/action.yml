@@ -1,0 +1,134 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: 'Deploy CSI driver'
+description: 'Deploys the PanFS CSI driver.'
+inputs:
+  deployment-target:
+    description: What to deploy - driver, storage class, or both
+    default: all # all, driver, storageclass
+    type: string
+  driver-installation-type:
+    default: kubectl
+    description: Driver installation type
+    type: string
+  driver-image-url:
+    default: ""
+    description: Docker image URL for the driver
+    type: string
+  kmm-image-url:
+    default: ""
+    description: Docker image URL for KMM
+    type: string
+  kernel-version:
+    default: "default"
+    description: Kernel version of PanFS DFC
+    type: string
+  ref:
+    description: Git ref to clone
+    required: true
+    type: string
+  realm_user:
+    description: Realm user for authentication
+    required: true
+    type: string
+  realm_address:
+    description: Realm address for authentication
+    required: true
+    type: string
+  realm_password:
+    description: Realm password for authentication
+    required: true
+    type: string
+  kubectl_version:
+    description: Version of kubectl to install (if not already present)
+    default: ""
+    type: string
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Mask secret inputs
+      if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'storageclass' }}
+      shell: bash
+      run: |
+        echo "::group::Masking secrets"
+        echo "::add-mask::${{ inputs.realm_user }}"
+        echo "::add-mask::${{ inputs.realm_address }}"
+        echo "::add-mask::${{ inputs.realm_password }}"
+        echo "::endgroup::"
+
+    - name: Checkout
+      uses: actions/checkout@v4
+      with:
+        ref: ${{ inputs.ref }}
+
+    - name: Install envsubst
+      if: ${{ inputs.driver-installation-type != 'helm' }}
+      shell: bash
+      run: |
+        echo "::group::Installing envsubst"
+        sudo apt-get update
+        sudo apt-get install -y gettext-base
+        echo "::endgroup::"
+
+    - name: Install kubectl
+      uses: ./.github/actions/install-kubectl
+      with:
+        version: ${{ inputs.kubectl_version }}
+
+    - name: Install helm
+      if: ${{ inputs.driver-installation-type == 'helm' }}
+      uses: azure/setup-helm@v4.3.0
+
+    - name: Deploy CSI driver
+      if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'driver' }}
+      env:
+        CSIDFCKMM_IMAGE: ${{ inputs.kmm-image-url }}
+        CSIDRIVER_IMAGE: ${{ inputs.driver-image-url }}
+        KERNEL_VERSION: "${{ inputs.kernel-version }}"
+        USE_HELM: "${{ inputs.driver-installation-type == 'helm' }}"
+      shell: bash
+      run: |
+        echo "::group::Installing PanFS CSI Driver"
+        make deploy-driver
+        echo "::endgroup::"
+
+    - name: Validate installation
+      if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'driver' }}
+      env:
+        CSIDRIVER_IMAGE: "${{ inputs.driver-image-url }}"
+        CSIDFCKMM_IMAGE: "${{ inputs.kmm-image-url }}"
+        KERNEL_VERSION: "${{ inputs.kernel-version }}"
+      shell: bash
+      run: |
+        echo "::group::Validating installation"
+        make verify
+        echo "::endgroup::"
+
+    - name: Deploy Storage Class
+      if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'storageclass' }}
+      env:
+        REALM_USER: ${{ inputs.realm_user }}
+        REGISTRY_CREDS_FILE: gcr-pull-secret.json
+        REALM_PRIVATE_KEY: ""
+        REALM_PRIVATE_KEY_PASSPHRASE: ""
+        USE_HELM: "${{ inputs.driver-installation-type == 'helm' }}"
+      shell: bash
+      run: |
+        echo "::group::Installing PanFS CSI Driver and Storage Class"
+        export REALM_ADDRESS="${{ inputs.realm_address }}"
+        export REALM_PASSWORD="${{ inputs.realm_password }}"
+        make deploy-storageclass
+        echo "::endgroup::"

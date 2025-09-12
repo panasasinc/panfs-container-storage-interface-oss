@@ -1,0 +1,62 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: 'Check File Changes'
+description: 'Checks if files matching a pattern have changed between two commits'
+inputs:
+  base-sha:
+    description: 'Base SHA to compare against'
+    required: true
+    type: string
+  head-sha:
+    description: 'Head SHA to compare against'
+    required: true
+    type: string
+  pattern:
+    description: 'Regex pattern to match file paths (e.g., "^tests/")'
+    required: true
+    type: string
+  pattern-description:
+    description: 'Description of what the pattern matches (for logging)'
+    required: false
+    default: 'specified pattern'
+    type: string
+
+outputs:
+  changed:
+    description: 'Whether files matching the pattern have changed'
+    value: ${{ steps.changes.outputs.changed }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Checkout with full history
+      uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
+        ref: ${{ inputs.head-sha }}
+
+    - name: Check for changes matching pattern
+      id: changes
+      shell: bash
+      run: |
+        echo "::group::Checking for changes in ${{ inputs.pattern-description }}"
+        if git diff --name-only ${{ inputs.base-sha }} ${{ inputs.head-sha }} | grep -E '${{ inputs.pattern }}'; then
+          echo "changed=true" >> $GITHUB_OUTPUT
+          echo "::notice::Changes detected in files matching pattern: ${{ inputs.pattern }}"
+        else
+          echo "changed=false" >> $GITHUB_OUTPUT
+          echo "::notice::No changes detected in files matching pattern: ${{ inputs.pattern }}"
+        fi
+        echo "::endgroup::"

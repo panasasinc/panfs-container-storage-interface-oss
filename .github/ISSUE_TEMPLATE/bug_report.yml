@@ -1,0 +1,111 @@
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+# http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Bug Report
+description: File a bug report.
+title: "[Bug]: "
+labels: ["bug", "triage"]
+assignees: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        ## Bug Report
+        Please fill out the following sections to help us address your issue.
+  - type: input
+    id: summary
+    attributes:
+      label: Summary
+      description: Briefly describe the issue or feature request.
+      placeholder: e.g. Unexpected error when mounting volume
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: CSI Driver Version, or commit hash
+      placeholder: e.g. 1.2.3
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ## Environment Details
+        Please provide details about your environment. You may include outputs such as:
+        - `kubectl get nodes -o wide`
+        - `kubectl get all -n <CSI_DRIVER_NS>`
+        - `kubectl get all -n <CSI_DRIVER_NS> -o wide`
+        - `kubectl get storageclass`
+        - `kubectl get csinodes,csidrivers`
+        - `kubectl get module panfs -n <CSI_DRIVER_NS>`
+        - etc.
+  - type: textarea
+    id: environment
+    attributes:
+      label: K8s Environment
+      description: List environment details (OS, Kernel, Kubernetes version, etc.)
+      placeholder: |
+        kubectl get nodes -o wide
+        ...
+    validations:
+      required: true
+  - type: markdown
+    attributes:
+      value: |
+        ## Issue Details
+  - type: textarea
+    id: steps-to-reproduce
+    attributes:
+      label: Steps to Reproduce
+      description: Describe what steps will lead to the issue.
+      placeholder: |
+        1. ...
+        2. ...
+        3. ...
+    validations:
+      required: true
+  - type: textarea
+    id: expected-behavior
+    attributes:
+      label: Expected Behavior
+      description: Describe what you expected to happen.
+      placeholder: The volume mounts successfully
+    validations:
+      required: true
+  - type: textarea
+    id: actual-behavior
+    attributes:
+      label: Actual Behavior
+      description: Describe what actually happened.
+      placeholder: Error message shown, volume not mounted
+    validations:
+      required: true
+  - type: textarea
+    id: other-details
+    attributes:
+      label: Other Relevant Details
+      description: Any other environment details
+      placeholder: e.g. SELinux Configuration, Worker Nodes Labels, etc.
+    validations:
+      required: false
+  - type: checkboxes
+    id: terms
+    attributes:
+      label: Code of Conduct
+      description: By submitting this issue, you agree to follow our Code of Conduct.
+      options:
+        - label: I agree to follow this project's Code of Conduct
+          required: true

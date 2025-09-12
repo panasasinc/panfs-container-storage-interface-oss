@@ -1,0 +1,22 @@
+name: Cleanup Images
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "35 1 * * *"  # every day at 01:35 UTC
+
+jobs:
+  clean:
+    runs-on: ubuntu-latest
+    name: Delete old images
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    steps:
+      - uses: dataaxiom/ghcr-cleanup-action@v1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          packages: ${{ github.event.repository.name }}/panfs-csi-driver,${{ github.event.repository.name }}/panfs-csi-sanity,${{ github.event.repository.name }}/panfs-dfc-kmm
+          delete-untagged: true
+          dry-run: false
