@@ -1,0 +1,188 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# DaemonSet for the CSI PanFS node plugin
+apiVersion: apps/v1
+kind: DaemonSet
+metadata:
+  name: csi-panfs-node
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-node
+    product: {{ .Values.productName }}
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      app: csi-panfs-node
+  {{- if .Values.nodeServer.updateStrategy }}
+  updateStrategy:
+    {{- toYaml .Values.nodeServer.updateStrategy | nindent 4 }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: csi-panfs-node
+        product: {{ .Values.productName }}
+        {{- if .Values.labels }}
+        {{- toYaml .Values.labels | nindent 8 }}
+        {{- end }}
+    spec:
+      # Set pod priority class
+      priorityClassName: {{ .Values.nodeServer.priorityClassName }}
+      # Use host networking for node pods
+      hostNetwork: true
+      # Use the specified ServiceAccount for node plugin
+      serviceAccount: {{ .Release.Namespace }}-node
+      # Image pull secrets for private registries
+      {{- if .Values.imagePullSecrets }}
+      imagePullSecrets:
+        - name: {{ index .Values.imagePullSecrets 0 }}
+      {{- end }}
+      {{- if .Values.seLinux }}
+      securityContext:
+        {{- if .Values.panfsPlugin.seLinuxOptions }}
+        seLinuxOptions:
+          {{- toYaml .Values.panfsPlugin.seLinuxOptions | nindent 10 }}
+        {{- end }}
+      {{- end }}
+      initContainers:
+        # Init container to create the socket directory
+        - name: get-dfc-bin
+          {{- $firstKernel := index .Values.dfcRelease.kernelMappings 0 }}
+          image: {{ if $firstKernel.image }}{{ $firstKernel.image }}{{ else }}{{ .Values.dfcRelease.image }}{{ end }}
+          imagePullPolicy: {{ .Values.dfcRelease.pullPolicy }}
+          command: ["sh", "-c", "cp /usr/sbin/mount.panfs /var/lib/panfs/"] 
+          volumeMounts:
+            - name: dfc-bin
+              mountPath: /var/lib/panfs
+      containers:
+      # CSI node-driver-registrar sidecar
+      - name: csi-driver-registrar
+        image: {{ .Values.nodeServer.driverRegistrar.image }}
+        imagePullPolicy: {{ .Values.nodeServer.driverRegistrar.pullPolicy }}
+        args:
+          - "--v={{ .Values.nodeServer.driverRegistrar.logLevel }}"
+          - "--csi-address=$(ADDRESS)"
+          - "--kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)"
+          - "--timeout={{ .Values.nodeServer.driverRegistrar.timeout }}"
+        resources:
+          {{- toYaml .Values.nodeServer.driverRegistrar.resources | nindent 12 }}
+        livenessProbe:
+          exec:
+            command:
+            - /csi-node-driver-registrar
+            - --kubelet-registration-path=$(DRIVER_REG_SOCK_PATH)
+            - --mode=kubelet-registration-probe
+          initialDelaySeconds: 30
+          timeoutSeconds: 15
+        env:
+          - name: ADDRESS
+            value: /csi/csi.sock
+          - name: DRIVER_REG_SOCK_PATH
+            value: /var/lib/kubelet/plugins/{{ .Values.productName }}/csi.sock
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /csi
+          - name: registration-dir
+            mountPath: /registration
+      # Main CSI node plugin container
+      - name: csi-panfs-plugin
+        image: {{ .Values.panfsPlugin.image }}
+        imagePullPolicy: {{ .Values.panfsPlugin.pullPolicy }}
+        args:
+          - "--endpoint=$(CSI_ENDPOINT)"
+          - "--v={{ .Values.panfsPlugin.logLevel }}"
+        env:
+          - name: CSI_ENDPOINT
+            value: /csi/csi.sock
+        resources:
+          {{- toYaml .Values.panfsPlugin.resources | nindent 12 }}
+        livenessProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              - 'test -S $(CSI_ENDPOINT)'
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+        securityContext:
+          privileged: true
+          {{- if .Values.seLinux }}
+          {{- if .Values.panfsPlugin.seLinuxOptions }}
+          seLinuxOptions:
+            {{- toYaml .Values.panfsPlugin.seLinuxOptions | nindent 12 }}
+          {{- end }}
+          {{- end }}
+        volumeMounts:
+          - name: dfc-bin
+            mountPath: /usr/sbin/mount.panfs
+            subPath: mount.panfs
+          - name: socket-dir
+            mountPath: /csi
+          - name: pods-mount-dir
+            mountPath: /var/lib/kubelet
+            mountPropagation: Bidirectional
+          {{- if .Values.seLinux }}
+          - name: selinux
+            mountPath: /sys/fs/selinux
+            mountPropagation: None
+          - name: selinux-config
+            mountPath: /etc/selinux
+            readOnly: true
+          {{- end }}
+      {{- if .Values.nodeServer.tolerations}}
+      tolerations:
+        {{- toYaml .Values.nodeServer.tolerations | nindent 8 }}
+      {{- end }}
+      {{- if .Values.nodeServer.selector }}
+      nodeSelector:
+        {{- toYaml .Values.nodeServer.selector | nindent 8 }}
+      {{- end }}
+      volumes:
+        # For DFC binary
+        - name: dfc-bin
+          emptyDir: {}
+        # For kubelet plugin registration
+        - name: registration-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins_registry
+            type: DirectoryOrCreate
+        # For CSI socket
+        - name: socket-dir
+          hostPath:
+            path: /var/lib/kubelet/plugins/{{ .Values.productName }}
+            type: DirectoryOrCreate
+        # For mounting volumes
+        - name: pods-mount-dir
+          hostPath:
+            path: /var/lib/kubelet
+            type: Directory
+        {{- if .Values.seLinux }}
+        # SELinux context support
+        - name: selinux
+          hostPath:
+            path: /sys/fs/selinux
+            type: Directory
+        # SELinux configuration
+        - name: selinux-config
+          hostPath:
+            path: /etc/selinux
+            type: Directory
+        {{- end }}

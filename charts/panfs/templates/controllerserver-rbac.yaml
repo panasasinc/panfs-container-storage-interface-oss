@@ -1,0 +1,229 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ServiceAccount for the controller server
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Namespace }}-controller
+  namespace: {{ .Release.Namespace }}
+---
+# ClusterRole for the controller provisioner sidecar
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-provisioner
+rules:
+  # Allow managing PersistentVolumes for provisioning and deletion
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "create", "delete"]
+
+  # Allow managing PersistentVolumeClaims for binding and updating
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch", "create", "delete", "update", "patch"]
+
+  # Allow reading StorageClasses for provisioning decisions
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow emitting and updating Events for resource operations
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+
+  # Allow reading CSINodes for topology and node info
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading Nodes for topology-aware provisioning
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading VolumeAttachments for attach/detach operations
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch"]
+---
+# Bind the provisioner ClusterRole to the controller ServiceAccount
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-provisioner-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Namespace }}-controller
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-controller-provisioner
+  apiGroup: rbac.authorization.k8s.io
+---
+# Namespace Role for leader election and storage capacity tracking
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-provisioner
+  namespace: {{ .Release.Namespace }}
+rules:
+  # Allow leader election via leases
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
+
+  # Allow managing CSIStorageCapacity objects for storage capacity tracking
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csistoragecapacities"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+
+  # Allow reading pods for topology-aware provisioning
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get"]
+
+  # Allow reading replicasets for topology-aware provisioning
+  - apiGroups: ["apps"]
+    resources: ["replicasets"]
+    verbs: ["get"]
+---
+# Bind the namespace Role to the controller ServiceAccount
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-provisioner-rolebinding
+  namespace: {{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Namespace }}-controller
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Release.Namespace }}-controller-provisioner
+  apiGroup: rbac.authorization.k8s.io
+---
+# ClusterRole for the attacher sidecar
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-attacher
+rules:
+  # Allow patching PersistentVolumes for attach/detach operations
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "patch"]
+
+  # Allow reading CSI node information
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csinodes"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow managing VolumeAttachments for attach/detach
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments"]
+    verbs: ["get", "list", "watch", "patch"]
+
+  # Allow updating status of VolumeAttachments
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["volumeattachments/status"]
+    verbs: ["patch"]
+---
+# Bind the attacher ClusterRole to the controller ServiceAccount
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-attacher-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Namespace }}-controller
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-controller-attacher
+  apiGroup: rbac.authorization.k8s.io
+---
+# Namespace Role for attacher leader election
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-attacher
+  namespace: {{ .Release.Namespace }}
+rules:
+  # Allow leader election via leases for attacher sidecar
+  - apiGroups: ["coordination.k8s.io"]
+    resources: ["leases"]
+    verbs: ["get", "watch", "list", "delete", "update", "create"]
+---
+# Bind the attacher Role to the controller ServiceAccount
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-attacher-rolebinding
+  namespace: {{ .Release.Namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Namespace }}-controller
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Release.Namespace }}-controller-attacher
+  apiGroup: rbac.authorization.k8s.io
+---
+# ClusterRole for the resizer sidecar
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-resizer
+rules:
+  # Allow patching PersistentVolumes for resizing
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["get", "list", "watch", "patch"]
+
+  # Allow reading PersistentVolumeClaims for resizing
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow reading Pods for resizing operations
+  - apiGroups: [""]
+    resources: ["pods"]
+    verbs: ["get", "list", "watch"]
+
+  # Allow patching PersistentVolumeClaim status for resizing
+  - apiGroups: [""]
+    resources: ["persistentvolumeclaims/status"]
+    verbs: ["patch"]
+
+  # Allow managing Events related to resizing
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["list", "watch", "create", "update", "patch"]
+---
+# Bind the resizer ClusterRole to the controller ServiceAccount
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-resizer-rolebinding
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Namespace }}-controller
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-controller-resizer
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,193 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Deployment for the CSI PanFS controller server
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: csi-panfs-controller
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-controller
+    product: {{ .Values.productName }}
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
+spec:
+  replicas: {{ .Values.controllerServer.replicaCount }}
+  strategy:
+    type: {{ .Values.controllerServer.strategy.type }}
+    rollingUpdate:
+      maxUnavailable: {{ .Values.controllerServer.strategy.rollingUpdate.maxUnavailable }}
+      maxSurge: {{ .Values.controllerServer.strategy.rollingUpdate.maxSurge }}
+  selector:
+    matchLabels:
+      app: csi-panfs-controller
+  template:
+    metadata:
+      labels:
+        app: csi-panfs-controller
+        product: {{ .Values.productName }}
+        {{- if .Values.labels }}
+        {{- toYaml .Values.labels | nindent 8 }}
+        {{- end }}
+    spec:
+      {{- if .Values.controllerServer.affinity }}
+      affinity:
+        {{- toYaml .Values.controllerServer.affinity | nindent 8 }}
+      {{- end }}
+      priorityClassName: {{ .Values.controllerServer.priorityClassName }}
+      serviceAccount: {{ .Release.Namespace }}-controller
+      imagePullSecrets:
+        {{- range .Values.imagePullSecrets }}
+        - name: {{ . }}
+        {{- end }}
+      {{- if .Values.controllerServer.tolerations }}
+      tolerations:
+        {{- toYaml .Values.controllerServer.tolerations | nindent 8 }}
+      {{- end }}
+      containers:
+      - name: csi-provisioner
+        image: {{ .Values.controllerServer.provisioner.image }}
+        imagePullPolicy: {{ .Values.controllerServer.provisioner.pullPolicy }}
+        args:
+          - "--v={{ .Values.controllerServer.provisioner.logLevel }}"
+          - "--csi-address=$(ADDRESS)"
+          - "--http-endpoint=:8080"
+          - "--timeout={{ .Values.controllerServer.provisioner.timeout }}"
+          - "--worker-threads={{ .Values.controllerServer.provisioner.workerThreads }}"
+          - "--retry-interval-start={{ .Values.controllerServer.provisioner.retryIntervalStart }}"
+          {{- if gt (int .Values.controllerServer.replicaCount) 1 }}
+          - "--leader-election"
+          {{- end }}
+        env:
+          - name: ADDRESS
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        ports:
+          - containerPort: 8080
+            name: http-endpoint
+            protocol: TCP
+        resources:
+          {{- toYaml .Values.controllerServer.provisioner.resources | nindent 12 }}
+        {{- if gt (int .Values.controllerServer.replicaCount) 1 }}
+        livenessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /healthz/leader-election
+            port: http-endpoint
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 20
+        {{- end }}
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy
+      - name: csi-attacher
+        image: {{ .Values.controllerServer.attacher.image }}
+        imagePullPolicy: {{ .Values.controllerServer.attacher.pullPolicy }}
+        args:
+          - "--v={{ .Values.controllerServer.attacher.logLevel }}"
+          - "--csi-address=$(ADDRESS)"
+          - "--http-endpoint=:8081"
+          - "--timeout={{ .Values.controllerServer.attacher.timeout }}"
+          {{- if gt (int .Values.controllerServer.replicaCount) 1 }}
+          - "--leader-election"
+          {{- end }}
+        env:
+          - name: MY_NAME
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.name
+          - name: ADDRESS
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        ports:
+          - containerPort: 8081
+            name: http-endpoint
+            protocol: TCP
+        resources:
+          {{- toYaml .Values.controllerServer.attacher.resources | nindent 12 }}
+        {{- if gt (int .Values.controllerServer.replicaCount) 1 }}
+        livenessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /healthz/leader-election
+            port: http-endpoint
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 20
+        {{- end }}
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy
+      - name: csi-resizer
+        image: {{ .Values.controllerServer.resizer.image }}
+        imagePullPolicy: {{ .Values.controllerServer.resizer.pullPolicy }}
+        args:
+          - "--v={{ .Values.controllerServer.resizer.logLevel }}"
+          - "--csi-address=$(ADDRESS)"
+          - "--http-endpoint=:8082"
+          - "--timeout={{ .Values.controllerServer.resizer.timeout }}"
+          {{- if gt (int .Values.controllerServer.replicaCount) 1 }}
+          - "--leader-election"
+          {{- end }}
+        env:
+          - name: ADDRESS
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        ports:
+          - containerPort: 8082
+            name: http-endpoint
+            protocol: TCP
+        resources:
+          {{- toYaml .Values.controllerServer.resizer.resources | nindent 12 }}
+        {{- if gt (int .Values.controllerServer.replicaCount) 1 }}
+        livenessProbe:
+          failureThreshold: 1
+          httpGet:
+            path: /healthz/leader-election
+            port: http-endpoint
+          initialDelaySeconds: 10
+          timeoutSeconds: 10
+          periodSeconds: 20
+        {{- end }}
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy
+      - name: csi-panfs-plugin
+        image: {{ .Values.panfsPlugin.image }}
+        imagePullPolicy: {{ .Values.panfsPlugin.pullPolicy }}
+        args:
+          - "--endpoint=$(CSI_ENDPOINT)"
+          - "--v={{ .Values.panfsPlugin.logLevel }}"
+        env:
+          - name: CSI_ENDPOINT
+            value: /var/lib/csi/sockets/pluginproxy/csi.sock
+        resources:
+          {{- toYaml .Values.panfsPlugin.resources | nindent 12 }}
+        volumeMounts:
+          - name: socket-dir
+            mountPath: /var/lib/csi/sockets/pluginproxy
+        livenessProbe:
+          exec:
+            command:
+              - sh
+              - -c
+              - 'test -S $(CSI_ENDPOINT)'
+          initialDelaySeconds: 10
+          periodSeconds: 20
+          timeoutSeconds: 5
+          successThreshold: 1
+          failureThreshold: 3
+      volumes:
+        - name: socket-dir
+          emptyDir: {}

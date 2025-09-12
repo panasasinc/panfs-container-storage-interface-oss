@@ -1,0 +1,59 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+{{ if .Values.sanityTests.enabled }}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: "{{ .Release.Name }}-node-check"
+  annotations: {{- toYaml .Values.sanityTests.annotations | nindent 4 }}
+  labels:
+    helm.sh/chart-test: "true"
+    product: {{ .Values.productName }}
+spec:
+  restartPolicy: Never
+  serviceAccount: {{ .Release.Namespace }}-sanity-tests
+  containers:
+    - name: check-pod
+      image: {{ .Values.sanityTests.image }}
+      env:
+        - name: REVISION
+          value: {{ .Release.Revision | quote }}
+      command:
+        - /bin/sh
+        - -c
+        - |
+          echo "CSI PanFS Node Daemonset:"
+          kubectl get daemonset -n {{ .Release.Namespace }} {{ .Release.Namespace }}-node
+          echo
+          
+          echo "Cluster Nodes:"
+          kubectl get nodes -o wide
+          echo
+
+          echo "CSI PanFS Node Pods:"
+          kubectl get pods -n {{ .Release.Namespace }} -l app={{ .Release.Namespace }}-node,revision=$REVISION
+          echo
+          
+          nnd=$(kubectl get pods -n {{ .Release.Namespace }} -l app={{ .Release.Namespace }}-node,revision=$REVISION | grep -c 2/2)
+          nno=$(kubectl get nodes --no-headers | grep -c Ready)
+
+          echo "Number of fully provisionered node pods: $nnd"
+          echo "Number of Ready nodes in the cluster: $nno"
+
+          echo "Number of node pods should correspond to the number of Ready nodes in the cluster: $nno == $nnd"
+          [ $nno -eq $nnd ] || exit 1
+
+          echo "Success"
+{{ end }}

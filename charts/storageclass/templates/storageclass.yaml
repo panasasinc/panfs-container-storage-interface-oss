@@ -1,0 +1,62 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Storage Class for PanFS CSI
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: {{ .Release.Name }}
+  annotations:
+    # Set this to true to mark this StorageClass as the default
+    # This allows Kubernetes to use this StorageClass automatically for PVCs that do not specify a StorageClass
+    storageclass.kubernetes.io/is-default-class: {{ .Values.setAsDefaultStorageClass | quote }}
+
+provisioner: {{ .Values.csiPanFSDriver.productName }}
+allowVolumeExpansion: {{ .Values.allowVolumeExpansion }}
+
+# Possible values for volumeBindingMode:
+# - Immediate: The volume is bound immediately when the PVC is created
+# - WaitForFirstConsumer: The volume is not bound until a pod that uses the PVC is scheduled
+volumeBindingMode: {{ .Values.volumeBindingMode }}
+
+# Possible values for reclaimPolicy:
+# - Delete: Automatically delete the volume when the PVC is deleted
+# - Retain: Keep the volume after the PVC is deleted, allowing manual cleanup
+reclaimPolicy: {{ .Values.volumeReclaimPolicy }}
+
+parameters:
+  # Relates to Secret object that contains credentials for the CSI driver
+  # This secret is used by the CSI driver to authenticate with the PanFS backend
+  csi.storage.k8s.io/provisioner-secret-name: &secretName {{ .Release.Name }}
+  csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace {{ .Release.Namespace }}
+  csi.storage.k8s.io/node-publish-secret-name: *secretName
+  csi.storage.k8s.io/node-publish-secret-namespace: *secretNamespace
+  csi.storage.k8s.io/controller-expand-secret-name: *secretName
+  csi.storage.k8s.io/controller-expand-secret-namespace: *secretNamespace
+
+  # Specific parameters for volumes (to be) created in the PanFS Realm
+  {{- range $k, $v := .Values.parameters }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
+
+# Optional mount options for the volumes created by this StorageClass
+# These options are passed to the underlying filesystem when mounting the volume
+{{- if .Values.mountOptions}}
+mountOptions:
+{{- range .Values.mountOptions }}
+  - {{ . | quote }}
+{{- end }}
+{{- else }}
+mountOptions: []
+{{- end }}

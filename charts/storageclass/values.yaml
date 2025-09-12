@@ -1,0 +1,74 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# -- PanFS CSI Driver details
+# @default -- `{...}`
+csiPanFSDriver:
+  # -- Product name for the PanFS CSI driver
+  productName: com.vdura.csi.panfs
+  # -- Namespace where the PanFS CSI driver is deployed
+  namespace: csi-panfs
+  # -- Service account used by the PanFS CSI driver controller
+  controllerServiceAccount: csi-panfs-controller
+
+# PanFS Realm Endpoint Configuration
+realm:
+  # -- Endpoint address for the backend PanFS realm
+  address: ""
+  # -- Username for the PanFS backend realm
+  username: ""
+  # -- Password for the PanFS backend realm
+  password: ""
+  # -- Private key for the PanFS backend realm
+  privateKey: ""
+  # Private Key Passphrase
+  privateKeyPassphrase: ""
+
+# -- Whether to set current storage class default for the cluster or not
+setAsDefaultStorageClass: false
+
+# -- Allow volume expansion for realms
+allowVolumeExpansion: true
+
+# -- Default reclaim policy for volumes
+# @default -- `Delete`
+volumeReclaimPolicy: Delete # Options: Retain, Delete
+
+# -- Default volume binding mode
+volumeBindingMode: WaitForFirstConsumer # Options: Immediate, WaitForFirstConsumer
+
+# -- Optional storage class parameters
+# @default -- `{...}`
+parameters:
+  panfs.csi.vdura.com/bladeset: "Set 1"
+  panfs.csi.vdura.com/recoverypriority: "50"
+  panfs.csi.vdura.com/efsa: "retry"
+  panfs.csi.vdura.com/layout: "raid6+"
+  panfs.csi.vdura.com/maxwidth: 3
+  panfs.csi.vdura.com/stripeunit: "64k"
+  panfs.csi.vdura.com/rgwidth: 3
+  panfs.csi.vdura.com/rgdepth: 2
+
+  panfs.csi.vdura.com/operm: "all"
+
+  # panfs.csi.vdura.com/volservice: "volserviceid"
+  panfs.csi.vdura.com/description: "PanFS CSI Storage Class"
+
+  # panfs.csi.vdura.com/user: username
+  # panfs.csi.vdura.com/group: groupname
+  # panfs.csi.vdura.com/uperm: "all"
+  # panfs.csi.vdura.com/gperm: "write-execute"
+  # panfs.csi.vdura.com/operm: "read-write"
+
+mountOptions: []

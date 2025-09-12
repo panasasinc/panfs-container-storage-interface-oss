@@ -1,0 +1,122 @@
+
+# PanFS CSI Driver Helm Chart
+
+{{ template "chart.description" . }}
+
+{{ template "chart.badgesSection" . }}
+
+## Prerequisites
+
+- Kubernetes 1.20+
+- Helm 3.8+
+- Access to the container images specified in the `values.yaml` file
+- RBAC enabled in the Kubernetes cluster
+
+## Components
+
+| Compatible with CSI Version  | Container Image | [Min K8s Version](https://kubernetes-csi.github.io/docs/kubernetes-compatibility.html#minimum-version) | [Recommended K8s Version](https://kubernetes-csi.github.io/docs/kubernetes-compatibility.html#recommended-version) |
+|---|---|---|---|
+| [CSI Spec v1.9.0](https://github.com/container-storage-interface/spec/releases/tag/v1.9.0) | [registry.k8s.io/sig-storage/csi-provisioner:v5.3.0](https://github.com/kubernetes-csi/external-provisioner) | 1.20 | 1.31 |
+| [CSI Spec v1.10.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [k8s.gcr.io/sig-storage/csi-resizer:v1.13.2](https://github.com/kubernetes-csi/external-resizer) | 1.16 | 1.32 |
+| [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [registry.k8s.io/sig-storage/csi-attacher:v4.9.0](https://github.com/kubernetes-csi/external-attacher) | 1.17 | 1.22 |
+| [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.14.0](https://github.com/kubernetes-csi/node-driver-registrar) | 1.13 | 1.23.10 |
+
+> **NOTE**: According to upstream documentation
+
+## Installation
+
+### Clone the Repository
+
+```bash
+git clone <repository-url>
+cd panfs-container-storage-interface
+```
+
+### Helm Commands
+
+Below are example Helm commands to manage the CSI PanFS chart.
+
+#### 1. Template the Chart
+Render the chart templates locally to inspect the generated Kubernetes manifests without applying them:
+
+```bash
+helm template charts/panfs --namespace csi-panfs
+helm template charts/panfs --namespace csi-panfs --output-dir ./output
+```
+
+This command generates the manifests in terminal or in the `./output` directory for review.
+
+#### 2. Install / Upgrade the Chart
+Install / Upgrade the chart into the `csi-panfs` namespace:
+
+```bash
+helm upgrade --install csi-panfs charts/panfs --namespace csi-panfs --create-namespace
+```
+
+This installs or updates the deployment while preserving the existing release.
+
+#### 3. Upgrade with Overriding Parameters
+Override specific values during an upgrade, for example, changing the replica count or image tag:
+
+```bash
+helm upgrade csi-panfs charts/panfs --namespace csi-panfs \
+  --set images.panfsPlugin.image=us-central1-docker.pkg.dev/labvirtualization/vdura-csi/csi-plugin@sha256:c3e9fe6257975a1ff984b7f43ea8cd3ef2d2bdfef19341d99af5c0bc6c798c6b
+```
+
+This updates the release with a specific image tag for the PanFS plugin.
+
+#### 4. Check Release Status
+View the status of the deployed release:
+
+```bash
+helm status csi-panfs --namespace csi-panfs
+```
+
+This displays details about the release, including the deployed resources and their status.
+
+#### 5. Uninstall the Chart
+Remove the CSI PanFS deployment from the cluster:
+
+```bash
+helm uninstall csi-panfs --namespace csi-panfs
+```
+
+This deletes all resources associated with the release.
+
+## Configuration
+
+The `values.yaml` file contains configurable parameters. 
+
+{{ template "chart.valuesSection" . }}
+
+> **NOTE:** Please refer to the `values.yaml` file for a complete list of configurable parameters.
+
+To customize, create a `custom-values.yaml` file and apply it during install or upgrade:
+
+```bash
+helm install csi-panfs csi-panfs --namespace csi-panfs -f custom-values.yaml
+```
+
+## Notes
+
+- Ensure the `csi-panfs` namespace exists or use `--create-namespace` during installation.
+- The PanFS CSI plugin requires privileged access for the node DaemonSet. Verify your cluster's security policies allow this.
+
+## Troubleshooting
+
+- Run sanity tests to verify the installation:
+  ```bash
+  helm test csi-panfs --namespace csi-panfs --logs
+  ```
+- Check pod logs for errors:
+  ```bash
+  kubectl logs -l app=csi-panfs-controller -n csi-panfs
+  kubectl logs -l app=csi-panfs-node -n csi-panfs
+  ```
+- Verify RBAC permissions are correctly applied:
+  ```bash
+  kubectl get clusterrole,clusterrolebinding,role,rolebinding -n csi-panfs
+  ```
+- Ensure the PanFS CSI plugin image is accessible from your cluster.
+
+For further assistance, refer to the [Kubernetes CSI documentation](https://kubernetes-csi.github.io/docs/) or contact the chart maintainers.
