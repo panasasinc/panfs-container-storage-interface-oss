@@ -1,5 +1,5 @@
-[![Driver deployment](https://github.com/panasasinc/panfs-container-storage-interface/actions/workflows/main.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface/actions/workflows/main.yaml)
-[![Vulnerability Scan](https://github.com/panasasinc/panfs-container-storage-interface/actions/workflows/vulnerability.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface/actions/workflows/vulnerability.yaml)
+[![Driver deployment](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/main.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/main.yaml)
+[![Vulnerability Scan](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml)
 
 # Container Storage Interface
 
