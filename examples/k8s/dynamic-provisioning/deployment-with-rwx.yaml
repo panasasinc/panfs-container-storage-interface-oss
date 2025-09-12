@@ -1,0 +1,66 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# -----------------------------------------------------------------------------
+# Creates a Deployment named sample-deployment-with-rwx with 5 replicas.
+# Each pod runs a single container using ubuntu:latest, executing 'sleep infinity'
+# to remain idle. Each container mounts a volume at /data, backed by a
+# PersistentVolumeClaim (csi-pvc-rwx). The PVC requests 5Gi of storage and uses
+# the ReadWriteMany (RWX) access mode, allowing all pods to share the same
+# volume with read/write access. This setup is useful for workloads that require
+# shared storage between multiple pods.
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sample-deployment-with-rwx
+  labels:
+    case: sample-deployment-with-rwx
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: sample-deployment-with-rwx
+  template:
+    metadata:
+      labels:
+        app: sample-deployment-with-rwx
+        case: sample-deployment-with-rwx
+    spec:
+      containers:
+      - name: main-container
+        image: ubuntu:latest
+        command: 
+        - sleep
+        - infinity
+        volumeMounts:
+          - mountPath: "/data"
+            name: panfs-volume
+      volumes:
+        - name: panfs-volume
+          persistentVolumeClaim:
+            claimName: csi-pvc-rwx
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-pvc-rwx
+  labels:
+    case: sample-deployment-with-rwx
+spec:
+  accessModes:
+  - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi

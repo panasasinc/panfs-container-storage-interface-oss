@@ -1,0 +1,94 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# -----------------------------------------------------------------------------
+# This Kubernetes Pod manifest defines a single Pod named "app" that runs an 
+# Ubuntu container executing an infinite sleep command. The container mounts a 
+# PersistentVolumeClaim named "panfs-static-volume-claim" at the path /data, 
+# enabling persistent storage for the application. This setup is typically used
+# for static provisioning scenarios, where the storage is pre-provisioned and 
+# bound to the Pod for data persistence.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: app
+spec:
+  containers:
+  - name: main
+    image: ubuntu:latest
+    command: ["sleep", "infinity"]
+    volumeMounts:
+    - name: persistent-storage
+      mountPath: /data
+  volumes:
+  - name: persistent-storage
+    persistentVolumeClaim:
+      claimName: panfs-static-volume-claim
+---
+# -----------------------------------------------------------------------------
+# This Kubernetes manifest defines a PersistentVolumeClaim (PVC) named 
+# 'panfs-static-volume-claim'. The PVC requests 10Gi of storage and is intended 
+# to bind to an existing PersistentVolume named 'panfs-static-volume-pv'. The 
+# 'storageClassName' is set to an empty string, indicating that no dynamic 
+# provisioning should occur and only statically provisioned volumes will be 
+# matched. The access mode is set to 'ReadWriteOnce', allowing the volume to be
+# mounted as read-write by a single node.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: panfs-static-volume-claim
+spec:
+  storageClassName: ""
+  volumeName: panfs-static-volume-pv
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+---
+# -----------------------------------------------------------------------------
+# This manifest defines a static PersistentVolume (PV) for Kubernetes using the
+# VDURA PanFS CSI driver. The PV provides 10Gi of storage with ReadWriteMany
+# access mode, allowing multiple pods to mount the volume simultaneously.
+# The volume is statically provisioned and will be retained after release.
+# CSI secrets for node staging, publishing, and expansion are referenced from
+# the 'csi-panfs-realm' namespace. Custom volume attributes are also specified.
+# -----------------------------------------------------------------------------
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: panfs-static-volume-pv
+spec:
+  capacity:
+    storage: 10Gi
+  accessModes:
+    - ReadWriteOnce
+  persistentVolumeReclaimPolicy: Retain
+  csi:
+    driver: com.vdura.csi.panfs
+    volumeHandle: "/static-volume"
+    nodeStageSecretRef:
+      name: csi-panfs-storage-class
+      namespace: csi-panfs-realm
+    nodePublishSecretRef:
+      name: csi-panfs-storage-class
+      namespace: csi-panfs-realm
+    controllerExpandSecretRef:
+      name: csi-panfs-storage-class
+      namespace: csi-panfs-realm
+    volumeAttributes:
+      customAttr: "staticValue"
+      mountFlag: "ro"

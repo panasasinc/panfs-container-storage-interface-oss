@@ -1,0 +1,133 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ------------------------------------------------------------------
+# This manifest demonstrates static provisioning of PersistentVolumes
+# and their use in a Kubernetes Pod. It defines:
+#
+# - Two PersistentVolumes (PVs) statically provisioned with the VDURA CSI driver:
+#   - 'pod-with-static-volume' with volumeHandle '/static-volume'
+#   - 'pod-with-static-dir' with volumeHandle '/static-volume/dir1/path/to/somewhere/inside'
+#
+# - Two PersistentVolumeClaims (PVCs) that bind to the above PVs:
+#   - 'pod-with-static-volume-claim' binds to 'pod-with-static-volume'
+#   - 'pod-with-static-dir-claim' binds to 'pod-with-static-dir'
+#
+# - A Pod that mounts both PVCs at different paths:
+#   - '/static-volume' from 'pod-with-static-volume-claim'
+#   - '/data' from 'pod-with-static-dir-claim'
+#
+# This setup demonstrates how to statically provision volumes and mount
+# them into a Pod at different locations. The VDURA CSI driver is used
+# for storage integration.
+#
+# To deploy, run:
+#   kubectl apply -f pod-with-static-dir.yaml
+#
+# After deployment, you can exec into the Pod to verify the mounted volumes:
+#   kubectl exec -it pod-with-static-dir-demo -- /bin/bash
+# ------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: pod-with-static-dir-demo
+spec:
+  containers:
+  - name: main
+    image: ubuntu:latest
+    command: ["sleep", "infinity"]
+    volumeMounts:
+    - name: static-volume-volume
+      mountPath: /static-volume
+    - name: static-volume-dir
+      mountPath: /data
+  volumes:
+  - name: static-volume-volume
+    persistentVolumeClaim:
+      claimName: pod-with-static-volume-claim
+  - name: static-volume-dir
+    persistentVolumeClaim:
+      claimName: pod-with-static-dir-claim
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pod-with-static-volume-claim
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: pod-with-static-volume
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: pod-with-static-dir-claim
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: ""
+  resources:
+    requests:
+      storage: 1Gi
+  volumeName: pod-with-static-dir
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pod-with-static-volume
+spec:
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+  capacity:
+    storage: 1Gi
+  csi:
+    driver: com.vdura.csi
+    # This volumeHandle should point to a static PanFS volume
+    # The volume should already exist in the PanFS system
+    volumeHandle: /static-volume
+    nodeStageSecretRef:
+      name: csi-panfs-storage-class
+      namespace: csi-panfs-realm
+    nodePublishSecretRef:
+      name: csi-panfs-storage-class
+      namespace: csi-panfs-realm
+---
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: pod-with-static-dir
+spec:
+  accessModes:
+    - ReadWriteMany
+  persistentVolumeReclaimPolicy: Retain
+  volumeMode: Filesystem
+  capacity:
+    storage: 1Gi
+  csi:
+    driver: com.vdura.csi.panfs
+    # This volumeHandle should point to a directory inside the static volume
+    # The directory structure should already exist in the PanFS volume
+    volumeHandle: /static-volume/dir1/path/to/somewhere/inside
+    nodeStageSecretRef:
+      name: csi-panfs-storage-class
+      namespace: csi-panfs-realm
+    nodePublishSecretRef:
+      name: csi-panfs-storage-class
+      namespace: csi-panfs-realm

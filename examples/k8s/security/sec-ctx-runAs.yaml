@@ -1,0 +1,94 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ------------------------------------------------------------------
+# This manifest demonstrates the use of security contexts at both
+# the Pod and container levels in Kubernetes. It defines a Pod that
+# mounts a PersistentVolumeClaim and runs two init containers and
+# one main container. Each init container runs as a different user
+# and group, creating files in the shared volume with distinct
+# ownership.
+#
+# - The first init container runs as user 1500, group 3500, and
+#   creates /sec-ctx-vol/user-1500:3500-info.txt.
+# - The second init container runs as user 2500, group 4500, and
+#   creates /sec-ctx-vol/user-2500:4500-info.txt.
+# - The main container lists the contents of /sec-ctx-vol.
+#
+# This setup demonstrates how files created by different users/groups
+# retain their ownership, and how the main container can observe
+# these differences. The Pod does not set a pod-level securityContext,
+# so each container's securityContext (if any) applies.
+#
+# To check the result, you can run the following command after
+# the Pod has completed:
+#
+# kubectl logs pod/sec-ctx-runas-demo
+#
+# The manifest also defines the required PersistentVolumeClaim.
+# ------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sec-ctx-runas-demo
+spec:
+  restartPolicy: Never
+  initContainers:
+    - name: init-sec-ctx
+      image: ubuntu:latest
+      securityContext:
+        runAsUser: 1500
+        runAsGroup: 3500
+      command: 
+        - touch
+        - /sec-ctx-vol/user-1500:3500-info.txt
+      volumeMounts:
+        - name: sec-ctx-vol
+          mountPath: /sec-ctx-vol
+    - name: init-sec-ctx-chmod
+      image: ubuntu:latest
+      securityContext:
+        runAsUser: 2500
+        runAsGroup: 4500
+      command:
+        - touch
+        - /sec-ctx-vol/user-2500:4500-info.txt
+      volumeMounts:
+        - name: sec-ctx-vol
+          mountPath: /sec-ctx-vol
+  containers:
+    - name: main
+      image: ubuntu:latest
+      command: 
+        - ls
+        - -la 
+        - /sec-ctx-vol
+      volumeMounts:
+        - name: sec-ctx-vol
+          mountPath: /sec-ctx-vol
+  volumes:
+    - name: sec-ctx-vol
+      persistentVolumeClaim:
+        claimName: sec-ctx-vol
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sec-ctx-vol
+spec:
+  accessModes:
+  - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi

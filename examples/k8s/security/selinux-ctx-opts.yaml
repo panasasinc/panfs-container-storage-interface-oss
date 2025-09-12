@@ -1,0 +1,85 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# ------------------------------------------------------------------
+# This manifest demonstrates the use of SELinux labels with
+# PersistentVolumeClaims and Pods in Kubernetes. It defines a Pod
+# that mounts a PersistentVolumeClaim and applies a pod-level
+# securityContext specifying SELinux options (level: "s0:c124").
+#
+# - The Pod runs a single container that mounts the volume at /mnt/panfs.
+# - The container creates a file in the mounted directory and lists
+#   the SELinux labels of files within it.
+#
+# This setup illustrates how files created inside the container
+# inherit the specified SELinux labels, demonstrating SELinux
+# integration with CSI volumes.
+#
+# To check the result, you can run the following command after
+# the Pod has completed:
+#
+# kubectl logs pod/selinux-labels-demo
+#
+# The manifest also defines the required PersistentVolumeClaim.
+# ------------------------------------------------------------------
+apiVersion: v1
+kind: Pod
+metadata:
+  name: selinux-labels-demo
+spec:
+  securityContext:
+    seLinuxOptions:
+      user: "system_u"
+      role: "system_r"
+      type: "container_t"
+      level: "s0"
+  restartPolicy: Never
+  containers:
+  - name: main
+    image: ubuntu:latest
+    command:
+    - sh
+    - -c
+    - |
+      set -e
+      mount | grep /mnt/panfs
+      touch /mnt/panfs/main-labels.txt
+      echo "SELinux labels applied to the files created in the container:"
+      echo "should be 'system_u:object_r:container_file_t:s0:c124'"
+      ls -lZ /mnt/panfs | grep 'system_u:object_r:container_file_t:s0:c124'
+      echo "SELinux context applied correctly"
+    securityContext:
+      seLinuxOptions:
+        user: "system_u"
+        role: "system_r"
+        type: "container_t"
+        level: "s0:c124"
+    volumeMounts:
+    - name: csi-sec-labels-vol
+      mountPath: /mnt/panfs
+  volumes:
+  - name: csi-sec-labels-vol
+    persistentVolumeClaim:
+      claimName: csi-sec-labels-vol
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-sec-labels-vol
+spec:
+  accessModes:
+  - ReadWriteOncePod
+  resources:
+    requests:
+      storage: 1Gi

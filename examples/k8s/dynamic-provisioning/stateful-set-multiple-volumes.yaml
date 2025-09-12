@@ -1,0 +1,65 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# -----------------------------------------------------------------------------
+# Creates a StatefulSet named sample-statefulset with 3 replicas (pods).
+# Each pod runs a single container based on the ubuntu:latest image, executing
+# 'sleep infinity'. Each container mounts two volumes: /data5 and /data15.
+# These volumes are provisioned from PersistentVolumeClaim templates
+# (csi-volume-sts-5gb and csi-volume-sts-15gb). Each PVC requests storage
+# (5Gi and 15Gi) and uses ReadWriteOnce, so each pod gets its own unique
+# volumes. All pods run concurrently, each with isolated /data5 and /data15
+# directories backed by separate persistent volumes.
+# -----------------------------------------------------------------------------
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: sample-statefulset
+spec:
+  serviceName: sample-statefulset
+  replicas: 3
+  selector:
+    matchLabels:
+      app: sample-statefulset
+  template:
+    metadata:
+      labels:
+        app: sample-statefulset
+    spec:
+      containers:
+        - name: main-container
+          image: ubuntu:latest
+          command:
+            - sleep
+            - infinity
+          volumeMounts:
+            - name: csi-volume-sts-5gb
+              mountPath: /data5
+            - name: csi-volume-sts-15gb
+              mountPath: /data15
+  volumeClaimTemplates:
+    - metadata:
+        name: csi-volume-sts-5gb
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 5Gi
+    - metadata:
+        name: csi-volume-sts-15gb
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 15Gi
