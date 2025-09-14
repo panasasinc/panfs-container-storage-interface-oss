@@ -18,4 +18,5 @@ jobs:
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           packages: ${{ github.event.repository.name }}/panfs-csi-driver
+          delete-tags: pr${{github.event.pull_request.number}}
           delete-untagged: true
