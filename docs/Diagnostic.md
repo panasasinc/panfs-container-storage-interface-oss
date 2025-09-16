@@ -20,11 +20,10 @@ This document contains all diagnostic commands extracted from the Troubleshootin
 
 ## Automated Collection Script
 
-For convenience, use the provided `collect-csi-diagnostics.sh` script:
+For convenience, use the provided [cripts/collect-csi-diagnostics.sh](collect-csi-diagnostics.sh) script:
 
 ```bash
-chmod +x collect-csi-diagnostics.sh
-./collect-csi-diagnostics.sh
+bash collect-csi-diagnostics.sh
 ```
 
 ## Manual Command Collection
