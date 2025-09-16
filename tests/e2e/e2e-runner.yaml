@@ -15,7 +15,7 @@
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: sa-full-access
+  name: e2e-sa-full-access
   namespace: e2e
 ---
 apiVersion: batch/v1
@@ -25,7 +25,7 @@ metadata:
   namespace: e2e
 spec:
   schedule: "0 2 * * *"              # Every day at 2:00 AM
-  successfulJobsHistoryLimit: 15     # Keep last 51 successful Jobs
+  successfulJobsHistoryLimit: 15     # Keep last 15 successful Jobs
   failedJobsHistoryLimit: 25         # Keep last 25 failed Jobs
   concurrencyPolicy: Forbid          # Do not allow concurrent runs
   jobTemplate:
@@ -35,13 +35,11 @@ spec:
         metadata:
           name: tests
         spec:
-          serviceAccountName: sa-full-access
+          serviceAccountName: e2e-sa-full-access
           restartPolicy: Never
-          imagePullSecrets:
-            - name: gcr-json-key
           containers:
             - name: main
-              image: us-central1-docker.pkg.dev/labvirtualization/vdura-csi/panfs-csi-driver-test:stable
+              image: ubuntu:22.04
               imagePullPolicy: Always
               securityContext:
                 privileged: true
@@ -56,18 +54,33 @@ spec:
                   name: root-ssh
                   readOnly: true
               command:
-                - sh
+                - /bin/bash
                 - -c
                 - |
+                  apt-get update
+                  apt-get install -y curl wget ca-certificates jq
+
+                  # Figure out K8s Version
+                  APISERVER="https://${KUBERNETES_SERVICE_HOST}:${KUBERNETES_SERVICE_PORT}"
+                  TOKEN=$(cat /var/run/secrets/kubernetes.io/serviceaccount/token)
+                  CACERT=/var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+                  K8S_VERSION=$(curl -s --cacert "$CACERT" --header "Authorization: Bearer $TOKEN" "$APISERVER/version" | jq -r '.gitVersion')
+
+                  # Install kubectl
+                  wget -q -O/bin/kubectl "https://dl.k8s.io/release/${K8S_VERSION}/bin/linux/amd64/kubectl"
+                  chmod a+x /bin/kubectl
+
+                  # Install e2e.test and ginkgo
+                  curl --location "https://dl.k8s.io/${K8S_VERSION}/kubernetes-test-linux-amd64.tar.gz" |
+                  tar --directory=/bin --strip-components=3 -zxf - kubernetes/test/bin/e2e.test kubernetes/test/bin/ginkgo
+
                   e2e.test \
                     -ginkgo.v \
                     -ginkgo.timeout=2h \
                     -ginkgo.focus='External.Storage' \
                     -ginkgo.skip='(ext3|ext4|xfs|ntfs|block volmode|snapshot|Pre-provisioned|topology|Feature:Windows)' \
                     -ginkgo.json-report='results.json' \
-                    -storage.testdriver=/data/test-driver.yaml |
-                  tee e2e-tests.log
-                  e2e-tests-summary results.json e2e-tests.log
+                    -storage.testdriver=/data/test-driver.yaml
           volumes:
             - name: e2e-tests-cm
               configMap:
@@ -121,8 +134,6 @@ data:
         nodeExpansion: false
         volumeLimits: false
         multiplePVsSameID: true
-      SupportedMountOption:
-        "": {"callback-quiet", "callback-verbose", "do-chunked-readahead", "add-hidden-attr-to-dot-files", "force-fm-readdir", "sync"}
       RequiredAccessModes:
         - ReadWriteMany
         - ReadWriteOnce
@@ -146,7 +157,7 @@ data:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRole
 metadata:
-  name: sa-full-access-clusterrole
+  name: e2e-sa-full-access-clusterrole
   namespace: e2e
 rules:
 - apiGroups:
@@ -277,12 +288,12 @@ rules:
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding
 metadata:
-  name: sa-full-access-binding
+  name: e2e-sa-full-access-binding
 subjects:
 - kind: ServiceAccount
-  name: sa-full-access
+  name: e2e-sa-full-access
   namespace: e2e
 roleRef:
   kind: ClusterRole
-  name: sa-full-access-clusterrole
+  name: e2e-sa-full-access-clusterrole
   apiGroup: rbac.authorization.k8s.io
