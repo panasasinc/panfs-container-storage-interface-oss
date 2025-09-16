@@ -20,6 +20,7 @@ DriverInfo:
     controllerExpansion: true
     nodeExpansion: false
     volumeLimits: false
+    multiplePVsSameID: true
   RequiredAccessModes:
     - ReadWriteMany
     - ReadWriteOnce
