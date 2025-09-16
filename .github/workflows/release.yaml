@@ -36,3 +36,28 @@ jobs:
       trivy-scan: false
       push: true
     secrets: inherit
+
+  generate-release-notes:
+    name: Generate Release Notes
+    runs-on: ubuntu-latest
+    needs: csi-driver-image-ghcr
+    steps:
+      - name: Generate Release Notes
+        id: generate_release_notes
+        uses: mikepenz/release-changelog-builder-action@v1.4.0
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          output_file: RELEASE_NOTES.md
+          tag_name: ${{ github.ref_name }}
+          template: keepachangelog
+
+      - name: Create Release
+        uses: ncipollo/release-action@v1.20.0
+        with:
+          tag: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: RELEASE_NOTES.md
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
