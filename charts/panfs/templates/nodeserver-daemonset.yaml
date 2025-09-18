@@ -65,7 +65,7 @@ spec:
           {{- $firstKernel := index .Values.dfcRelease.kernelMappings 0 }}
           image: {{ if $firstKernel.image }}{{ $firstKernel.image }}{{ else }}{{ .Values.dfcRelease.image }}{{ end }}
           imagePullPolicy: {{ .Values.dfcRelease.pullPolicy }}
-          command: ["sh", "-c", "cp /usr/sbin/mount.panfs /var/lib/panfs/"] 
+          command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
           volumeMounts:
             - name: dfc-bin
               mountPath: /var/lib/panfs

@@ -365,7 +365,7 @@ spec:
         - name: get-dfc-bin
           image: <PANFS_DFC_IMAGE> # Change to your DFC image for PanFS
           imagePullPolicy: Always
-          command: ["sh", "-c", "cp /usr/sbin/mount.panfs /var/lib/panfs/"] 
+          command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
           volumeMounts:
             - name: dfc-bin
               mountPath: /var/lib/panfs
