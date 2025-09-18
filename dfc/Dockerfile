@@ -12,37 +12,36 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# MARK: Stage 1: DFC image
+# MARK: DFC image
 FROM rockylinux/rockylinux:8.10 AS dfc
+
+RUN yum install -y cpio findutils tree
 
 ARG PANFSPKG_NAME=panfs.rpm
 ARG KERNEL_FULL_VERSION
 
-ARG BUILD_DATE
-ARG VERSION
-ARG GIT_COMMIT
-
-# OCI labels for Open Container Initiative compliance
-LABEL org.opencontainers.image.title="PanFS CSI Driver: KMM Module" \
-      org.opencontainers.image.description="PanFS CSI Driver: KMM Module for Kubernetes" \
-      org.opencontainers.image.version="${VERSION}" \
-      org.opencontainers.image.created="${BUILD_DATE}" \
-      org.opencontainers.image.revision="${GIT_COMMIT}" \
-      org.opencontainers.image.vendor="PanFS CSI Team"
-
-# Copy the panfs RPM package into the image
 COPY ${PANFSPKG_NAME} /
-
-# Install the panfs RPM package
-RUN yum update -y && \
-    yum install -y /${PANFSPKG_NAME} kmod && \
+RUN rpm2cpio /${PANFSPKG_NAME} | cpio -idmv -D /tmp && \
     rm -f /${PANFSPKG_NAME} && \
-    yum clean all && \
-    rm -rf /var/cache/yum
+    find /tmp/ -name panfs.ko | while read f; do \
+        mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}; \
+        /bin/cp -vf $f /opt/lib/modules/${KERNEL_FULL_VERSION}/; \
+        touch /opt/lib/modules/${KERNEL_FULL_VERSION}/modules.{order,builtin,builtin.modinfo}; \
+    done
 
-# Copy the built panfs kernel module from the build stage
-RUN mkdir -p /opt/lib/modules/${KERNEL_FULL_VERSION}/ && \
-    cp /usr/lib/modules/${KERNEL_FULL_VERSION}/extra/panfs/panfs.ko /opt/lib/modules/${KERNEL_FULL_VERSION}/
+RUN tree /opt
 
-# Run depmod to generate module dependency information
-RUN depmod -b /opt ${KERNEL_FULL_VERSION}
+# MARK: DFC/KMM image
+FROM alpine:3.22 AS dfc-kmm
+
+LABEL org.opencontainers.image.description="PanFS CSI Driver: DFC/KMM Module for Kubernetes"
+
+# Install kmod
+RUN apk update && apk add --no-cache kmod && \
+    rm -rf /var/cache/apk/*
+
+COPY --from=dfc /opt/lib/modules/ /opt/lib/modules/
+COPY --from=dfc /tmp/sbin/mount.panfs /usr/sbin/mount.panfs
+
+ARG KERNEL_FULL_VERSION
+RUN depmod -b /opt $KERNEL_FULL_VERSION
