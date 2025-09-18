@@ -374,7 +374,7 @@ deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
 		exit 1; \
 	fi
 
-	@if [ -n "$(USE_HELM)" ]; then \
+	@if [ "$(USE_HELM)" = "true" ]; then \
 		make deploy-driver-with-helm; \
 	else \
 		make deploy-driver-with-manifest; \
@@ -490,7 +490,7 @@ deploy-storageclass: deploy-storageclass-info ## Deploy PanFS CSI Storage Class
 		exit 1; \
 	fi
 	
-	@if [ -n "$(USE_HELM)" ]; then \
+	@if [ "$(USE_HELM)" = "true" ]; then \
 		make deploy-storageclass-with-helm; \
 	else \
 		make deploy-storageclass-with-manifest; \
