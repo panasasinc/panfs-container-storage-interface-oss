@@ -7,7 +7,8 @@ kubectl get deploy,daemonset,pod -n {{ .Release.Namespace }}
 
 To deploy Storage Class, please use "storageclass" chart:
 helm upgrade --install csi-panfs-storage-class charts/storageclass \
-  --namespace=csi-panfs-realm --create-namespace \
+  --namespace=csi-panfs-realm \
+  --create-namespace \
   --set realm.address=RERALM_IP \
   --set realm.username=USERNAME \
   --set realm.password=PASSWORD

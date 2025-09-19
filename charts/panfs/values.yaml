@@ -172,9 +172,11 @@ seLinux: true
 # PanFS CSI plugin image and pull policy
 panfsPlugin:
   # -- Image for the PanFS CSI plugin
-  image: us-central1-docker.pkg.dev/labvirtualization/vdura-csi/panfs-csi-driver:1.0.3
+  image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:{{ .Chart.AppVersion }}
+  
   # -- Image pull policy for the PanFS CSI plugin
   pullPolicy: Always
+  
   # -- Log level for the PanFS CSI plugin
   logLevel: 5
 
@@ -198,37 +200,36 @@ dfcRelease:
   # -- Image pull policy for the DFC binary
   pullPolicy: Always
 
-  # -- default DFC image
-  image: us-central1-docker.pkg.dev/labvirtualization/vdura-csi/panfs-dfc-kmm:latest
-
-  # -- DFC image for PanFS
-  kernelMappings: 
-    - literal: ""
-      image: ""
+  # -- **PanFS DFC images** for different kernel versions
+  # @default -- `[]`
+  kernelMappings: []
+    # - literal: worker-node-kernel-version-1
+    #   image: panfs-dfc-kmm-image:<worker-node-kernel-version-1>-<dfc-release-version>
+    # - literal: worker-node-kernel-version-2
+    #   image: panfs-dfc-kmm-image:<worker-node-kernel-version-2>-<dfc-release-version>
+    # - literal: worker-node-kernel-version-3
+    #   image: panfs-dfc-kmm-image:<worker-node-kernel-version-3>-<dfc-release-version>
 
 panfsKmmModule:
   # -- Enable or disable KMM module for PanFS
   enabled: true
   # -- Image pull policy for the KMM module
   pullPolicy: Always
+  # -- Label applied to nodes when the PanFS kernel module is successfully loaded
+  # @default -- `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}`
+  kmmNodeReadyLabel:
+    # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
+    name: kmm.node.kubernetes.io/{{ .Release.Namespace }}.panfs.ready 
+    value: ""
+  # -- Node selector for node pods
+  selector:
+    node-role.kubernetes.io/worker: ""
 
 # labels -- Labels for the CSI driver workloads
 labels: {}
 
 # -- List of image pull secrets for private registries
 imagePullSecrets: []
-
-# Sanity tests configuration
-sanityTests:
-  # -- Enable or disable sanity tests
-  enabled: false
-  # -- Image for running sanity tests
-  image: bitnami/kubectl:latest
-  # -- Annotations for sanity test pods
-  # @default -- `{...}`
-  annotations:
-    "helm.sh/hook": test
-    "helm.sh/hook-delete-policy": before-hook-creation
 
 csiDriver:
   # -- Indicates if the driver requires NodePublishVolume to be periodically called for already published volumes
