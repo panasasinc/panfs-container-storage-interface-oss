@@ -137,7 +137,7 @@ The `values.yaml` file contains configurable parameters.
 | panfsKmmModule.kmmNodeReadyLabel | object | `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}` | Label applied to nodes when the PanFS kernel module is successfully loaded |
 | panfsKmmModule.pullPolicy | string | `"Always"` | Image pull policy for the KMM module |
 | panfsKmmModule.selector | object | `{"node-role.kubernetes.io/worker":""}` | Node selector for node pods |
-| panfsPlugin.image | string | `"ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:latest"` | Image for the PanFS CSI plugin |
+| panfsPlugin.image | string | `...` | Image for the PanFS CSI plugin |
 | panfsPlugin.logLevel | int | `5` | Log level for the PanFS CSI plugin |
 | panfsPlugin.pullPolicy | string | `"Always"` | Image pull policy for the PanFS CSI plugin |
 | panfsPlugin.resources | object | `{"limits":{"cpu":"300m","memory":"600Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}` | Resource requests and limits for the PanFS CSI plugin |

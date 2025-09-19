@@ -172,6 +172,7 @@ seLinux: true
 # PanFS CSI plugin image and pull policy
 panfsPlugin:
   # -- Image for the PanFS CSI plugin
+  # @default -- `...`
   image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:{{ .Chart.AppVersion }}
   
   # -- Image pull policy for the PanFS CSI plugin
