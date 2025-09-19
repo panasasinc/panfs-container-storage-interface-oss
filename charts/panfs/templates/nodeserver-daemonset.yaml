@@ -62,7 +62,7 @@ spec: # csi-panfs-node
       # Please make sure you have created the image pull secret in the same namespace
       # Check with: kubectl get secrets -n {{ .Release.Namespace }}
       # If not, create with:
-      # kubectl create secret docker-registry <PULL-SECRET-NAME> \
+      # kubectl create secret docker-registry -n {{ .Release.Namespace }} {{ index .Values.imagePullSecrets 0 }} \
       #   --docker-server=<REGISTRY_URL> \
       #   --docker-username=<USERNAME> \
       #   --docker-password=<PASSWORD>

@@ -35,7 +35,7 @@ spec:
   # Please make sure you have created the image pull secret in the same namespace
   # Check with: kubectl get secrets -n {{ .Release.Namespace }}
   # If not, create with:
-  #   kubectl create secret docker-registry <PULL-SECRET-NAME> \
+  #   kubectl create secret docker-registry -n {{ .Release.Namespace }} {{ index .Values.imagePullSecrets 0 }} \
   #     --docker-server=<REGISTRY_URL> \
   #     --docker-username=<USERNAME> \
   #     --docker-password=<PASSWORD>
@@ -66,6 +66,7 @@ spec:
         moduleName: panfs
       imagePullPolicy: {{ .Values.panfsKmmModule.pullPolicy | default "Always" }}
 
+      # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
       {{- $kernelNotSetMessage := "<KERNEL_VERSION> # Replace with your Worker node kernel version" }}
       {{- $imageNotSetMessage := "<PANFS_DFC_IMAGE> # Change to Kernel-related corresponding DFC/KMM image" }}
