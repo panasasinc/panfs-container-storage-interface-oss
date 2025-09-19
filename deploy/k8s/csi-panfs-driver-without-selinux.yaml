@@ -355,14 +355,6 @@ spec: # csi-panfs-node
       imageRepoSecret:
         # - name: <PULL-SECRET-NAME>
 
-      # SELinux security context
-      securityContext:
-        seLinuxOptions:
-          level: s0
-          role: system_r
-          type: container_t
-          user: system_u
-
       # Tolerations for scheduling the DaemonSet pods
       # Should match the tolerations of the PanFS consumer workloads
       # Double-check that the tolerations are correct:
@@ -421,12 +413,6 @@ spec: # csi-panfs-node
           # Must run in privileged mode
           securityContext:
             privileged: true
-            # SELinux security context
-            seLinuxOptions:
-              level: s0
-              role: system_r
-              type: container_t
-              user: system_u
 
           volumeMounts:
             - name: dfc-bin
@@ -439,14 +425,6 @@ spec: # csi-panfs-node
             - name: pods-mount-dir
               mountPath: /var/lib/kubelet
               mountPropagation: Bidirectional
-
-            - name: selinux
-              mountPath: /sys/fs/selinux
-              mountPropagation: None
-
-            - name: selinux-config
-              mountPath: /etc/selinux
-              readOnly: true
 
         # CSI node-driver-registrar sidecar
         - name: csi-driver-registrar
@@ -511,18 +489,6 @@ spec: # csi-panfs-node
         - name: pods-mount-dir
           hostPath:
             path: /var/lib/kubelet
-            type: Directory
-
-        # SELinux context support
-        - name: selinux
-          hostPath:
-            path: /sys/fs/selinux
-            type: Directory
-
-        # SELinux configuration
-        - name: selinux-config
-          hostPath:
-            path: /etc/selinux
             type: Directory
 ---
 # SPDX-License-Identifier: Apache-2.0

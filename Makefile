@@ -634,14 +634,9 @@ cleanup-workload-test: ## Cleanup test deployment
 manifest-driver: ## Generate manifests for the PanFS CSI Driver
 	@echo "Generating manifests for the PanFS CSI Driver..."
 	@mkdir -p deploy/k8s
-	helm template csi-panfs charts/panfs \
-		--namespace csi-panfs \
-		--set imagePullSecrets[0]="<IMAGE_PULL_SECRET_NAME> # Change to your secret for private registry with VDURA PanFS CSI Images" \
-		--set panfsPlugin.image="<PANFS_CSI_DRIVER_IMAGE> # Change to your PanFS CSI driver image" \
-		--set dfc.image="<PANFS_DFC_IMAGE> # Change to your DFC image for PanFS" \
-		--set dfcRelease.kernelMappings[0].literal="<KERNEL_VERSION>         # Change for your Worker Node kernel version in accordance with PANFS_DFC_IMAGE" \
-		--set dfcRelease.kernelMappings[0].image="<PANFS_DFC_IMAGE> # Change to your DFC image for PanFS"  | \
-		grep -v '^# Source:' > deploy/k8s/csi-panfs-driver.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs | grep -v '^# Source:' > deploy/k8s/csi-panfs-driver.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set seLinux=false | grep -v '^# Source:' > deploy/k8s/csi-panfs-driver-without-selinux.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set panfsKmmModule.enabled=false | grep -v '^# Source:' > deploy/k8s/csi-panfs-driver-without-kmm.yaml
 
 .PHONY: manifest-storageclass
 manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class

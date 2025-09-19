@@ -1,9 +1,9 @@
 
 # PanFS CSI Driver Helm Chart
 
-A Helm chart for deploying Vdura CSI PanFS controller and node components
+A Helm chart for deploying VDURA PanFS CSI controller, node components, and KMM module
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![AppVersion: 1.0](https://img.shields.io/badge/AppVersion-1.0-informational?style=flat-square)
+![Version: 1.2.2](https://img.shields.io/badge/Version-1.2.2-informational?style=flat-square) ![AppVersion: 1.2.2](https://img.shields.io/badge/AppVersion-1.2.2-informational?style=flat-square)
 
 ## Prerequisites
 
@@ -119,6 +119,8 @@ The `values.yaml` file contains configurable parameters.
 | csiDriver.fsGroupPolicy | string | `"File"` | Specifies the policy for fsGroup handling |
 | csiDriver.requiresRepublish | bool | `false` | Indicates if the driver requires NodePublishVolume to be periodically called for already published volumes |
 | csiDriver.seLinuxMount | bool | `true` | Enables SELinux mount support for the CSI driver |
+| dfcRelease.kernelMappings | list | `[]` | **PanFS DFC images** for different kernel versions |
+| dfcRelease.pullPolicy | string | `"Always"` | Image pull policy for the DFC binary |
 | imagePullSecrets | list | `[]` | List of image pull secrets for private registries |
 | labels | object | `{}` | Labels for the CSI driver workloads |
 | nodeServer.driverRegistrar.image | string | `"k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0"` | CSI node driver registrar image |
@@ -132,17 +134,16 @@ The `values.yaml` file contains configurable parameters.
 | nodeServer.updateStrategy.rollingUpdate.maxUnavailable | string | `"100%"` |  |
 | nodeServer.updateStrategy.type | string | `"RollingUpdate"` |  |
 | panfsKmmModule.enabled | bool | `true` | Enable or disable KMM module for PanFS |
-| panfsKmmModule.kernelMappings | list | `[{"image":"us-central1-docker.pkg.dev/labvirtualization/vdura-csi/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.0.a-1860775.2","literal":"4.18.0-553.el8_10.x86_64"}]` | Images for the KMM module |
+| panfsKmmModule.kmmNodeReadyLabel | object | `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}` | Label applied to nodes when the PanFS kernel module is successfully loaded |
 | panfsKmmModule.pullPolicy | string | `"Always"` | Image pull policy for the KMM module |
-| panfsPlugin.image | string | `"us-central1-docker.pkg.dev/labvirtualization/vdura-csi/panfs-csi-driver:11.1.0.a-1860775.2-main"` | Image for the PanFS CSI plugin |
-| panfsPlugin.logLevel | int | `0` | Log level for the PanFS CSI plugin |
+| panfsKmmModule.selector | object | `{"node-role.kubernetes.io/worker":""}` | Node selector for node pods |
+| panfsPlugin.image | string | `...` | Image for the PanFS CSI plugin |
+| panfsPlugin.logLevel | int | `5` | Log level for the PanFS CSI plugin |
 | panfsPlugin.pullPolicy | string | `"Always"` | Image pull policy for the PanFS CSI plugin |
 | panfsPlugin.resources | object | `{"limits":{"cpu":"300m","memory":"600Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}` | Resource requests and limits for the PanFS CSI plugin |
 | panfsPlugin.seLinuxOptions | object | `{"level":"s0","role":"system_r","type":"container_t","user":"system_u"}` | Security options for the PanFS CSI plugin |
 | productName | string | `"com.vdura.csi.panfs"` | Product name |
-| sanityTests.annotations | object | `{...}` | Annotations for sanity test pods |
-| sanityTests.enabled | bool | `false` | Enable or disable sanity tests |
-| sanityTests.image | string | `"bitnami/kubectl:latest"` | Image for running sanity tests |
+| seLinux | bool | `true` |  |
 
 > **NOTE:** Please refer to the `values.yaml` file for a complete list of configurable parameters.
 

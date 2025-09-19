@@ -370,11 +370,12 @@ spec: # csi-panfs-node
       tolerations:
         - operator: Exists
 
-      # Ensure the DaemonSet pods are scheduled only on nodes with the PanFS kernel module loaded
-      # This label is applied by the KMM operator when the PanFS module is successfully loaded
+      # Node selector for scheduling the DaemonSet pods
+      # Should match the nodes where the PanFS consumer workloads supposed to run
+      # Double-check that the nodes labels are correct:
+      # kubectl get nodes --show-labels
       nodeSelector:
-        # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
-        kmm.node.kubernetes.io/csi-panfs.panfs.ready: ""
+        node-role.kubernetes.io/worker: ""
 
       initContainers:
         # Init container to enable PanFS mount helper
@@ -779,40 +780,3 @@ spec:
   seLinuxMount: true
   volumeLifecycleModes:
     - Persistent
----
-# SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 VDURA Inc.
-
-# Kernel Module Manager (KMM) Module for PanFS
-apiVersion: kmm.sigs.x-k8s.io/v1beta1
-kind: Module
-metadata:
-  name: panfs
-  namespace: csi-panfs
-  labels:
-    app: panfs-kmm-module
-    product: com.vdura.csi.panfs
-spec:
-
-  # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-  # uncomment the line below and set the secret name to enable pulling images from a private registry.
-  imageRepoSecret:
-    # name: <PULL-SECRET-NAME>
-
-  # Node selector for scheduling the KMM Module pods (to load the PanFS kernel module)
-  # Should match the nodes where the PanFS consumer workloads supposed to run
-  # Ensure that the nodes have the appropriate labels
-  # kubectl get nodes --show-labels
-  selector:
-    node-role.kubernetes.io/worker: ""
-
-  moduleLoader:
-    container:
-      modprobe:
-        moduleName: panfs
-      imagePullPolicy: Always
-
-      # PanFS DFC/KMM image containing the PanFS kernel module
-      kernelMappings:
-        - literal: <KERNEL_VERSION> # Replace with your Worker node kernel version
-          containerImage: <PANFS_DFC_IMAGE> # Change to Kernel-related corresponding DFC/KMM image
