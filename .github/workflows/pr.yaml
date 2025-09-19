@@ -61,6 +61,21 @@ jobs:
       push: true
     secrets: inherit
 
+  deploy:
+    permissions:
+      id-token: write
+      packages: read
+      contents: read
+    needs: csi-driver-image
+    uses: ./.github/workflows/deploy-reusable.yaml
+    with:
+      driver-installation-type: "helm"
+      driver-image-url: "${{ needs.csi-driver-image.outputs.image-url }}:pr${{ github.event.pull_request.number }}"
+      kmm-image-url: "ghcr.io/${{ github.repository }}/panfs-dfc-kmm:stub"
+      runner-label: "ubuntu-latest"
+      ref: ${{ github.ref }}
+    secrets: inherit
+
   trivy-repo-scan:
     name: Trivy Repo Scan
     runs-on: ubuntu-latest
