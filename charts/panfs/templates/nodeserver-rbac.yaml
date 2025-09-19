@@ -23,6 +23,9 @@ metadata:
   name: {{ .Release.Namespace }}-node
   namespace: {{ .Release.Namespace }}
 ---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
 # ClusterRole for the node plugin
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -39,6 +42,9 @@ rules:
     resources: ["nodes"]
     verbs: ["get", "list", "watch", "update", "patch"]
 ---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
 # Node Server ClusterRoleBinding
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
