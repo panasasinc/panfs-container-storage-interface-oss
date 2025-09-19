@@ -326,7 +326,8 @@ else
 			--set "imagePullSecrets[0]=$(IMAGE_PULL_SECRET_NAME)" \
 			--set "panfsPlugin.image=$(CSIDRIVER_IMAGE)" \
 			--set "panfsPlugin.pullPolicy=IfNotPresent" \
-			--set "dfcRelease.image=$(CSIDFCKMM_IMAGE)" \
+			--set "dfcRelease.kernelMappings[0].literal=default" \
+			--set "dfcRelease.kernelMappings[0].image=$(CSIDFCKMM_IMAGE)" \
 			--set "dfcRelease.pullPolicy=IfNotPresent" \
 			--set "panfsKmmModule.enabled=false" \
 			--set "seLinux=false"; \
