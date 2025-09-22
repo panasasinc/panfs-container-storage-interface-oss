@@ -18,9 +18,9 @@ csiPanFSDriver:
   # -- Product name for the PanFS CSI driver
   productName: com.vdura.csi.panfs
   # -- Namespace where the PanFS CSI driver is deployed
-  namespace: csi-panfs
+  namespace: 
   # -- Service account used by the PanFS CSI driver controller
-  controllerServiceAccount: csi-panfs-controller
+  controllerServiceAccount: 
 
 # PanFS Realm Endpoint Configuration
 realm:
