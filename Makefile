@@ -540,14 +540,6 @@ uninstall-storageclass-with-helm:
 	@echo "$(GREEN)Successfully uninstalled PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)'$(RESET)"
 	@echo
 
-.PHONY: uninstall-storageclass-with-manifest
-uninstall-storageclass-with-manifest:
-	@echo "Uninstalling PanFS CSI Storage Class using manifest file deploy/k8s/csi-panfs-storage-class.yaml..."
-	@export STORAGE_CLASS_NAME=$(STORAGE_CLASS_NAME); \
-	cat deploy/k8s/csi-panfs-storage-class.yaml |  sed 's|<|$$|;s/\([^ ]\)>/\1/' | envsubst | kubectl delete --ignore-not-found -f -
-	@echo "$(GREEN)Successfully uninstalled PanFS CSI Storage Class using manifest file deploy/k8s/csi-panfs-storage-class.yaml$(RESET)"
-	@echo
-
 .PHONY: uninstall-storageclass
 uninstall-storageclass: ## Uninstall PanFS CSI Storage Class
 	@if [ "$(USE_HELM)" = "true" ]; then \
@@ -556,17 +548,21 @@ uninstall-storageclass: ## Uninstall PanFS CSI Storage Class
 		make uninstall-storageclass-with-manifest; \
 	fi
 
+.PHONY: uninstall-storageclass-with-manifest
+uninstall-storageclass-with-manifest:
+	@echo "Uninstalling PanFS CSI Storage Class using manifest file deploy/k8s/csi-panfs-storage-class.yaml..."
+	@export STORAGE_CLASS_NAME=$(STORAGE_CLASS_NAME); \
+	export CSI_CONTROLLER_SA=csi-panfs-controller; \
+	export CSI_NAMESPACE=csi-panfs; \
+	cat deploy/k8s/storage-class/default.yaml |  sed 's|<|$$|;s/\([^ ]\)>/\1/' | envsubst | kubectl delete --ignore-not-found -f -
+	@echo "$(GREEN)Successfully uninstalled PanFS CSI Storage Class using manifest file deploy/k8s/csi-panfs-storage-class.yaml$(RESET)"
+	@echo
+
 .PHONY: uninstall-driver-with-manifest
 uninstall-driver-with-manifest:
 	@echo "Uninstalling PanFS CSI Driver using manifest file deploy/k8s/csi-panfs-driver.yaml..."
 	kubectl delete -f deploy/k8s/csi-panfs-driver.yaml --ignore-not-found
 	@echo "$(GREEN)Successfully uninstalled PanFS CSI Driver using manifest file deploy/k8s/csi-panfs-driver.yaml$(RESET)"
-	@echo
-
-.PHONY: uninstall-driver-with-helm
-uninstall-driver-with-helm:
-	helm uninstall csi-panfs --namespace csi-panfs --wait
-	@echo "$(GREEN)Successfully uninstalled PanFS CSI Driver$(RESET)"
 	@echo
 
 .PHONY: uninstall-driver
@@ -576,6 +572,12 @@ uninstall-driver: ## Uninstall PanFS CSI Driver
 	else \
 		make uninstall-driver-with-manifest; \
 	fi
+
+.PHONY: uninstall-driver-with-helm
+uninstall-driver-with-helm:
+	helm uninstall csi-panfs --namespace csi-panfs --wait
+	@echo "$(GREEN)Successfully uninstalled PanFS CSI Driver$(RESET)"
+	@echo
 
 .PHONY: uninstall
 uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class 
