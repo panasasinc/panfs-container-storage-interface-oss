@@ -45,7 +45,6 @@ allowedTopologies:
     - # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
       key: kmm.node.kubernetes.io/csi-panfs.panfs.ready
       values:
-        - "true"
         - ""
 
 # -- Allow volume expansion for realms
