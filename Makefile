@@ -427,25 +427,16 @@ sc: deploy-storageclass ## Alias for deploy-storageclass
 overrides_sc = $(wildcard charts/storageclass/override.yaml)
 deploy-storageclass-with-helm:
 	@echo "Deploying PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)' with Helm since USE_HELM is set..."
-ifneq ($(overrides_sc),)
-	@echo "Using overrides from $(overrides_sc)"
 	helm upgrade --install $(STORAGE_CLASS_NAME) charts/storageclass \
-		--namespace=$(STORAGE_CLASS_NAME) \
+		--namespace $(STORAGE_CLASS_NAME) \
+		--create-namespace \
+		--set csiPanFSDriver.namespace="csi-panfs" \
+		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
 		--set setAsDefaultStorageClass=$(SET_STORAGECLASS_DEFAULT) \
-		--values $(overrides_sc) \
-		--wait
-else
-	helm upgrade --install $(STORAGE_CLASS_NAME) charts/storageclass \
-		--namespace=$(STORAGE_CLASS_NAME) \
-		--set setAsDefaultStorageClass=$(SET_STORAGECLASS_DEFAULT) \
-		--set realm.address=${REALM_ADDRESS} \
-		--set realm.username=${REALM_USER} \
+		--set realm.address="${REALM_ADDRESS}" \
+		--set realm.username="${REALM_USER}" \
 		--set realm.password="${REALM_PASSWORD}" \
-		--set realm.privateKey="${REALM_PRIVATE_KEY}" \
-		--set realm.privateKeyPassphrase="${REALM_PRIVATE_KEY_PASSPHRASE}" \
-		$(HELM_OPTS) \
 		--wait
-endif
 	@echo "$(GREEN)Successfully deployed PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)'$(RESET)"
 	@echo
 
@@ -458,8 +449,12 @@ deploy-storageclass-with-manifest:
 	export REALM_PASSWORD=$(REALM_PASSWORD); \
 	export REALM_PRIVATE_KEY=$(REALM_PRIVATE_KEY); \
 	export REALM_PRIVATE_KEY_PASSPHRASE=$(REALM_PRIVATE_KEY_PASSPHRASE); \
+	export CSI_CONTROLLER_SA=csi-panfs-controller; \
+	export CSI_NAMESPACE=csi-panfs; \
 	kubectl create namespace $(STORAGE_CLASS_NAME) --dry-run=client -o yaml | kubectl apply -f -; \
-	cat deploy/k8s/csi-panfs-storage-class.yaml | sed 's|<|$$|;s/\([^ ]\)>/\1/;s|is-default-class: "false"|is-default-class: "$(SET_STORAGECLASS_DEFAULT)"|' | envsubst | kubectl apply --server-side -f -
+	cat deploy/k8s/storage-class/default.yaml | \
+	sed 's|<|$$|;s/\([^ ]\)>/\1/;s|is-default-class: "false"|is-default-class: "$(SET_STORAGECLASS_DEFAULT)"|' | \
+	sed 's|csi-panfs-storage-class-name|$(STORAGE_CLASS_NAME)|' | envsubst | kubectl apply --server-side -f -
 	@echo "$(GREEN)Successfully deployed PanFS CSI Storage Class using manifest file deploy/k8s/csi-panfs-storage-class.yaml$(RESET)"
 	@echo
 
@@ -653,20 +648,20 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 
 	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs-storage-class-name \
-		--set csiPanFSDriver.namespace="<CSI_NAMESPACE> # Default: csi-panfs" \
-		--set csiPanFSDriver.controllerServiceAccount="<CSI_CONTROLLER_SA> # Default: csi-panfs-controller" \
+		--set csiPanFSDriver.namespace="<CSI_NAMESPACE>" \
+		--set csiPanFSDriver.controllerServiceAccount="<CSI_CONTROLLER_SA>" \
 		--set setAsDefaultStorageClass=false \
 		--set realm.address="<REALM_ADDRESS>" \
 		--set realm.username="<REALM_USERNAME>" \
 		--set realm.password="<REALM_PASSWORD>" \
 		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
 		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
-		grep -v '^# Source:' > deploy/k8s/storage-class/with-secret-in-dedicated-ns.yaml
+		grep -v '^# Source:' > deploy/k8s/storage-class/default.yaml
 
 	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs-storage-class-name \
-		--set csiPanFSDriver.namespace="<CSI_NAMESPACE> # Default: csi-panfs" \
-		--set csiPanFSDriver.controllerServiceAccount="<CSI_CONTROLLER_SA> # Default: csi-panfs-controller" \
+		--set csiPanFSDriver.namespace="<CSI_NAMESPACE>" \
+		--set csiPanFSDriver.controllerServiceAccount="<CSI_CONTROLLER_SA>" \
 		--set allowedTopologies[0].matchLabelExpressions[0].key=node-role.kubernetes.io/worker \
 		--set allowedTopologies[0].matchLabelExpressions[0].values[0]="" \
 		--set setAsDefaultStorageClass=false \
