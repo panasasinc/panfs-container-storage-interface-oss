@@ -57,18 +57,22 @@ parameters:
   {{ $k }}: {{ $v | quote }}
   {{- end }}
 
+{{- if .Values.mountOptions }}
+
 # Optional mount options for the volumes created by this StorageClass
 # These options are passed to the underlying filesystem when mounting the volume
-{{- if .Values.mountOptions}}
 mountOptions:
 {{- range .Values.mountOptions }}
   - {{ . | quote }}
 {{- end }}
 {{- else }}
+
+# No custom mount options specified; using defaults
 mountOptions: []
 {{- end }}
 
 {{- if .Values.allowedTopologies }}
+
 # Topology constraints for volume provisioning to specific nodes
 allowedTopologies:
 {{- toYaml .Values.allowedTopologies | nindent 2 }}
