@@ -63,18 +63,17 @@ spec: # csi-panfs-node
       # Check with: kubectl get secrets -n {{ .Release.Namespace }}
       # If not, create with:
       # kubectl create secret docker-registry -n {{ .Release.Namespace }} {{ index .Values.imagePullSecrets 0 }} \
-      #   --docker-server=<REGISTRY_URL> \
-      #   --docker-username=<USERNAME> \
-      #   --docker-password=<PASSWORD>
+      #   --docker-server={REGISTRY_URL} \
+      #   --docker-username=<{SERNAME} \
+      #   --docker-password={PASSWORD}
       imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
         - name: {{ . }}
         {{- end }}
       {{- else }}
 
-      # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-      # uncomment the line below and set the secret name to enable pulling images from a private registry.
-      imageRepoSecret:
+      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      imagePullSecrets:
         # - name: <IMAGE_PULL_SECRET_NAME>
       {{- end }}
       {{- if .Values.seLinux }}
