@@ -17,6 +17,8 @@ kind: Pod
 metadata:
   name: single-pod-10v
 spec:
+  nodeSelector:
+    kmm.node.kubernetes.io/csi-panfs.panfs.ready: ""
   containers:
   - name: busybox
     image: ubuntu:latest
@@ -88,6 +90,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -99,6 +102,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -110,6 +114,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -121,6 +126,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -132,6 +138,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -143,6 +150,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -154,6 +162,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -165,6 +174,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -176,6 +186,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
@@ -187,3 +198,4 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class

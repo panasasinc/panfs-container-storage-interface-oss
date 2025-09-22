@@ -38,12 +38,41 @@ spec:
         app: sample-deployment-with-rwx
         case: sample-deployment-with-rwx
     spec:
+      # Apply nodeSelector to ensure the Pod is scheduled on a node
+      # where the CSI PanFS driver is ready.
+      nodeSelector:
+        kmm.node.kubernetes.io/csi-panfs.panfs.ready: ""
+
+      # Apply affinity rules to prevent pods from being scheduled on the same node (soft).
+      affinity:
+        podAntiAffinity:
+          # Hard anti-affinity (never place on same node)
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: app
+                    operator: In
+                    values:
+                      - sample-deployment-with-rwx
+              topologyKey: "kubernetes.io/hostname"
+
+          # Soft anti-affinity (prefer spreading further if possible)
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - sample-deployment-with-rwx
+                topologyKey: "kubernetes.io/hostname"
       containers:
       - name: main-container
         image: ubuntu:latest
         command: 
-        - sleep
-        - infinity
+          - sleep
+          - infinity
         volumeMounts:
           - mountPath: "/data"
             name: panfs-volume
@@ -64,3 +93,4 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class

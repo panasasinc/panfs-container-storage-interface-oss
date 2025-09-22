@@ -17,6 +17,11 @@ kind: Pod
 metadata:
   name: single-pod-20v
 spec:
+  # Apply nodeSelector to ensure the Pod is scheduled on a node
+  # where the CSI PanFS driver is ready.
+  nodeSelector:
+    kmm.node.kubernetes.io/csi-panfs.panfs.ready: ""
+
   containers:
   - name: busybox
     image: ubuntu:latest
@@ -138,6 +143,7 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim

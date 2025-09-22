@@ -23,12 +23,17 @@ spec:
   resources:
     requests:
       storage: 1Gi
+  storageClassName: csi-panfs-storage-class
 ---
 apiVersion: v1
 kind: Pod
 metadata:
   name: selinux-mcs-label
 spec:
+  # Apply nodeSelector to ensure the Pod is scheduled on a node
+  # where the CSI PanFS driver is ready.
+  nodeSelector:
+    kmm.node.kubernetes.io/csi-panfs.panfs.ready: ""
   securityContext:
     seLinuxOptions:
       level: "s0"
