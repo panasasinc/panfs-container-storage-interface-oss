@@ -351,7 +351,7 @@ deploy-driver-with-manifest:
 	export PANFS_CSI_DRIVER_IMAGE=$(CSIDRIVER_IMAGE); \
 	export PANFS_DFC_IMAGE=$(CSIDFCKMM_IMAGE); \
 	export KERNEL_VERSION=$(KERNEL_VERSION); \
-	cat deploy/k8s/csi-panfs-driver.yaml | sed 's|<|$$|;s|>||' | envsubst | kubectl apply --server-side -f -
+	cat deploy/k8s/csi-driver/default.yaml | sed 's|<|$$|;s|>||;s/^\(  *\)# \(.*IMAGE_PULL_SECRET_NAME.*\)/\1\2/' | envsubst | kubectl apply --server-side -f -	
 	@echo "$(GREEN)Successfully deployed PanFS CSI Driver using manifest file deploy/k8s/csi-panfs-driver.yaml$(RESET)"
 	@echo
 
@@ -394,7 +394,7 @@ deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
 			available=$$(kubectl get module panfs -n csi-panfs -o jsonpath='{.status.moduleLoader.availableNumber}'); \
 			nodes=$$(kubectl get module panfs -n csi-panfs -o jsonpath='{.status.moduleLoader.nodesMatchingSelectorNumber}'); \
 			echo "NODES: $$nodes  LOADED: $$available  DESIRED: $$desired"; \
-			if [ "$$desired$$available" = "$$nodes$$nodes" ] && [ -n "$$desired" ]; then \
+			if [ "$$desired" = "$$available" ] && [ -n "$$desired" ]; then \
 				echo "All modules loaded successfully."; \
 				break; \
 			fi; \
@@ -534,51 +534,6 @@ update-storageclass: deploy-storageclass ## Update PanFS CSI Storage Class
 
 ## Uninstall CSI Driver and Storage Class:
 
-.PHONY: uninstall-storageclass-with-helm
-uninstall-storageclass-with-helm:
-	helm uninstall csi-panfs-storage-class --namespace csi-panfs-storage-class --wait
-	@echo "$(GREEN)Successfully uninstalled PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)'$(RESET)"
-	@echo
-
-.PHONY: uninstall-storageclass
-uninstall-storageclass: ## Uninstall PanFS CSI Storage Class
-	@if [ "$(USE_HELM)" = "true" ]; then \
-		make uninstall-storageclass-with-helm; \
-	else \
-		make uninstall-storageclass-with-manifest; \
-	fi
-
-.PHONY: uninstall-storageclass-with-manifest
-uninstall-storageclass-with-manifest:
-	@echo "Uninstalling PanFS CSI Storage Class using manifest file deploy/k8s/csi-panfs-storage-class.yaml..."
-	@export STORAGE_CLASS_NAME=$(STORAGE_CLASS_NAME); \
-	export CSI_CONTROLLER_SA=csi-panfs-controller; \
-	export CSI_NAMESPACE=csi-panfs; \
-	cat deploy/k8s/storage-class/default.yaml |  sed 's|<|$$|;s/\([^ ]\)>/\1/' | envsubst | kubectl delete --ignore-not-found -f -
-	@echo "$(GREEN)Successfully uninstalled PanFS CSI Storage Class using manifest file deploy/k8s/csi-panfs-storage-class.yaml$(RESET)"
-	@echo
-
-.PHONY: uninstall-driver-with-manifest
-uninstall-driver-with-manifest:
-	@echo "Uninstalling PanFS CSI Driver using manifest file deploy/k8s/csi-panfs-driver.yaml..."
-	kubectl delete -f deploy/k8s/csi-panfs-driver.yaml --ignore-not-found
-	@echo "$(GREEN)Successfully uninstalled PanFS CSI Driver using manifest file deploy/k8s/csi-panfs-driver.yaml$(RESET)"
-	@echo
-
-.PHONY: uninstall-driver
-uninstall-driver: ## Uninstall PanFS CSI Driver
-	@if [ "$(USE_HELM)" = "true" ]; then \
-		make uninstall-driver-with-helm; \
-	else \
-		make uninstall-driver-with-manifest; \
-	fi
-
-.PHONY: uninstall-driver-with-helm
-uninstall-driver-with-helm:
-	helm uninstall csi-panfs --namespace csi-panfs --wait
-	@echo "$(GREEN)Successfully uninstalled PanFS CSI Driver$(RESET)"
-	@echo
-
 .PHONY: uninstall
 uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class 
 	@if kubectl get pv 2>&1 | grep $(STORAGE_CLASS_NAME) 2>/dev/null; then \
@@ -586,43 +541,10 @@ uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class
 		kubectl get pv | grep $(STORAGE_CLASS_NAME); \
 		exit 1; \
 	fi
-	@kubectl delete -f deploy/k8s/csi-panfs-driver.yaml --ignore-not-found
+	@kubectl delete -f deploy/k8s/csi-driver/default.yaml --ignore-not-found
 	@kubectl delete secret -n csi-panfs -l owner=helm 
-	@kubectl delete -f deploy/k8s/csi-panfs-storage-class.yaml --ignore-not-found
+	@kubectl delete -f deploy/k8s/storage-class/default.yaml --ignore-not-found
 	@kubectl delete secret -n $(STORAGE_CLASS_NAME) -l owner=helm
-
-## Working with test workloads:
-.PHONY: workload-test
-workload-test: ## Run simple deployment with pvc
-	kubectl apply -f examples/k8s/dynamic-provisioning/single-pod.yaml
-	@echo
-	@PVC_NAME=$$(kubectl apply -f examples/k8s/dynamic-provisioning/single-pod.yaml --dry-run=client -o jsonpath='{.items[?(@.kind=="PersistentVolumeClaim")].metadata.name}'); \
-	echo "$(GRAY)Waiting for PVC '$$PVC_NAME' to become Bound...$(RESET)"; \
-	while true; do \
-		kubectl get pvc "$$PVC_NAME" --no-headers; \
-		[ "$$(kubectl get pvc $$PVC_NAME -o jsonpath='{.status.phase}')" = "Bound" ] && break || sleep 2; \
-	done; \
-	echo "$(GREEN)PVC '$$PVC_NAME' is now Bound$(RESET)"
-	@echo
-	@POD_NAME=$$(kubectl apply -f examples/k8s/dynamic-provisioning/single-pod.yaml --dry-run=client -o jsonpath='{.items[?(@.kind=="Pod")].metadata.name}'); \
-	echo "$(GRAY)Waiting for Pod '$$POD_NAME' to become Running...$(RESET)"; \
-	while true; do \
-		kubectl get pod "$$POD_NAME" --no-headers; \
-		kubectl get events --field-selector involvedObject.name=$$POD_NAME -o json | jq -r '.items[] | "\(.lastTimestamp) | \(.type) | \(.message)"' ; echo; \
-		[ "$$(kubectl get pod $$POD_NAME -o jsonpath='{.status.phase}')" = "Running" ] && break || sleep 2; \
-	done; \
-	echo "$(GREEN)Pod '$$POD_NAME' is now Running$(RESET)"
-	@echo
-	@echo "$(GRAY)kubectl get po,pvc,pv -o wide$(RESET)"
-	@kubectl get po,pvc,pv -o wide
-	@echo
-
-.PHONY: delete-workload-test
-delete-workload-test: cleanup-workload-test
-
-.PHONY: cleanup-workload-test
-cleanup-workload-test: ## Cleanup test deployment
-	@find examples/k8s/ -name "*.yaml" -exec kubectl delete -f {} --ignore-not-found \;
 
 ## Prepare to Release:
 
@@ -651,15 +573,14 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 
 	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs-storage-class-name \
-		--set csiPanFSDriver.namespace="<CSI_NAMESPACE>" \
-		--set csiPanFSDriver.controllerServiceAccount="<CSI_CONTROLLER_SA>" \
+		--set csiPanFSDriver.namespace="csi-panfs" \
+		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
 		--set setAsDefaultStorageClass=false \
 		--set realm.address="<REALM_ADDRESS>" \
 		--set realm.username="<REALM_USERNAME>" \
 		--set realm.password="<REALM_PASSWORD>" \
 		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
 		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
-		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
 		grep -v '^# Source:' > deploy/k8s/storage-class/default.yaml
 
 	helm template csi-panfs-storage-class-name charts/storageclass \
