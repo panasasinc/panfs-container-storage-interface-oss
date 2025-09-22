@@ -117,7 +117,7 @@ spec: # csi-panfs-node
         # Init container to enable PanFS mount helper
         - name: get-dfc-bin
           {{- $firstKernel := dict }}
-          {{- $imageIsNotSet := "<PANFS_DFC_IMAGE> # Change to relevant DFC/KMM image" }}
+          {{- $imageIsNotSet := "<PANFS-DFC-IMAGE> # Change to relevant DFC/KMM image" }}
           {{- if .Values.dfcRelease.kernelMappings }}
           {{- $firstKernel = index .Values.dfcRelease.kernelMappings 0 }}
           {{- end }}
