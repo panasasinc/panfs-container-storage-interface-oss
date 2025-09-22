@@ -85,7 +85,7 @@ spec: # csi-panfs-controller
       # If your cluster does not inherit image pull credentials from the default ServiceAccount,
       # uncomment the line below and set the secret name to enable pulling images from a private registry.
       imageRepoSecret:
-        # - name: <PULL-SECRET-NAME>
+        # - name: <IMAGE_PULL_SECRET_NAME>
       {{- end }}
       {{- if .Values.controllerServer.tolerations}}
 

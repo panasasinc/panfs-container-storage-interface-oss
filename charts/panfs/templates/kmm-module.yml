@@ -68,8 +68,8 @@ spec:
 
       # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
-      {{- $kernelNotSetMessage := "<KERNEL-VERSION> # Replace with your Worker node kernel version" }}
-      {{- $imageNotSetMessage := "<PANFS-DFC-IMAGE> # Change to Kernel-related corresponding DFC/KMM image" }}
+      {{- $kernelNotSetMessage := "<KERNEL_VERSION> # Replace with your Worker node kernel version" }}
+      {{- $imageNotSetMessage := "<PANFS_DFC_IMAGE> # Change to Kernel-related corresponding DFC/KMM image" }}
       {{- range .Values.dfcRelease.kernelMappings }}
         - literal: {{if .literal }}{{ .literal }}{{else}}{{ $kernelNotSetMessage }}{{end }}
           containerImage: {{if .containerImage }}{{ .containerImage }}{{else if .image }}{{ .image }}{{ else }}{{ $imageNotSetMessage }}{{end }}
