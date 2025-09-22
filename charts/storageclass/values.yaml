@@ -38,6 +38,16 @@ realm:
 # -- Whether to set current storage class default for the cluster or not
 setAsDefaultStorageClass: false
 
+# -- Add topology constraints to restrict volume provisioning to specific nodes
+# @default -- `[{key: kmm.node.kubernetes.io/csi-panfs.panfs.ready, values: [""]}]`
+allowedTopologies:
+  - matchLabelExpressions:
+    - # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
+      key: kmm.node.kubernetes.io/csi-panfs.panfs.ready
+      values:
+        - "true"
+        - ""
+
 # -- Allow volume expansion for realms
 allowVolumeExpansion: true
 

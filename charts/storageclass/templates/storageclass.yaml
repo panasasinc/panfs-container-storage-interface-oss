@@ -67,3 +67,9 @@ mountOptions:
 {{- else }}
 mountOptions: []
 {{- end }}
+
+{{- if .Values.allowedTopologies }}
+# Topology constraints for volume provisioning to specific nodes
+allowedTopologies:
+{{- toYaml .Values.allowedTopologies | nindent 2 }}
+{{- end }}
