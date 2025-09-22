@@ -443,9 +443,8 @@ spec: # csi-panfs-node
       # ServiceAccount for node plugin
       serviceAccount: csi-panfs-node
 
-      # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-      # uncomment the line below and set the secret name to enable pulling images from a private registry.
-      imageRepoSecret:
+      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      imagePullSecrets:
         # - name: <IMAGE_PULL_SECRET_NAME>
 
       # Tolerations for scheduling the DaemonSet pods
@@ -640,9 +639,8 @@ spec: # csi-panfs-controller
       # ServiceAccount for the controller pods
       serviceAccount: csi-panfs-controller
 
-      # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-      # uncomment the line below and set the secret name to enable pulling images from a private registry.
-      imageRepoSecret:
+      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      imagePullSecrets:
         # - name: <IMAGE_PULL_SECRET_NAME>
 
       containers:
@@ -861,7 +859,7 @@ spec:
   # If your cluster does not inherit image pull credentials from the default ServiceAccount,
   # uncomment the line below and set the secret name to enable pulling images from a private registry.
   imageRepoSecret:
-    # name: <PULL-SECRET-NAME>
+    # name: <IMAGE_PULL_SECRET_NAME>
 
   # Node selector for scheduling the KMM Module pods (to load the PanFS kernel module)
   # Should match the nodes where the PanFS consumer workloads supposed to run
