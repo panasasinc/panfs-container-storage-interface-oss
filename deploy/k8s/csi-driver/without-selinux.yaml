@@ -446,7 +446,7 @@ spec: # csi-panfs-node
       # If your cluster does not inherit image pull credentials from the default ServiceAccount,
       # uncomment the line below and set the secret name to enable pulling images from a private registry.
       imageRepoSecret:
-        # - name: <PULL-SECRET-NAME>
+        # - name: <IMAGE_PULL_SECRET_NAME>
 
       # Tolerations for scheduling the DaemonSet pods
       # Should match the tolerations of the PanFS consumer workloads
@@ -464,7 +464,7 @@ spec: # csi-panfs-node
       initContainers:
         # Init container to enable PanFS mount helper
         - name: get-dfc-bin
-          image: <PANFS-DFC-IMAGE> # Change to relevant DFC/KMM image
+          image: <PANFS_DFC_IMAGE> # Change to relevant DFC/KMM image
           imagePullPolicy: Always
           command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
           volumeMounts:
@@ -643,7 +643,7 @@ spec: # csi-panfs-controller
       # If your cluster does not inherit image pull credentials from the default ServiceAccount,
       # uncomment the line below and set the secret name to enable pulling images from a private registry.
       imageRepoSecret:
-        # - name: <PULL-SECRET-NAME>
+        # - name: <IMAGE_PULL_SECRET_NAME>
 
       containers:
         # Main PanFS CSI plugin container
@@ -878,5 +878,5 @@ spec:
 
       # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
-        - literal: <KERNEL-VERSION> # Replace with your Worker node kernel version
-          containerImage: <PANFS-DFC-IMAGE> # Change to Kernel-related corresponding DFC/KMM image
+        - literal: <KERNEL_VERSION> # Replace with your Worker node kernel version
+          containerImage: <PANFS_DFC_IMAGE> # Change to Kernel-related corresponding DFC/KMM image

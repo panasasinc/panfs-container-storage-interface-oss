@@ -446,7 +446,7 @@ spec: # csi-panfs-node
       # If your cluster does not inherit image pull credentials from the default ServiceAccount,
       # uncomment the line below and set the secret name to enable pulling images from a private registry.
       imageRepoSecret:
-        # - name: <PULL-SECRET-NAME>
+        # - name: <IMAGE_PULL_SECRET_NAME>
 
       # SELinux security context
       securityContext:
@@ -473,7 +473,7 @@ spec: # csi-panfs-node
       initContainers:
         # Init container to enable PanFS mount helper
         - name: get-dfc-bin
-          image: <PANFS-DFC-IMAGE> # Change to relevant DFC/KMM image
+          image: <PANFS_DFC_IMAGE> # Change to relevant DFC/KMM image
           imagePullPolicy: Always
           command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
           volumeMounts:
@@ -678,7 +678,7 @@ spec: # csi-panfs-controller
       # If your cluster does not inherit image pull credentials from the default ServiceAccount,
       # uncomment the line below and set the secret name to enable pulling images from a private registry.
       imageRepoSecret:
-        # - name: <PULL-SECRET-NAME>
+        # - name: <IMAGE_PULL_SECRET_NAME>
 
       containers:
         # Main PanFS CSI plugin container
