@@ -464,7 +464,7 @@ spec: # csi-panfs-node
       initContainers:
         # Init container to enable PanFS mount helper
         - name: get-dfc-bin
-          image: <PANFS_DFC_IMAGE> # Change to relevant DFC/KMM image
+          image: <PANFS-DFC-IMAGE> # Change to relevant DFC/KMM image
           imagePullPolicy: Always
           command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
           volumeMounts:
@@ -878,5 +878,5 @@ spec:
 
       # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
-        - literal: <KERNEL_VERSION> # Replace with your Worker node kernel version
-          containerImage: <PANFS_DFC_IMAGE> # Change to Kernel-related corresponding DFC/KMM image
+        - literal: <KERNEL-VERSION> # Replace with your Worker node kernel version
+          containerImage: <PANFS-DFC-IMAGE> # Change to Kernel-related corresponding DFC/KMM image

@@ -473,7 +473,7 @@ spec: # csi-panfs-node
       initContainers:
         # Init container to enable PanFS mount helper
         - name: get-dfc-bin
-          image: <PANFS_DFC_IMAGE> # Change to relevant DFC/KMM image
+          image: <PANFS-DFC-IMAGE> # Change to relevant DFC/KMM image
           imagePullPolicy: Always
           command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
           volumeMounts:
