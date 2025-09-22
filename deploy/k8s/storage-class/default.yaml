@@ -7,7 +7,7 @@ apiVersion: v1
 kind: Secret
 metadata:
   name: csi-panfs-storage-class-name
-  namespace: csi-panfs
+  namespace: csi-panfs-storage-class-name
   labels:
     app: csi-panfs-storage-class-name
     product: com.vdura.csi.panfs
@@ -66,7 +66,7 @@ parameters:
   # Relates to Secret object that contains credentials for the CSI driver
   # This secret is used by the CSI driver to authenticate with the PanFS backend
   csi.storage.k8s.io/provisioner-secret-name: &secretName csi-panfs-storage-class-name
-  csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace csi-panfs
+  csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace csi-panfs-storage-class-name
   csi.storage.k8s.io/node-publish-secret-name: *secretName
   csi.storage.k8s.io/node-publish-secret-namespace: *secretNamespace
   csi.storage.k8s.io/controller-expand-secret-name: *secretName
@@ -93,3 +93,53 @@ allowedTopologies:
     - key: kmm.node.kubernetes.io/csi-panfs.panfs.ready
       values:
       - ""
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Role that defines permissions for the CSI driver to read secrets
+# This role allows the PanFS CSI driver ServiceAccount to access secrets containing
+# storage credentials and configuration needed for volume operations
+# NOTE: This is a namespace-scoped Role, so it only grants access to secrets
+# in the current namespace (csi-panfs-storage-class-name), not cluster-wide
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: <CSI_CONTROLLER_SA>-read-secret
+  namespace: csi-panfs-storage-class-name
+  labels:
+    app: csi-panfs-storage-class-name
+    product: com.vdura.csi.panfs
+rules:
+  # Allow access to secrets for CSI driver credentials
+  # The CSI driver needs to read secrets that contain PanFS backend credentials
+  # Permissions are limited to the current namespace only (not cluster-wide)
+  - apiGroups: [""] 
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# RoleBinding that connects the CSI driver service account to the secret-read role
+# This binding grants the PanFS CSI controller service account the permissions
+# defined in the role above, allowing it to read secrets in this namespace
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: <CSI_CONTROLLER_SA>-read-secret-rolebinding
+  namespace: csi-panfs-storage-class-name
+  labels:
+    app: csi-panfs-storage-class-name
+    product: com.vdura.csi.panfs
+subjects:
+  # The service account used by the PanFS CSI driver controller
+  # Relates to PanFS Driver ServiceAccount (controller) 
+  - kind: ServiceAccount
+    name: <CSI_CONTROLLER_SA> # The name of the PanFS CSI Driver service account
+    namespace: <CSI_NAMESPACE> # The namespace where the PanFS CSI Driver is deployed into
+roleRef:
+  # Reference to the Role defined above that grants secret read permissions
+  kind: Role
+  name: <CSI_CONTROLLER_SA>-read-secret
+  apiGroup: rbac.authorization.k8s.io
