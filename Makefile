@@ -633,7 +633,7 @@ cleanup-workload-test: ## Cleanup test deployment
 manifest-driver: ## Generate manifests for the PanFS CSI Driver
 	@echo "Generating manifests for the PanFS CSI Driver..."
 	@mkdir -p deploy/k8s/csi-driver/
-	helm template csi-panfs charts/panfs --namespace csi-panfs | grep -v '^# Source:' > deploy/k8s/csi-driver/full.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs | grep -v '^# Source:' > deploy/k8s/csi-driver/default.yaml
 	helm template csi-panfs charts/panfs --namespace csi-panfs --set seLinux=false | grep -v '^# Source:' > deploy/k8s/csi-driver/without-selinux.yaml
 	helm template csi-panfs charts/panfs --namespace csi-panfs --set panfsKmmModule.enabled=false | grep -v '^# Source:' > deploy/k8s/csi-driver/without-kmm.yaml
 
