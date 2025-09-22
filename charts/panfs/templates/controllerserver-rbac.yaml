@@ -22,6 +22,9 @@ kind: ServiceAccount
 metadata:
   name: {{ .Release.Namespace }}-controller
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-controller
+    product: {{ .Values.productName }}
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -31,6 +34,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-provisioner
+  labels:
+    app: csi-panfs-controller
+    sidecar: provisioner
+    product: {{ .Values.productName }}
 rules:
   # Allow managing PersistentVolumes for provisioning and deletion
   - apiGroups: [""]
@@ -75,6 +82,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-provisioner-rolebinding
+  labels:
+    app: csi-panfs-controller
+    sidecar: provisioner
+    product: {{ .Values.productName }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -87,12 +98,57 @@ roleRef:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
+# Namespace Role for reading secrets
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-secret-reader
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-controller
+    sidecar: secret-provisioner
+    product: {{ .Values.productName }}
+rules:
+  # Allow reading secrets for accessing PanFS realm credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Bind the secret reader Role to the controller ServiceAccount
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-controller-secret-reader-rolebinding
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-controller
+    sidecar: secret-provisioner
+    product: {{ .Values.productName }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Namespace }}-controller
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Release.Namespace }}-controller-secret-reader
+  apiGroup: rbac.authorization.k8s.io
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
 # Namespace Role for leader election and storage capacity tracking
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-provisioner
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-controller
+    sidecar: provisioner
+    product: {{ .Values.productName }}
 rules:
   # Allow leader election via leases
   - apiGroups: ["coordination.k8s.io"]
@@ -123,6 +179,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-provisioner-rolebinding
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-controller
+    sidecar: provisioner
+    product: {{ .Values.productName }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -140,6 +200,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-attacher
+  labels:
+    app: csi-panfs-controller
+    sidecar: attacher
+    product: {{ .Values.productName }}
 rules:
   # Allow patching PersistentVolumes for attach/detach operations
   - apiGroups: [""]
@@ -169,6 +233,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-attacher-rolebinding
+  labels:
+    app: csi-panfs-controller
+    sidecar: attacher
+    product: {{ .Values.productName }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -187,6 +255,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-attacher
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-controller
+    sidecar: attacher
+    product: {{ .Values.productName }}
 rules:
   # Allow leader election via leases for attacher sidecar
   - apiGroups: ["coordination.k8s.io"]
@@ -202,6 +274,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-attacher-rolebinding
   namespace: {{ .Release.Namespace }}
+  labels:
+    app: csi-panfs-controller
+    sidecar: attacher
+    product: {{ .Values.productName }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -219,6 +295,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-resizer
+  labels:
+    app: csi-panfs-controller
+    sidecar: resizer
+    product: {{ .Values.productName }}
 rules:
   # Allow patching PersistentVolumes for resizing
   - apiGroups: [""]
@@ -253,6 +333,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: {{ .Release.Namespace }}-controller-resizer-rolebinding
+  labels:
+    app: csi-panfs-controller
+    sidecar: resizer
+    product: {{ .Values.productName }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller

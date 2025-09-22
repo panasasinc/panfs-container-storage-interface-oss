@@ -21,6 +21,11 @@ apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: {{ .Values.productName }}
+  annotations:
+    csi-driver-namespace: {{ .Release.Namespace }}
+    csi-driver-controller-sa: {{ .Release.Namespace }}-controller
+  labels:
+    product: {{ .Values.productName }}
 spec:
   attachRequired: false
   podInfoOnMount: false
