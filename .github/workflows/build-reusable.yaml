@@ -183,7 +183,7 @@ jobs:
             --exit-code-from=sanity_tests \
             --always-recreate-deps \
             --force-recreate | tee sanity-tests.log
-          test ${PIPESTATUS[1]} -eq 0
+          test ${PIPESTATUS[0]} -eq 0
           echo "::endgroup::"
 
       - name: Annotate Sanity Test Results
