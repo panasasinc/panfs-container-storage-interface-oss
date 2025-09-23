@@ -31,10 +31,10 @@ import (
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
-	"k8s.io/klog/v2"
-
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/klog/v2"
+
 	"k8s.io/client-go/kubernetes"
 	"k8s.io/client-go/rest"
 )
@@ -157,26 +157,6 @@ func CreateDriver(
 	}
 }
 
-func (d *Driver) updateNodeLabel(key, value string) error {
-	var patch []byte
-	if value == "" {
-		// Remove label
-		patch = []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, key))
-	} else {
-		// Set label
-		patch = []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value))
-	}
-
-	_, err := d.kubeClient.CoreV1().Nodes().Patch(
-		context.TODO(),
-		d.host, // your Node name from NodeGetInfo
-		types.MergePatchType,
-		patch,
-		metav1.PatchOptions{},
-	)
-	return err
-}
-
 // Run starts the gRPC server and listens for incoming CSI requests.
 //
 // Returns:
@@ -216,12 +196,8 @@ func (d *Driver) Run() error {
 		d.log.Info("shutting down server", "signal", s.String())
 
 		// Unset the node label when shutting down
-		if IsNodeLabelSet {
-			if err := d.updateNodeLabel(NodeLabelKey, ""); err != nil {
-				d.log.Error(err, "failed to remove node label")
-			} else {
-				d.log.Info("removed node label")
-			}
+		if err := d.updateNodeLabel(NodeLabelKey, ""); err != nil {
+			d.log.Error(err, "failed to remove node label")
 		}
 
 		grpcServer.GracefulStop()
@@ -244,4 +220,52 @@ func (d *Driver) Run() error {
 	d.log.Info("gRPC server stopped")
 
 	return nil
+}
+
+// updateNodeLabel sets or removes a label on the Kubernetes node where the driver is running.
+//
+// Parameters:
+//
+//	key   - The label key to set or remove.
+//	value - The label value to set. If empty, the label will be removed.
+//
+// Returns:
+//
+//	error - Returns an error if the Kubernetes API call fails.
+//
+// Behavior:
+//   - If the global variable IsNodeLabelSet is false and value is empty, the function does nothing.
+//   - If value is empty, the function removes the label with the specified key from the node.
+//   - If value is non-empty, the function sets the label with the specified key to the given value on the node.
+func (d *Driver) updateNodeLabel(key, value string) error {
+	if !IsNodeLabelSet && value == "" {
+		return nil
+	}
+
+	var patch []byte
+	if value == "" {
+		// Remove label
+		patch = []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, key))
+	} else {
+		// Set label
+		patch = []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value))
+	}
+
+	_, err := d.kubeClient.CoreV1().Nodes().Patch(
+		context.TODO(),
+		d.host,
+		types.MergePatchType,
+		patch,
+		metav1.PatchOptions{},
+	)
+
+	if err == nil {
+		if value == "" {
+			d.log.Info("removed node label", "label", fmt.Sprintf("%s", key), "node", d.host)
+		} else {
+			d.log.Info("set node label", "label", fmt.Sprintf("%s=%s", key, value), "node", d.host)
+		}
+	}
+
+	return err
 }

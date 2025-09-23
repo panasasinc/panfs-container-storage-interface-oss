@@ -260,18 +260,17 @@ func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*
 	d.log.V(2).Info("NodeGetInfo called")
 
 	// Set the label when starting up
-	if err := d.updateNodeLabel(NodeLabelKey, "true"); err != nil {
+	nodeLabelValue := "true"
+	if err := d.updateNodeLabel(NodeLabelKey, nodeLabelValue); err != nil {
 		d.log.Error(err, "failed to set node label")
+		nodeLabelValue = "false"
 	}
-
-	d.log.Info("set node label", "label", fmt.Sprintf("%s=true", NodeLabelKey))
-	IsNodeLabelSet = true
 
 	return &csi.NodeGetInfoResponse{
 		NodeId: d.host,
 		AccessibleTopology: &csi.Topology{
 			Segments: map[string]string{
-				NodeLabelKey: "true",
+				NodeLabelKey: nodeLabelValue,
 			},
 		},
 	}, nil
