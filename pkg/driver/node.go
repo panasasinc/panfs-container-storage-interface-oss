@@ -25,7 +25,13 @@ import (
 )
 
 const (
-	NodeLabelKey = "node.kubernetes.io/csi-panfs.panfs.ready"
+	// NodeLabelKey is the Kubernetes node label key used to indicate the readiness of the PanFS CSI driver on the node.
+	NodeLabelKey = "node.kubernetes.io/csi-driver.panfs.ready"
+)
+
+var (
+	// IsNodeLabelSet tracks whether the node label has been set to avoid redundant updates.
+	IsNodeLabelSet = false
 )
 
 // NodeStageVolume handles the CSI NodeStageVolume request.

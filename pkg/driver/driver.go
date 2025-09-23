@@ -215,12 +215,14 @@ func (d *Driver) Run() error {
 
 		d.log.Info("shutting down server", "signal", s.String())
 
-		// // Unset the node label when shutting down
-		// if err := d.updateNodeLabel("node.kubernetes.io/csi-panfs.panfs.ready", ""); err != nil {
-		// 	d.log.Error(err, "failed to remove node label")
-		// } else {
-		// 	d.log.Info("removed node label")
-		// }
+		// Unset the node label when shutting down
+		if IsNodeLabelSet {
+			if err := d.updateNodeLabel(NodeLabelKey, ""); err != nil {
+				d.log.Error(err, "failed to remove node label")
+			} else {
+				d.log.Info("removed node label")
+			}
+		}
 
 		grpcServer.GracefulStop()
 		shutdownError <- nil
