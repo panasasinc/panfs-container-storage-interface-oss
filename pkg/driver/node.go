@@ -265,6 +265,7 @@ func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*
 	}
 
 	d.log.Info("set node label", "label", fmt.Sprintf("%s=true", NodeLabelKey))
+	IsNodeLabelSet = true
 
 	return &csi.NodeGetInfoResponse{
 		NodeId: d.host,
