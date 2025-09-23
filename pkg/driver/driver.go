@@ -133,16 +133,25 @@ func CreateDriver(
 		return nil
 	}
 
-	// Initialize Kubernetes client
-	config, err := rest.InClusterConfig()
-	if err != nil {
-		log.Error(err, "failed to get in-cluster kubeconfig")
-		return nil
-	}
-	kubeClient, err := kubernetes.NewForConfig(config)
-	if err != nil {
-		log.Error(err, "failed to create kube client")
-		return nil
+	var kubeClient *kubernetes.Clientset
+
+	// If CSI_SANITY_MODE is not set to true, do not initialize kubeClient
+	// This is useful for running csi-sanity tests which do not require kubeClient
+	// and do not have access to in-cluster config
+	if os.Getenv("CSI_SANITY_MODE") == "true" {
+		kubeClient = nil
+	} else {
+		// Initialize Kubernetes client
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			log.Error(err, "failed to get in-cluster kubeconfig")
+			return nil
+		}
+		kubeClient, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			log.Error(err, "failed to create kube client")
+			return nil
+		}
 	}
 
 	return &Driver{
@@ -234,10 +243,17 @@ func (d *Driver) Run() error {
 //	error - Returns an error if the Kubernetes API call fails.
 //
 // Behavior:
+//   - If kubeClient is nil, the function does nothing.
 //   - If the global variable IsNodeLabelSet is false and value is empty, the function does nothing.
 //   - If value is empty, the function removes the label with the specified key from the node.
 //   - If value is non-empty, the function sets the label with the specified key to the given value on the node.
 func (d *Driver) updateNodeLabel(key, value string) error {
+	// If kubeClient is not initialized, do nothing
+	if d.kubeClient == nil {
+		return nil
+	}
+
+	// If the label is not set in the configuration and value is empty, do nothing
 	if !IsNodeLabelSet && value == "" {
 		return nil
 	}
