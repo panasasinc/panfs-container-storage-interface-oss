@@ -24,6 +24,10 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	NodeLabelKey = "node.kubernetes.io/csi-panfs.panfs.ready"
+)
+
 // NodeStageVolume handles the CSI NodeStageVolume request.
 // Logs the request and returns an unimplemented error.
 //
@@ -248,11 +252,33 @@ func (d *Driver) NodeExpandVolume(ctx context.Context, in *csi.NodeExpandVolumeR
 //	error - Always nil.
 func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	d.log.V(2).Info("NodeGetInfo called")
+
+	// Set the label when starting up
+	if err := d.updateNodeLabel(NodeLabelKey, "true"); err != nil {
+		d.log.Error(err, "failed to set node label")
+	}
+
+	d.log.Info("set node label", "label", fmt.Sprintf("%s=true", NodeLabelKey))
+
+	return &csi.NodeGetInfoResponse{
+		NodeId: d.host,
+		AccessibleTopology: &csi.Topology{
+			Segments: map[string]string{
+				NodeLabelKey: "true",
+			},
+		},
+	}, nil
+}
+
+/*
+func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
+	d.log.V(2).Info("NodeGetInfo called")
 	return &csi.NodeGetInfoResponse{
 		NodeId:            d.host,
 		MaxVolumesPerNode: 0,
 	}, nil
 }
+*/
 
 // NodeGetVolumeStats handles the CSI NodeGetVolumeStats request.
 // Logs the request and returns an unimplemented error.

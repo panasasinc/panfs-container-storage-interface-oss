@@ -18,6 +18,7 @@
 package driver
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -31,6 +32,11 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	"k8s.io/klog/v2"
+
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 //go:generate mockgen -source=driver.go -destination=mock/mock_driver.go -package=mock StorageProviderClient PanMounter
@@ -56,11 +62,12 @@ type Driver struct {
 	Version string
 	Name    string
 
-	endpoint  string
-	host      string
-	log       klog.Logger
-	mounterV2 PanMounter
-	panfs     StorageProviderClient
+	endpoint   string
+	host       string
+	log        klog.Logger
+	mounterV2  PanMounter
+	panfs      StorageProviderClient
+	kubeClient *kubernetes.Clientset
 	csi.UnimplementedIdentityServer
 	csi.UnimplementedControllerServer
 	csi.UnimplementedNodeServer
@@ -126,15 +133,48 @@ func CreateDriver(
 		return nil
 	}
 
-	return &Driver{
-		Version:   version,
-		Name:      driverName,
-		endpoint:  endpoint,
-		mounterV2: mounterV2,
-		log:       log,
-		host:      host,
-		panfs:     panfs,
+	// Initialize Kubernetes client
+	config, err := rest.InClusterConfig()
+	if err != nil {
+		log.Error(err, "failed to get in-cluster kubeconfig")
+		return nil
 	}
+	kubeClient, err := kubernetes.NewForConfig(config)
+	if err != nil {
+		log.Error(err, "failed to create kube client")
+		return nil
+	}
+
+	return &Driver{
+		Version:    version,
+		Name:       driverName,
+		endpoint:   endpoint,
+		mounterV2:  mounterV2,
+		log:        log,
+		host:       host,
+		panfs:      panfs,
+		kubeClient: kubeClient,
+	}
+}
+
+func (d *Driver) updateNodeLabel(key, value string) error {
+	var patch []byte
+	if value == "" {
+		// Remove label
+		patch = []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, key))
+	} else {
+		// Set label
+		patch = []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value))
+	}
+
+	_, err := d.kubeClient.CoreV1().Nodes().Patch(
+		context.TODO(),
+		d.host, // your Node name from NodeGetInfo
+		types.MergePatchType,
+		patch,
+		metav1.PatchOptions{},
+	)
+	return err
 }
 
 // Run starts the gRPC server and listens for incoming CSI requests.
@@ -175,13 +215,20 @@ func (d *Driver) Run() error {
 
 		d.log.Info("shutting down server", "signal", s.String())
 
-		grpcServer.GracefulStop()
+		// // Unset the node label when shutting down
+		// if err := d.updateNodeLabel("node.kubernetes.io/csi-panfs.panfs.ready", ""); err != nil {
+		// 	d.log.Error(err, "failed to remove node label")
+		// } else {
+		// 	d.log.Info("removed node label")
+		// }
 
+		grpcServer.GracefulStop()
 		shutdownError <- nil
 	}()
 
 	d.log.Info("successfully registered services", "address", d.endpoint)
 
+	// Serve gRPC server
 	err = grpcServer.Serve(lis)
 	if !errors.Is(err, grpc.ErrServerStopped) {
 		return err
