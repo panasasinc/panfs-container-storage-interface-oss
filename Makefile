@@ -351,7 +351,8 @@ deploy-driver-with-manifest:
 	export PANFS_CSI_DRIVER_IMAGE=$(CSIDRIVER_IMAGE); \
 	export PANFS_DFC_IMAGE=$(CSIDFCKMM_IMAGE); \
 	export KERNEL_VERSION=$(KERNEL_VERSION); \
-	cat deploy/k8s/csi-driver/default.yaml | sed 's|<|$$|;s|>||;s/^\(  *\)# \(.*IMAGE_PULL_SECRET_NAME.*\)/\1\2/' | envsubst | kubectl apply --server-side -f -	
+	cat deploy/k8s/csi-driver/default.yaml | sed 's|<|$$|;s|>||;s/^\(  *\)# \(.*IMAGE_PULL_SECRET_NAME.*\)/\1\2/' | \
+	sed 's|\([^ ]*panfs-csi-driver:.*\)|$(CSIDRIVER_IMAGE)|' | envsubst | kubectl apply --server-side -f -	
 	@echo "$(GREEN)Successfully deployed PanFS CSI Driver using manifest file deploy/k8s/csi-panfs-driver.yaml$(RESET)"
 	@echo
 
@@ -586,9 +587,7 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs-storage-class-name \
 		--set csiPanFSDriver.namespace="<CSI_NAMESPACE>" \
-		--set csiPanFSDriver.controllerServiceAccount="<CSI_CONTROLLER_SA>" \
-		--set allowedTopologies[0].matchLabelExpressions[0].key=node-role.kubernetes.io/worker \
-		--set allowedTopologies[0].matchLabelExpressions[0].values[0]="" \
+		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
 		--set setAsDefaultStorageClass=false \
 		--set realm.address="<REALM_ADDRESS>" \
 		--set realm.username="<REALM_USERNAME>" \
