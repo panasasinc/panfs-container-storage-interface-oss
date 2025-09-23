@@ -18,7 +18,7 @@ metadata:
   name: single-pod-10v
 spec:
   nodeSelector:
-    kmm.node.kubernetes.io/csi-panfs.panfs.ready: ""
+    node.kubernetes.io/csi-driver.panfs.ready: "true"
   containers:
   - name: busybox
     image: ubuntu:latest

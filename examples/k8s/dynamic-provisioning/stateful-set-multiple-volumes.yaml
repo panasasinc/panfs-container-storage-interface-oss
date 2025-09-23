@@ -40,7 +40,7 @@ spec:
       # Apply nodeSelector to ensure the Pod is scheduled on a node
       # where the CSI PanFS driver is ready.
       nodeSelector:
-        kmm.node.kubernetes.io/csi-panfs.panfs.ready: ""
+        node.kubernetes.io/csi-driver.panfs.ready: "true"
       containers:
         - name: main-container
           image: ubuntu:latest
