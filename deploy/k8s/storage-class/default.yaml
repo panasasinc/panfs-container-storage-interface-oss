@@ -90,9 +90,9 @@ mountOptions: []
 # Topology constraints for volume provisioning to specific nodes
 allowedTopologies:
   - matchLabelExpressions:
-    - key: kmm.node.kubernetes.io/csi-panfs.panfs.ready
+    - key: node.kubernetes.io/csi-driver.panfs.ready
       values:
-      - ""
+      - "true"
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
