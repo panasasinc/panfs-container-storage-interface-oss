@@ -575,7 +575,6 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs-storage-class-name \
 		--set csiPanFSDriver.namespace="csi-panfs" \
-		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
 		--set setAsDefaultStorageClass=false \
 		--set realm.address="<REALM_ADDRESS>" \
 		--set realm.username="<REALM_USERNAME>" \
@@ -587,7 +586,6 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs-storage-class-name \
 		--set csiPanFSDriver.namespace="<CSI_NAMESPACE>" \
-		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
 		--set setAsDefaultStorageClass=false \
 		--set realm.address="<REALM_ADDRESS>" \
 		--set realm.username="<REALM_USERNAME>" \
@@ -595,7 +593,7 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
 		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
 		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
-		grep -v '^# Source:' > deploy/k8s/storage-class/with-secret-in-dedicated-ns-without-kmm.yaml
+		grep -v '^# Source:' > deploy/k8s/storage-class/with-secret-in-dedicated-ns.yaml
 
 .PHONY: manifests
 manifests: manifest-driver manifest-storageclass ## Generate manifests for the PanFS CSI Driver and Storage Class
