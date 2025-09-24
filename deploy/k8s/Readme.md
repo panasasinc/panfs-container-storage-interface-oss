@@ -6,11 +6,11 @@ This guide describes how to deploy the PanFS CSI Driver and StorageClass using t
 ## 1. Choosing the Correct CSI Driver Manifest
 
 - **Default installation (with KMM and SELinux in Enforcing/Permissive mode):**
-	- Use: `csi-driver/default.yaml`
+  - Use: `csi-driver/default.yaml`
 - **If you do NOT use Kernel Module Manager (KMM) in your cluster:**
-	- Use: `csi-driver/without-kmm.yaml`
+  - Use: `csi-driver/without-kmm.yaml`
 - **If SELinux is disabled in your cluster:**
-	- Use: `csi-driver/without-selinux.yaml`
+  - Use: `csi-driver/without-selinux.yaml`
 
 **Important:**
 Before applying the driver manifest, update the following parameters to match your infrastructure:
@@ -28,11 +28,11 @@ kubectl apply -f <selected-driver-manifest>.yaml
 Choose the manifest that matches your namespace and topology requirements:
 
 - **Secret and StorageClass in a dedicated namespace (with KMM topology):**
-	- Use: `storage-class/default.yaml`
+  - Use: `storage-class/default.yaml`
 - **Secret and StorageClass in the CSI Driver Namespace:**
-	- Use: `storage-class/with-secret-in-driver-ns.yaml`
+  - Use: `storage-class/with-secret-in-driver-ns.yaml`
 - **Secret and StorageClass in a dedicated namespace (without KMM topology):**
-	- Use: `storage-class/with-secret-in-dedicated-ns-without-kmm.yaml`
+  - Use: `storage-class/with-secret-in-dedicated-ns-without-kmm.yaml`
 
 **Important:**
 - Review all parameters and comments in the manifest.
@@ -52,14 +52,14 @@ After deploying the StorageClass, you can create PVCs referencing your StorageCl
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-	name: csi-panfs-sample
+  name: csi-panfs-sample
 spec:
-	accessModes:
-		- ReadWriteOnce
-	resources:
-		requests:
-			storage: 10Gi
-	storageClassName: csi-panfs-storage-class-name
+  storageClassName: csi-panfs-storage-class-name
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
 ```
 
 Apply with:
