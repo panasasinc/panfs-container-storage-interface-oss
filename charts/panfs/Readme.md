@@ -142,7 +142,6 @@ The `values.yaml` file contains configurable parameters.
 | panfsPlugin.pullPolicy | string | `"Always"` | Image pull policy for the PanFS CSI plugin |
 | panfsPlugin.resources | object | `{"limits":{"cpu":"300m","memory":"600Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}` | Resource requests and limits for the PanFS CSI plugin |
 | panfsPlugin.seLinuxOptions | object | `{"level":"s0","role":"system_r","type":"container_t","user":"system_u"}` | Security options for the PanFS CSI plugin |
-| productName | string | `"com.vdura.csi.panfs"` | Product name |
 | seLinux | bool | `true` |  |
 
 > **NOTE:** Please refer to the `values.yaml` file for a complete list of configurable parameters.

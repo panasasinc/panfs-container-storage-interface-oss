@@ -38,16 +38,24 @@ spec:
       labels:
         app: sample-deployment-with-rwo
     spec:
+      # Apply nodeSelector to ensure the Pod is scheduled on a node
+      # where the CSI PanFS driver is ready.
+      nodeSelector:
+        node.kubernetes.io/csi-driver.panfs.ready: "true"
+
+      # Apply affinity rules to prevent pods from being scheduled on the same node (soft).
       affinity:
         podAntiAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            - labelSelector:
-                matchExpressions:
-                  - key: app
-                    operator: In
-                    values:
-                      - sample-deployment-with-rwo
-              topologyKey: "kubernetes.io/hostname"
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchExpressions:
+                    - key: app
+                      operator: In
+                      values:
+                        - sample-deployment-with-rwo
+                topologyKey: "kubernetes.io/hostname"
       containers:
       - name: main-container
         image: ubuntu:latest
@@ -72,3 +80,4 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class

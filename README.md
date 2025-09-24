@@ -1,5 +1,6 @@
 [![Driver deployment](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/main.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/main.yaml)
 [![Vulnerability Scan](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml)
+[![Go Report Card](https://goreportcard.com/report/github.com/panasasinc/panfs-container-storage-interface-oss)](https://goreportcard.com/report/github.com/panasasinc/panfs-container-storage-interface-oss)
 
 # VDURA PanFS Container Storage Interface Driver
 
@@ -139,12 +140,11 @@ kubectl create secret docker-registry <your-secret-name> \
 
 This will deploy CSI driver components and the KMM module.
 
-Please update the settings in [deploy/k8s/csi-panfs-driver.yaml](deploy/k8s/csi-panfs-driver.yaml) according to your cluster specification and available image tags in your private registry:
+Please update the settings in [deploy/k8s/csi-driver/default.yaml](deploy/k8s/csi-driver/default.yaml) according to your cluster specification and available image tags in your private registry:
 
-- `<KERNEL_VERSION>` - Worker Node kernel version, should correspond to PANFS_KMM_IMAGE, e.g: `4.18.0-553.el8_10.x86_64`
-- `<PANFS_KMM_IMAGE>` - PanFS KMM module image, e.g: `<your private registry>/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.0.a-1860775.2`
-- `<PANFS_CSI_DRIVER_IMAGE>` - PanFS CSI Driver image, e.g: `<your private registry>/panfs-csi-driver:1.0.3`
-- `<IMAGE_PULL_SECRET_NAME>` - Image pull secret for fetching PanFS CSI Driver images from your private registry
+- `<IMAGE_PULL_SECRET_NAME>`: The name of your image pull secret for accessing container images.
+- `<PANFS_DFC_IMAGE>`: The full image reference for the PanFS DFC container.
+- `<KERNEL_VERSION>`: The kernel version required for your environment.
 
 Review other settings relevant to your Kubernetes infrastructure, such as:
 - `replicas`
@@ -153,7 +153,7 @@ Review other settings relevant to your Kubernetes infrastructure, such as:
 - etc
 
 ```bash
-kubectl apply -f deploy/k8s/csi-panfs-driver.yaml
+kubectl apply -f deploy/k8s/csi-driver/default.yaml
 ```
 
 The expected output will look like:
@@ -187,7 +187,7 @@ module.kmm.sigs.x-k8s.io/panfs created
   ```
   Expected output:
   ```
-  com.vdura.csi.panfs   true   true   false   <unset>   true   Persistent   1m
+  com.vdura.csi.panfs   false   false   false   <unset>   false   Persistent   1m
   ```
 
 - Check controller deployment:
@@ -220,19 +220,23 @@ module.kmm.sigs.x-k8s.io/panfs created
   panfs   1m
   ```
   ```bash
-  kubectl get module panfs -n csi-panfs -o custom-columns=NODES:.status.moduleLoader.nodesMatchingSelectorNumber,LOADED:.status.moduleLoader.availableNumber,DESIRED:.status.moduleLoader.desiredNumber
+  kubectl get module panfs -n csi-panfs -o yaml | sed -n '/status:$/,/^$/p'
   ```
   Expected output:
   ```
-  NODES   LOADED   DESIRED
-  6       6        6
+  status:
+    devicePlugin: {}
+    moduleLoader:
+      availableNumber: 10
+      desiredNumber: 10
+      nodesMatchingSelectorNumber: 10
   ```
 
 #### 3. Configure and deploy StorageClass
 
 The StorageClass defines how Kubernetes provisions PanFS-backed volumes.
 
-Configure authentication based on your PanFS Realm setup by editing the following placeholders in [deploy/k8s/csi-panfs-storage-class.yaml](deploy/k8s/csi-panfs-storage-class.yaml):
+Configure authentication based on your PanFS Realm setup by editing the following placeholders in [deploy/k8s/storage-class/default.yaml](deploy/k8s/storage-class/default.yaml):
 
 - `<STORAGE_CLASS_NAME>` - Storage Class name, e.g., `csi-panfs-storage-class`
 - `<REALM_ADDRESS>` - PanFS backend address, e.g., `panfs.example.com`
@@ -245,7 +249,7 @@ To make this StorageClass the default for your Kubernetes cluster, set the annot
 
 ```bash
 # Deploy PanFS Storage Class
-kubectl apply -f deploy/k8s/csi-panfs-storage-class.yaml
+kubectl apply -f deploy/k8s/storage-class/default.yaml
 ```
 
 The expected output will look like this:

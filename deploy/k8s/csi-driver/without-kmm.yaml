@@ -25,6 +25,9 @@ kind: ServiceAccount
 metadata:
   name: csi-panfs-controller
   namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    product: com.vdura.csi.panfs
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -35,6 +38,9 @@ kind: ServiceAccount
 metadata:
   name: csi-panfs-node
   namespace: csi-panfs
+  labels:
+    app: csi-panfs-node
+    product: com.vdura.csi.panfs
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -44,6 +50,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-provisioner
+  labels:
+    app: csi-panfs-controller
+    sidecar: provisioner
+    product: com.vdura.csi.panfs
 rules:
   # Allow managing PersistentVolumes for provisioning and deletion
   - apiGroups: [""]
@@ -88,6 +98,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-attacher
+  labels:
+    app: csi-panfs-controller
+    sidecar: attacher
+    product: com.vdura.csi.panfs
 rules:
   # Allow patching PersistentVolumes for attach/detach operations
   - apiGroups: [""]
@@ -117,6 +131,10 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-resizer
+  labels:
+    app: csi-panfs-controller
+    sidecar: resizer
+    product: com.vdura.csi.panfs
 rules:
   # Allow patching PersistentVolumes for resizing
   - apiGroups: [""]
@@ -151,6 +169,9 @@ kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-node
+  labels:
+    app: csi-panfs-node
+    product: com.vdura.csi.panfs
 rules:
   # Allow emitting and updating events
   - apiGroups: [""]
@@ -170,6 +191,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-provisioner-rolebinding
+  labels:
+    app: csi-panfs-controller
+    sidecar: provisioner
+    product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
     name: csi-panfs-controller
@@ -187,6 +212,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-attacher-rolebinding
+  labels:
+    app: csi-panfs-controller
+    sidecar: attacher
+    product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
     name: csi-panfs-controller
@@ -204,6 +233,10 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-resizer-rolebinding
+  labels:
+    app: csi-panfs-controller
+    sidecar: resizer
+    product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
     name: csi-panfs-controller
@@ -221,6 +254,9 @@ kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-node-rolebinding
+  labels:
+    app: csi-panfs-node
+    product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
     name: csi-panfs-node
@@ -233,12 +269,35 @@ roleRef:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
+# Namespace Role for reading secrets
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-secret-reader
+  namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    sidecar: secret-provisioner
+    product: com.vdura.csi.panfs
+rules:
+  # Allow reading secrets for accessing PanFS realm credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
 # Namespace Role for leader election and storage capacity tracking
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-provisioner
   namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    sidecar: provisioner
+    product: com.vdura.csi.panfs
 rules:
   # Allow leader election via leases
   - apiGroups: ["coordination.k8s.io"]
@@ -269,11 +328,37 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-attacher
   namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    sidecar: attacher
+    product: com.vdura.csi.panfs
 rules:
   # Allow leader election via leases for attacher sidecar
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
     verbs: ["get", "watch", "list", "delete", "update", "create"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Bind the secret reader Role to the controller ServiceAccount
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-secret-reader-rolebinding
+  namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    sidecar: secret-provisioner
+    product: com.vdura.csi.panfs
+subjects:
+  - kind: ServiceAccount
+    name: csi-panfs-controller
+    namespace: csi-panfs
+roleRef:
+  kind: Role
+  name: csi-panfs-controller-secret-reader
+  apiGroup: rbac.authorization.k8s.io
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -284,6 +369,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-provisioner-rolebinding
   namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    sidecar: provisioner
+    product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
     name: csi-panfs-controller
@@ -302,6 +391,10 @@ apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-attacher-rolebinding
   namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    sidecar: attacher
+    product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
     name: csi-panfs-controller
@@ -350,10 +443,9 @@ spec: # csi-panfs-node
       # ServiceAccount for node plugin
       serviceAccount: csi-panfs-node
 
-      # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-      # uncomment the line below and set the secret name to enable pulling images from a private registry.
-      imageRepoSecret:
-        # - name: <PULL-SECRET-NAME>
+      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      imagePullSecrets:
+        # - name: <IMAGE_PULL_SECRET_NAME>
 
       # SELinux security context
       securityContext:
@@ -582,10 +674,9 @@ spec: # csi-panfs-controller
       # ServiceAccount for the controller pods
       serviceAccount: csi-panfs-controller
 
-      # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-      # uncomment the line below and set the secret name to enable pulling images from a private registry.
-      imageRepoSecret:
-        # - name: <PULL-SECRET-NAME>
+      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      imagePullSecrets:
+        # - name: <IMAGE_PULL_SECRET_NAME>
 
       containers:
         # Main PanFS CSI plugin container
@@ -772,6 +863,11 @@ apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
   name: com.vdura.csi.panfs
+  annotations:
+    csi-driver-namespace: csi-panfs
+    csi-driver-controller-sa: csi-panfs-controller
+  labels:
+    product: com.vdura.csi.panfs
 spec:
   attachRequired: false
   podInfoOnMount: false

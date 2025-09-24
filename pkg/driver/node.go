@@ -24,6 +24,16 @@ import (
 	"google.golang.org/grpc/status"
 )
 
+const (
+	// NodeLabelKey is the Kubernetes node label key used to indicate the readiness of the PanFS CSI driver on the node.
+	NodeLabelKey = "node.kubernetes.io/csi-driver.panfs.ready"
+)
+
+var (
+	// IsNodeLabelSet tracks whether the node label has been set to avoid redundant updates.
+	IsNodeLabelSet = false
+)
+
 // NodeStageVolume handles the CSI NodeStageVolume request.
 // Logs the request and returns an unimplemented error.
 //
@@ -248,8 +258,27 @@ func (d *Driver) NodeExpandVolume(ctx context.Context, in *csi.NodeExpandVolumeR
 //	error - Always nil.
 func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
 	d.log.V(2).Info("NodeGetInfo called")
+
+	// Set the label when starting up
+	nodeLabelValue := "true"
+	if err := d.updateNodeLabel(NodeLabelKey, nodeLabelValue); err != nil {
+		d.log.Error(err, "failed to set node label")
+		return &csi.NodeGetInfoResponse{
+			NodeId: d.host,
+			AccessibleTopology: &csi.Topology{
+				Segments: map[string]string{},
+			},
+			MaxVolumesPerNode: 0,
+		}, nil
+	}
+
 	return &csi.NodeGetInfoResponse{
-		NodeId:            d.host,
+		NodeId: d.host,
+		AccessibleTopology: &csi.Topology{
+			Segments: map[string]string{
+				NodeLabelKey: nodeLabelValue,
+			},
+		},
 		MaxVolumesPerNode: 0,
 	}, nil
 }

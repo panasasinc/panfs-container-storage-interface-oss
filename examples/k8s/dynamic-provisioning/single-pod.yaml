@@ -11,14 +11,17 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-
 apiVersion: v1
 kind: Pod
 metadata:
   name: single-pod
 spec:
+  # Apply nodeSelector to ensure the Pod is scheduled on a node
+  # where the CSI PanFS driver is ready.
+  nodeSelector:
+    node.kubernetes.io/csi-driver.panfs.ready: "true"
   containers:
-  - name: busybox
+  - name: main-container
     image: ubuntu:latest
     command: [ "sleep", "1000000" ]
     volumeMounts:
@@ -43,3 +46,4 @@ spec:
   resources:
     requests:
       storage: 5Gi
+  storageClassName: csi-panfs-storage-class

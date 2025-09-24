@@ -20,7 +20,15 @@
 apiVersion: storage.k8s.io/v1
 kind: CSIDriver
 metadata:
-  name: {{ .Values.productName }}
+  name: com.vdura.csi.panfs
+  annotations:
+    csi-driver-namespace: {{ .Release.Namespace }}
+    csi-driver-controller-sa: {{ .Release.Namespace }}-controller
+  labels:
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 spec:
   attachRequired: false
   podInfoOnMount: false

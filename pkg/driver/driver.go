@@ -18,6 +18,7 @@
 package driver
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -30,7 +31,12 @@ import (
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/klog/v2"
+
+	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/rest"
 )
 
 //go:generate mockgen -source=driver.go -destination=mock/mock_driver.go -package=mock StorageProviderClient PanMounter
@@ -56,11 +62,12 @@ type Driver struct {
 	Version string
 	Name    string
 
-	endpoint  string
-	host      string
-	log       klog.Logger
-	mounterV2 PanMounter
-	panfs     StorageProviderClient
+	endpoint   string
+	host       string
+	log        klog.Logger
+	mounterV2  PanMounter
+	panfs      StorageProviderClient
+	kubeClient *kubernetes.Clientset
 	csi.UnimplementedIdentityServer
 	csi.UnimplementedControllerServer
 	csi.UnimplementedNodeServer
@@ -126,14 +133,36 @@ func CreateDriver(
 		return nil
 	}
 
+	var kubeClient *kubernetes.Clientset
+
+	// If CSI_SANITY_MODE is not set to true, do not initialize kubeClient
+	// This is useful for running csi-sanity tests which do not require kubeClient
+	// and do not have access to in-cluster config
+	if os.Getenv("CSI_SANITY_MODE") == "true" {
+		kubeClient = nil
+	} else {
+		// Initialize Kubernetes client
+		config, err := rest.InClusterConfig()
+		if err != nil {
+			log.Error(err, "failed to get in-cluster kubeconfig")
+			return nil
+		}
+		kubeClient, err = kubernetes.NewForConfig(config)
+		if err != nil {
+			log.Error(err, "failed to create kube client")
+			return nil
+		}
+	}
+
 	return &Driver{
-		Version:   version,
-		Name:      driverName,
-		endpoint:  endpoint,
-		mounterV2: mounterV2,
-		log:       log,
-		host:      host,
-		panfs:     panfs,
+		Version:    version,
+		Name:       driverName,
+		endpoint:   endpoint,
+		mounterV2:  mounterV2,
+		log:        log,
+		host:       host,
+		panfs:      panfs,
+		kubeClient: kubeClient,
 	}
 }
 
@@ -175,13 +204,18 @@ func (d *Driver) Run() error {
 
 		d.log.Info("shutting down server", "signal", s.String())
 
-		grpcServer.GracefulStop()
+		// Unset the node label when shutting down
+		if err := d.updateNodeLabel(NodeLabelKey, ""); err != nil {
+			d.log.Error(err, "failed to remove node label")
+		}
 
+		grpcServer.GracefulStop()
 		shutdownError <- nil
 	}()
 
 	d.log.Info("successfully registered services", "address", d.endpoint)
 
+	// Serve gRPC server
 	err = grpcServer.Serve(lis)
 	if !errors.Is(err, grpc.ErrServerStopped) {
 		return err
@@ -195,4 +229,60 @@ func (d *Driver) Run() error {
 	d.log.Info("gRPC server stopped")
 
 	return nil
+}
+
+// updateNodeLabel sets or removes a label on the Kubernetes node where the driver is running.
+//
+// Parameters:
+//
+//	key   - The label key to set or remove.
+//	value - The label value to set. If empty, the label will be removed.
+//
+// Returns:
+//
+//	error - Returns an error if the Kubernetes API call fails.
+//
+// Behavior:
+//   - If kubeClient is nil, the function does nothing.
+//   - If the global variable IsNodeLabelSet is false and value is empty, the function does nothing.
+//   - If value is empty, the function removes the label with the specified key from the node.
+//   - If value is non-empty, the function sets the label with the specified key to the given value on the node.
+func (d *Driver) updateNodeLabel(key, value string) error {
+	// If kubeClient is not initialized, do nothing
+	if d.kubeClient == nil {
+		return nil
+	}
+
+	// If the label is not set in the configuration and value is empty, do nothing
+	if !IsNodeLabelSet && value == "" {
+		return nil
+	}
+
+	var patch []byte
+	if value == "" {
+		// Remove label
+		patch = []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":null}}}`, key))
+	} else {
+		// Set label
+		patch = []byte(fmt.Sprintf(`{"metadata":{"labels":{"%s":"%s"}}}`, key, value))
+	}
+
+	_, err := d.kubeClient.CoreV1().Nodes().Patch(
+		context.TODO(),
+		d.host,
+		types.MergePatchType,
+		patch,
+		metav1.PatchOptions{},
+	)
+
+	if err == nil {
+		if value == "" {
+			d.log.Info("removed node label", "label", key, "node", d.host)
+		} else {
+			d.log.Info("set node label", "label", fmt.Sprintf("%s=%s", key, value), "node", d.host)
+			IsNodeLabelSet = true
+		}
+	}
+
+	return err
 }

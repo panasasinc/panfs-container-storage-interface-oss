@@ -13,7 +13,7 @@
   # See the License for the specific language governing permissions and
   # limitations under the License.
 */}}
-{{- if .Values.panfsKmmModule.enabled}}
+{{- if .Values.panfsKmmModule.enabled }}
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
@@ -25,7 +25,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: panfs-kmm-module
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
     {{- if .Values.labels }}
     {{- toYaml .Values.labels | nindent 4 }}
     {{- end }}
@@ -48,7 +48,7 @@ spec:
   # If your cluster does not inherit image pull credentials from the default ServiceAccount,
   # uncomment the line below and set the secret name to enable pulling images from a private registry.
   imageRepoSecret:
-    # name: <PULL-SECRET-NAME>
+    # name: <IMAGE_PULL_SECRET_NAME>
   {{- end }}
   {{- if .Values.panfsKmmModule.selector }}
 
@@ -68,13 +68,10 @@ spec:
 
       # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
-      {{- $kernelNotSetMessage := "<KERNEL_VERSION> # Replace with your Worker node kernel version" }}
-      {{- $imageNotSetMessage := "<PANFS_DFC_IMAGE> # Change to Kernel-related corresponding DFC/KMM image" }}
       {{- range .Values.dfcRelease.kernelMappings }}
-        - literal: {{if .literal }}{{ .literal }}{{else}}{{ $kernelNotSetMessage }}{{end }}
-          containerImage: {{if .containerImage }}{{ .containerImage }}{{else if .image }}{{ .image }}{{ else }}{{ $imageNotSetMessage }}{{end }}
+        - {{ . }}
       {{- else }}
-        - literal: {{ $kernelNotSetMessage}}
-          containerImage: {{ $imageNotSetMessage }}
+        - literal: "<KERNEL_VERSION>"         # Replace with your Worker node kernel version
+          containerImage: "<PANFS_DFC_IMAGE>" # Change to Kernel-related corresponding DFC/KMM image
       {{- end }}
 {{ end }}

@@ -24,7 +24,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: csi-panfs-controller
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
     {{- if .Values.labels }}
     {{- toYaml .Values.labels | nindent 4 }}
     {{- end }}
@@ -49,7 +49,7 @@ spec: # csi-panfs-controller
     metadata:
       labels:
         app: csi-panfs-controller
-        product: {{ .Values.productName }}
+        product: com.vdura.csi.panfs
         {{- if .Values.labels }}
         {{- toYaml .Values.labels | nindent 8 }}
         {{- end }}
@@ -75,17 +75,16 @@ spec: # csi-panfs-controller
       # kubectl create secret docker-registry -n {{ .Release.Namespace }} {{ index .Values.imagePullSecrets 0 }} \
       #   --docker-server=<REGISTRY_URL> \
       #   --docker-username=<USERNAME> \
-      #   --docker-password=<PASSWORD>
+      #   --docker-password=<PASSWORD_OR_TOKEN>
       imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
         - name: {{ . }}
         {{- end }}
       {{- else }}
 
-      # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-      # uncomment the line below and set the secret name to enable pulling images from a private registry.
-      imageRepoSecret:
-        # - name: <PULL-SECRET-NAME>
+      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      imagePullSecrets:
+        # - name: <IMAGE_PULL_SECRET_NAME>
       {{- end }}
       {{- if .Values.controllerServer.tolerations}}
 

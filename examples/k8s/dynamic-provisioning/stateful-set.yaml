@@ -38,6 +38,10 @@ spec:
       labels:
         app: sample-statefulset
     spec:
+      # Apply nodeSelector to ensure the Pod is scheduled on a node
+      # where the CSI PanFS driver is ready.
+      nodeSelector:
+        node.kubernetes.io/csi-driver.panfs.ready: "true"
       containers:
         - name: main-container
           image: ubuntu:latest
@@ -55,3 +59,4 @@ spec:
         resources:
           requests:
             storage: 10Gi
+        storageClassName: csi-panfs-storage-class
