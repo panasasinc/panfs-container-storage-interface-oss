@@ -18,9 +18,9 @@ csiPanFSDriver:
   # -- Product name for the PanFS CSI driver
   productName: com.vdura.csi.panfs
   # -- Namespace where the PanFS CSI driver is deployed
-  namespace: 
+  namespace: csi-panfs
   # -- Service account used by the PanFS CSI driver controller
-  controllerServiceAccount: 
+  controllerServiceAccount: csi-panfs-controller
 
 # PanFS Realm Endpoint Configuration
 realm:
@@ -37,14 +37,6 @@ realm:
 
 # -- Whether to set current storage class default for the cluster or not
 setAsDefaultStorageClass: false
-
-# -- Add topology constraints to restrict volume provisioning to specific nodes
-# @default -- `[{key: "node.kubernetes.io/csi-driver.panfs.ready", values: ["true"]}]`
-allowedTopologies:
-  - matchLabelExpressions:
-    - key: node.kubernetes.io/csi-driver.panfs.ready
-      values:
-        - "true"
 
 # -- Allow volume expansion for realms
 allowVolumeExpansion: true
