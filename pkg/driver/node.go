@@ -276,16 +276,6 @@ func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*
 	}, nil
 }
 
-/*
-func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*csi.NodeGetInfoResponse, error) {
-	d.log.V(2).Info("NodeGetInfo called")
-	return &csi.NodeGetInfoResponse{
-		NodeId:            d.host,
-		MaxVolumesPerNode: 0,
-	}, nil
-}
-*/
-
 // NodeGetVolumeStats handles the CSI NodeGetVolumeStats request.
 // Logs the request and returns an unimplemented error.
 //
