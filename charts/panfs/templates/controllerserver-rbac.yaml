@@ -151,31 +151,6 @@ roleRef:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Bind the secret reader Role to the controller ServiceAccount
-kind: RoleBinding
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: {{ .Release.Namespace }}-controller-secret-reader-rolebinding
-  namespace: {{ .Release.Namespace }}
-  labels:
-    app: csi-panfs-controller
-    sidecar: secret-provisioner
-    product: com.vdura.csi.panfs
-    {{- if .Values.labels }}
-    {{- toYaml .Values.labels | nindent 4 }}
-    {{- end }}
-subjects:
-  - kind: ServiceAccount
-    name: {{ .Release.Namespace }}-controller
-    namespace: {{ .Release.Namespace }}
-roleRef:
-  kind: Role
-  name: {{ .Release.Namespace }}-controller-secret-reader
-  apiGroup: rbac.authorization.k8s.io
----
-# SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 VDURA Inc.
-
 # Namespace Role for leader election and storage capacity tracking
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
