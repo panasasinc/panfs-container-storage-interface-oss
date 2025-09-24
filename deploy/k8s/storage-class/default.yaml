@@ -1,29 +1,16 @@
 ---
-# Namespace for the PanFS Realm Credentials Secret
-apiVersion: v1
-kind: Namespace
-metadata:
-  name: <STORAGE_CLASS_NAME>
----
+# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+
 # Secret for the PanFS Storage Class (Realm Address, Username, Password, Private Key, and Passphrase)
 apiVersion: v1
 kind: Secret
 metadata:
-  name: <STORAGE_CLASS_NAME>
-  namespace: <STORAGE_CLASS_NAME>
+  name: csi-panfs-storage-class-name
+  namespace: csi-panfs-storage-class-name
+  labels:
+    app: csi-panfs-storage-class-name
+    product: com.vdura.csi.panfs
 type: Opaque
 stringData:
   # Realm address, username, password, and/or private key for the PanFS backend
@@ -46,29 +33,21 @@ stringData:
   private_key_passphrase: >-
     <REALM_PRIVATE_KEY_PASSPHRASE>
 ---
+# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 # Storage Class for PanFS CSI
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: <STORAGE_CLASS_NAME>
+  name: csi-panfs-storage-class-name
   annotations:
     # Set this to true to mark this StorageClass as the default
     # This allows Kubernetes to use this StorageClass automatically for PVCs that do not specify a StorageClass
     storageclass.kubernetes.io/is-default-class: "false"
+  labels:
+    product: com.vdura.csi.panfs
+    release: csi-panfs-storage-class-name
 
 provisioner: com.vdura.csi.panfs
 allowVolumeExpansion: true
@@ -86,8 +65,8 @@ reclaimPolicy: Delete
 parameters:
   # Relates to Secret object that contains credentials for the CSI driver
   # This secret is used by the CSI driver to authenticate with the PanFS backend
-  csi.storage.k8s.io/provisioner-secret-name: &secretName <STORAGE_CLASS_NAME>
-  csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace <STORAGE_CLASS_NAME>
+  csi.storage.k8s.io/provisioner-secret-name: &secretName csi-panfs-storage-class-name
+  csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace csi-panfs-storage-class-name
   csi.storage.k8s.io/node-publish-secret-name: *secretName
   csi.storage.k8s.io/node-publish-secret-namespace: *secretNamespace
   csi.storage.k8s.io/controller-expand-secret-name: *secretName
@@ -105,34 +84,25 @@ parameters:
   panfs.csi.vdura.com/rgwidth: "3"
   panfs.csi.vdura.com/stripeunit: "64k"
 
-# Optional mount options for the volumes created by this StorageClass
-# These options are passed to the underlying filesystem when mounting the volume
+# No custom mount options specified; using defaults
 mountOptions: []
 ---
+# SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 
 # Role that defines permissions for the CSI driver to read secrets
-# This role allows the PanFS CSI driver to access secrets containing
+# This role allows the PanFS CSI driver ServiceAccount to access secrets containing
 # storage credentials and configuration needed for volume operations
 # NOTE: This is a namespace-scoped Role, so it only grants access to secrets
-# in the current namespace (<STORAGE_CLASS_NAME>), not cluster-wide
+# in the current namespace (csi-panfs-storage-class-name), not cluster-wide
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-read-secret
-  namespace: <STORAGE_CLASS_NAME>
+  namespace: csi-panfs-storage-class-name
+  labels:
+    app: csi-panfs-storage-class-name
+    product: com.vdura.csi.panfs
 rules:
   # Allow access to secrets for CSI driver credentials
   # The CSI driver needs to read secrets that contain PanFS backend credentials
@@ -141,6 +111,9 @@ rules:
     resources: ["secrets"]
     verbs: ["get", "list"]
 ---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
 # RoleBinding that connects the CSI driver service account to the secret-read role
 # This binding grants the PanFS CSI controller service account the permissions
 # defined in the role above, allowing it to read secrets in this namespace
@@ -148,13 +121,16 @@ kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
   name: csi-panfs-controller-read-secret-rolebinding
-  namespace: <STORAGE_CLASS_NAME>
+  namespace: csi-panfs-storage-class-name
+  labels:
+    app: csi-panfs-storage-class-name
+    product: com.vdura.csi.panfs
 subjects:
   # The service account used by the PanFS CSI driver controller
   # Relates to PanFS Driver ServiceAccount (controller) 
   - kind: ServiceAccount
-    name: csi-panfs-controller    # The name of the PanFS CSI Driver service account
-    namespace: csi-panfs          # The namespace where the PanFS CSI Driver is deployed
+    name: csi-panfs-controller # The name of the PanFS CSI Driver service account
+    namespace: csi-panfs # The namespace where the PanFS CSI Driver is deployed into
 roleRef:
   # Reference to the Role defined above that grants secret read permissions
   kind: Role

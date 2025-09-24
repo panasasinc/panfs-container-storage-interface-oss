@@ -1,18 +1,214 @@
+<!--
+  # Copyright 2025 VDURA Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+-->
+
 # csi-panfs-storageclass
 
 PanFS Realm Storage Class Chart
 
-![Version: 0.1.0](https://img.shields.io/badge/Version-0.1.0-informational?style=flat-square) ![AppVersion: 1.0](https://img.shields.io/badge/AppVersion-1.0-informational?style=flat-square)
+![Version: 1.2.2](https://img.shields.io/badge/Version-1.2.2-informational?style=flat-square) ![AppVersion: 1.2.2](https://img.shields.io/badge/AppVersion-1.2.2-informational?style=flat-square)
+
+## What PanFS CSI StorageClass is
+
+The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource that leverages the PanFS Container Storage Interface (CSI) driver to provision and manage persistent storage volumes on a PanFS backend. The chart enables you to configure parameters such as the PanFS realm endpoint, authentication credentials, and volume options.
+
+> **Note:** Installation into the `default` namespace is not permitted. You must specify a non-default namespace using the `--namespace <namespace>` option during installation.
+
+### Resources Created by the Helm Chart
+
+- A `StorageClass` resource that uses the PanFS CSI driver to provision and manage persistent storage volumes on a PanFS backend.
+- A `Secret` resource containing PanFS realm credentials (address, username, password, and private key).
+- If the PanFS realm credentials secret resides in a different namespace than the PanFS CSI driver, the chart creates a `Role` and `RoleBinding` to allow the CSI driver to access the secret.
+
+## Usage
+
+To use this chart, ensure your Kubernetes cluster has the PanFS CSI driver installed. You can then create a StorageClass resource that uses the CSI driver.
+
+### Examples
+
+### 1. Creating a StorageClass with default parameters
+
+Install the chart **in the same namespace** as the PanFS CSI driver.
+
+```bash
+helm upgrade --install <STORAGE_CLASS_NAME> ./ \
+    --namespace <CSI_DRIVER_NAMESPACE> \
+    --set realm.address=realm-address \
+    --set realm.username=username \
+    --set realm.password=password
+```
+
+> Note: The `--create-namespace` flag is not required when installing in an existing namespace.
+
+#### Using Helm overrides:
+```yaml
+realm:
+  address: "panfs-realm.example.com"
+  username: "username"
+  password: "password"
+```
+
+You can also use a YAML file to provide the necessary overrides. Below is an example of such a file:
+```yaml
+realm:
+  address: "panfs-realm.example.com"
+  username: "username"
+  password: "password"
+```
+
+Install the chart using the overrides file:
+```bash
+helm upgrade --install <STORAGE_CLASS_NAME> ./ \
+    --namespace <CSI_DRIVER_NAMESPACE> \
+    --values path/to/your/overrides.yaml
+```
+
+### 2. Creating a StorageClass with custom parameters
+
+Install the chart **in a different namespace** than the PanFS CSI driver.
+
+```bash
+helm upgrade --install <STORAGE_CLASS_NAME> ./ \
+    --namespace <REALM_SECRET_NAMESPACE> \
+    --create-namespace \
+    --set realm.address=realm-address \
+    --set realm.username=admin \
+    --set realm.password=admin-password \
+    --set csiPanFSDriver.namespace=<CSI_DRIVER_NAMESPACE> \
+    --set csiPanFSDriver.controllerServiceAccount=<CSI_DRIVER_CONTROLLER_SERVICE_ACCOUNT>
+```
+
+> Note: The `--create-namespace` flag is required since installing in a new namespace.
+
+If the PanFS realm credentials secret is in a different namespace, the chart creates the necessary permissions for the CSI driver to read the secret.
+
+To identify the Service Account used by the PanFS CSI driver controller, run the provided command:
+
+```bash
+kubectl get serviceaccount -A -l app=csi-panfs-controller,product=com.vdura.csi.panfs
+```
+
+#### Using Helm overrides:
+
+You can also use a YAML file to provide the necessary overrides. Below is an example of such a file:
+```yaml
+realm:
+  address: "panfs-realm.example.com"
+  username: "username"
+  password: "password"
+
+csiPanFSDriver:
+  namespace: csi-panfs
+  controllerServiceAccount: csi-panfs-controller
+```
+
+Install the chart using the overrides file:
+```bash
+helm upgrade --install <STORAGE_CLASS_NAME> ./ \
+    --namespace <REALM_SECRET_NAMESPACE> \
+    --create-namespace \
+    --values path/to/your/overrides.yaml
+```
+
+### Verifying the installation
+
+#### 1. Checking the StorageClass
+
+Use the provided command to list StorageClasses.
+
+```bash
+kubectl get sc -l product=com.vdura.csi.panfs
+```
+
+#### 2. Deploying a Sample Workload
+
+A sample manifest is provided to demonstrate usage.
+
+```yaml
+# Sample Pod that uses the PVC to mount the PanFS volume
+apiVersion: v1
+kind: Pod
+metadata:
+  name: single-pod
+spec:
+  containers:
+    - name: busybox
+      image: ubuntu:latest
+      command: [ "sleep", "1000000" ]
+      volumeMounts:
+        - mountPath: "/data-1"
+          name: my-volume-1
+      resources:
+        limits:
+          memory: 1G
+          cpu: "100m"
+  volumes:
+    - name: my-volume-1
+      persistentVolumeClaim:
+        claimName: csi-pvc-single-pod
+---
+# Sample PVC that uses the StorageClass created by this Helm chart
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: csi-pvc-single-pod
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: <STORAGE_CLASS_NAME>
+```
+
+Check the status of pods, PVCs, and PVs using the provided command.
+
+```bash
+kubectl get po,pvc,pv
+```
+
+If you encounter errors:
+
+- Verify the realm credentials in the StorageClass secret.
+- Check the logs of the CSI driver:
+  - For controller issues (volume provisioning), review the controller logs:
+    ```
+    kubectl logs -n <CSI_DRIVER_NAMESPACE> -l app=csi-panfs-controller --all-pods -c csi-panfs-plugin
+    ```
+  - For node issues (volume mounting), review the node logs:
+    ```
+    kubectl logs -n <CSI_DRIVER_NAMESPACE> -l app=csi-panfs-node --all-pods -c csi-panfs-plugin
+    ```
+
+### Uninstalling the chart
+
+Use the provided command to uninstall the chart from the specified namespace.
+
+```bash
+helm uninstall <STORAGE_CLASS_NAME> \
+    --namespace=<NAMESPACE>
+```
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | allowVolumeExpansion | bool | `true` | Allow volume expansion for realms |
-| csiPanFSDriver | object | `{"controllerServiceAccount":"csi-panfs-controller","namespace":"csi-panfs","productName":"com.vdura.csi.panfs"}` | PanFS CSI Driver details |
+| csiPanFSDriver | object | `{...}` | PanFS CSI Driver details |
 | csiPanFSDriver.controllerServiceAccount | string | `"csi-panfs-controller"` | Service account used by the PanFS CSI driver controller |
 | csiPanFSDriver.namespace | string | `"csi-panfs"` | Namespace where the PanFS CSI driver is deployed |
-| csiPanFSDriver.productName | string | `"com.vdura.csi.panfs"` | Product name for the PanFS CSI driver |
 | mountOptions | list | `[]` |  |
 | parameters | object | `{...}` | Optional storage class parameters |
 | realm.address | string | `""` | Endpoint address for the backend PanFS realm |
@@ -22,9 +218,11 @@ PanFS Realm Storage Class Chart
 | realm.username | string | `""` | Username for the PanFS backend realm |
 | setAsDefaultStorageClass | bool | `false` | Whether to set current storage class default for the cluster or not |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |
-| volumeReclaimPolicy | string | `"Delete"` | Default reclaim policy for volumes |
+| volumeReclaimPolicy | string | `Delete` | Default reclaim policy for volumes |
 
 ### PanFS Specific Volume Parameters (see PanCLI User Guide for the details)
+
+Refer to the PanCLI User Guide for details on the following parameters:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
@@ -44,51 +242,3 @@ PanFS Realm Storage Class Chart
 | parameters."panfs.csi.vdura.com/gperm" | string | `""` | Group permissions |
 | parameters."panfs.csi.vdura.com/operm" | string | `""` | Other permissions |
 
-## Usage
-To use this chart, you need to have a Kubernetes cluster with the CSI driver for PanFS installed. You can then create a StorageClass resource that uses the CSI driver.
-
-### 1. Checking chart configuration
-
-```bash
-helm lint charts/storageclass \
-    --set realm.address=realm-address \
-    --set realm.username=admin \
-    --set realm.password=admin-password
-```
-
-### 2. Installing the chart
-
-```bash
-helm upgrade --install csi-panfs-storage-class-1 charts/storageclass \
-    --namespace=csi-panfs-realm-1 --create-namespace \
-    --set realm.address=realm-address \
-    --set realm.username=admin \
-    --set realm.password=admin-password
-```
-
-### 4. Verifying the installation
-```bash
-kubectl get storageclass csi-panfs-storage-class-1 \
-    --namespace=csi-panfs-realm-1
-```
-### 5. Creating a Persistent Volume Claim (PVC)
-```yaml
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: my-pvc
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 1Gi
-  storageClassName: csi-panfs-storage-class-1
-```
-
-### 6. Uninstalling the chart
-
-```bash
-helm uninstall csi-panfs-storage-class-1 \
-    --namespace=csi-panfs-realm-1
-```

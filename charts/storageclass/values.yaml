@@ -15,8 +15,6 @@
 # -- PanFS CSI Driver details
 # @default -- `{...}`
 csiPanFSDriver:
-  # -- Product name for the PanFS CSI driver
-  productName: com.vdura.csi.panfs
   # -- Namespace where the PanFS CSI driver is deployed
   namespace: csi-panfs
   # -- Service account used by the PanFS CSI driver controller

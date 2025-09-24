@@ -10,6 +10,7 @@ metadata:
   namespace: csi-panfs
   labels:
     app: csi-panfs-controller
+    product: com.vdura.csi.panfs
 spec:
   minAvailable: 1
   selector:
@@ -265,25 +266,6 @@ roleRef:
   kind: ClusterRole
   name: csi-panfs-node
   apiGroup: rbac.authorization.k8s.io
----
-# SPDX-License-Identifier: Apache-2.0
-# Copyright 2025 VDURA Inc.
-
-# Namespace Role for reading secrets
-kind: Role
-apiVersion: rbac.authorization.k8s.io/v1
-metadata:
-  name: csi-panfs-controller-secret-reader
-  namespace: csi-panfs
-  labels:
-    app: csi-panfs-controller
-    sidecar: secret-provisioner
-    product: com.vdura.csi.panfs
-rules:
-  # Allow reading secrets for accessing PanFS realm credentials
-  - apiGroups: [""]
-    resources: ["secrets"]
-    verbs: ["get", "list"]
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.

@@ -1,0 +1,31 @@
+Thank you for installing '{{ .Chart.Name }}'.
+
+## Please double-check your PanFS Realm credentials:
+
+kubectl get secret -n {{ .Release.Namespace }} {{ .Release.Name }}
+
+{{if not (or (eq .Release.Namespace (.Values.csiPanFSDriver.namespace | default "")) (eq (.Values.csiPanFSDriver.namespace | default "") "")) }}
+Your Realm credentials are located in the '{{ .Release.Namespace }}' namespace and require the PanFS CSI Driver to read them.
+
+Please double-check that the current configuration is correct:
+- The CSI Driver namespace is set to '{{ .Values.csiPanFSDriver.namespace}}'
+- The CSI Driver Controller Service Account is set to '{{ .Values.csiPanFSDriver.controllerServiceAccount }}'
+
+Use this command:
+
+kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o yaml | grep '^  *csi-driver-'
+{{ end }}
+
+## You can now use PVCs like this:
+
+apiVersion: v1
+kind: PersistentVolumeClaim
+  metadata:
+    name: csi-panfs-sample
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: XXXGi
+  storageClassName: {{ .Release.Name }}

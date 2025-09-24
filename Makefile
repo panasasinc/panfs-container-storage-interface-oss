@@ -561,25 +561,42 @@ manifest-driver: ## Generate manifests for the PanFS CSI Driver
 .PHONY: manifest-storageclass
 manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 	@echo "Generating manifests for the PanFS CSI Storage Class..."
-	@mkdir -p deploy/k8s
-	@echo "---" > deploy/k8s/csi-panfs-storage-class.yaml
-	@echo "# Namespace for the PanFS Realm Credentials Secret" >> deploy/k8s/csi-panfs-storage-class.yaml
-	@echo "apiVersion: v1" >> deploy/k8s/csi-panfs-storage-class.yaml
-	@echo "kind: Namespace" >> deploy/k8s/csi-panfs-storage-class.yaml
-	@echo "metadata:" >> deploy/k8s/csi-panfs-storage-class.yaml
-	@echo "  name: <STORAGE_CLASS_NAME>" >> deploy/k8s/csi-panfs-storage-class.yaml
-
-	helm template csi-panfs-storage-class charts/storageclass \
-		--namespace csi-panfs-storage-class \
+	@mkdir -p deploy/k8s/storage-class/
+	helm template csi-panfs-storage-class-name charts/storageclass \
+		--namespace csi-panfs \
 		--set setAsDefaultStorageClass=false \
 		--set realm.address="<REALM_ADDRESS>" \
 		--set realm.username="<REALM_USERNAME>" \
 		--set realm.password="<REALM_PASSWORD>" \
 		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
-		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" \
-		--set storageClassName="<STORAGE_CLASS_NAME>" | \
-		sed 's|csi-panfs-storage-class|<STORAGE_CLASS_NAME>|' | \
-		grep -v '^# Source:' >> deploy/k8s/csi-panfs-storage-class.yaml
+		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
+		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
+		grep -v '^# Source:' > deploy/k8s/storage-class/with-secret-in-driver-ns.yaml
+
+	helm template csi-panfs-storage-class-name charts/storageclass \
+		--namespace csi-panfs-storage-class-name \
+		--set csiPanFSDriver.namespace="csi-panfs" \
+		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
+		--set setAsDefaultStorageClass=false \
+		--set realm.address="<REALM_ADDRESS>" \
+		--set realm.username="<REALM_USERNAME>" \
+		--set realm.password="<REALM_PASSWORD>" \
+		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
+		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
+		grep -v '^# Source:' > deploy/k8s/storage-class/default.yaml
+
+	helm template csi-panfs-storage-class-name charts/storageclass \
+		--namespace csi-panfs-storage-class-name \
+		--set csiPanFSDriver.namespace="<CSI_NAMESPACE>" \
+		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
+		--set setAsDefaultStorageClass=false \
+		--set realm.address="<REALM_ADDRESS>" \
+		--set realm.username="<REALM_USERNAME>" \
+		--set realm.password="<REALM_PASSWORD>" \
+		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
+		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
+		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
+		grep -v '^# Source:' > deploy/k8s/storage-class/with-secret-in-dedicated-ns-without-kmm.yaml
 
 .PHONY: manifests
 manifests: manifest-driver manifest-storageclass ## Generate manifests for the PanFS CSI Driver and Storage Class
