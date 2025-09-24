@@ -267,6 +267,22 @@ roleRef:
   name: csi-panfs-node
   apiGroup: rbac.authorization.k8s.io
 ---
+# Namespace Role for reading secrets
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-secret-reader
+  namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    sidecar: secret-provisioner
+    product: com.vdura.csi.panfs
+rules:
+  # Allow reading secrets for accessing PanFS realm credentials
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
@@ -319,6 +335,28 @@ rules:
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
     verbs: ["get", "watch", "list", "delete", "update", "create"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Bind the secret reader Role to the controller ServiceAccount
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-secret-reader-rolebinding
+  namespace: csi-panfs
+  labels:
+    app: csi-panfs-controller
+    sidecar: secret-provisioner
+    product: com.vdura.csi.panfs
+subjects:
+  - kind: ServiceAccount
+    name: csi-panfs-controller
+    namespace: csi-panfs
+roleRef:
+  kind: Role
+  name: csi-panfs-controller-secret-reader
+  apiGroup: rbac.authorization.k8s.io
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
