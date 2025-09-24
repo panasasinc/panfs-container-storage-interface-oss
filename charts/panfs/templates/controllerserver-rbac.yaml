@@ -80,6 +80,9 @@ rules:
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch"]
 ---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
 # Namespace Role for reading secrets
 kind: Role
 apiVersion: rbac.authorization.k8s.io/v1
