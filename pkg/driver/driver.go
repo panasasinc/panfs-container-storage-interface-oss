@@ -280,6 +280,7 @@ func (d *Driver) updateNodeLabel(key, value string) error {
 			d.log.Info("removed node label", "label", key, "node", d.host)
 		} else {
 			d.log.Info("set node label", "label", fmt.Sprintf("%s=%s", key, value), "node", d.host)
+			IsNodeLabelSet = true
 		}
 	}
 
