@@ -24,7 +24,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: csi-panfs-controller
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
     {{- if .Values.labels }}
     {{- toYaml .Values.labels | nindent 4 }}
     {{- end }}
@@ -49,7 +49,7 @@ spec: # csi-panfs-controller
     metadata:
       labels:
         app: csi-panfs-controller
-        product: {{ .Values.productName }}
+        product: com.vdura.csi.panfs
         {{- if .Values.labels }}
         {{- toYaml .Values.labels | nindent 8 }}
         {{- end }}

@@ -24,6 +24,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: csi-panfs-controller
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 spec:
   minAvailable: {{ .Values.controllerServer.podDisruptionBudget.minAvailable }}
   selector:

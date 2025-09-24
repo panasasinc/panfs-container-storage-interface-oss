@@ -24,7 +24,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: csi-panfs-controller
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -37,7 +40,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: provisioner
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 rules:
   # Allow managing PersistentVolumes for provisioning and deletion
   - apiGroups: [""]
@@ -85,7 +91,7 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: provisioner
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -107,7 +113,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: secret-provisioner
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 rules:
   # Allow reading secrets for accessing PanFS realm credentials
   - apiGroups: [""]
@@ -126,7 +135,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: secret-provisioner
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -148,7 +160,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: provisioner
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 rules:
   # Allow leader election via leases
   - apiGroups: ["coordination.k8s.io"]
@@ -182,7 +197,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: provisioner
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -203,7 +221,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: attacher
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 rules:
   # Allow patching PersistentVolumes for attach/detach operations
   - apiGroups: [""]
@@ -236,7 +257,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: attacher
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -258,7 +282,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: attacher
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 rules:
   # Allow leader election via leases for attacher sidecar
   - apiGroups: ["coordination.k8s.io"]
@@ -277,7 +304,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: attacher
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller
@@ -298,7 +328,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: resizer
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 rules:
   # Allow patching PersistentVolumes for resizing
   - apiGroups: [""]
@@ -336,7 +369,10 @@ metadata:
   labels:
     app: csi-panfs-controller
     sidecar: resizer
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-controller

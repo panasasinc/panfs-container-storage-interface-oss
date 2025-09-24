@@ -24,7 +24,10 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: csi-panfs-node
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -36,7 +39,10 @@ metadata:
   name: {{ .Release.Namespace }}-node
   labels:
     app: csi-panfs-node
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 rules:
   # Allow emitting and updating events
   - apiGroups: [""]
@@ -58,7 +64,10 @@ metadata:
   name: {{ .Release.Namespace }}-node-rolebinding
   labels:
     app: csi-panfs-node
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
+    {{- if .Values.labels }}
+    {{- toYaml .Values.labels | nindent 4 }}
+    {{- end }}
 subjects:
   - kind: ServiceAccount
     name: {{ .Release.Namespace }}-node

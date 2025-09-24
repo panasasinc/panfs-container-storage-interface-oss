@@ -24,7 +24,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: csi-panfs-node
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
     {{- if .Values.labels }}
     {{- toYaml .Values.labels | nindent 4 }}
     {{- end }}
@@ -43,7 +43,7 @@ spec: # csi-panfs-node
     metadata:
       labels:
         app: csi-panfs-node
-        product: {{ .Values.productName }}
+        product: com.vdura.csi.panfs
         {{- if .Values.labels }}
         {{- toYaml .Values.labels | nindent 8 }}
         {{- end }}
@@ -203,7 +203,7 @@ spec: # csi-panfs-node
             - name: ADDRESS
               value: /csi/csi.sock
             - name: DRIVER_REG_SOCK_PATH
-              value: /var/lib/kubelet/plugins/{{ .Values.productName }}/csi.sock
+              value: /var/lib/kubelet/plugins/com.vdura.csi.panfs/csi.sock
 
           {{- if .Values.nodeServer.driverRegistrar.resources }}
 
@@ -244,7 +244,7 @@ spec: # csi-panfs-node
         # For CSI socket
         - name: socket-dir
           hostPath:
-            path: /var/lib/kubelet/plugins/{{ .Values.productName }}
+            path: /var/lib/kubelet/plugins/com.vdura.csi.panfs
             type: DirectoryOrCreate
 
         # For mounting volumes

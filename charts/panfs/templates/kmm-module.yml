@@ -25,7 +25,7 @@ metadata:
   namespace: {{ .Release.Namespace }}
   labels:
     app: panfs-kmm-module
-    product: {{ .Values.productName }}
+    product: com.vdura.csi.panfs
     {{- if .Values.labels }}
     {{- toYaml .Values.labels | nindent 4 }}
     {{- end }}
