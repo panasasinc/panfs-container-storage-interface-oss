@@ -142,10 +142,9 @@ This will deploy CSI driver components and the KMM module.
 
 Please update the settings in [deploy/k8s/csi-driver/default.yaml](deploy/k8s/csi-driver/default.yaml) according to your cluster specification and available image tags in your private registry:
 
-- `<KERNEL-VERSION>` - Worker Node kernel version, should correspond to PANFS_KMM_IMAGE, e.g: `4.18.0-553.el8_10.x86_64`
-- `<PANFS-DFC-IMAGE>` - PanFS KMM module image, e.g: `<your private registry>/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.0.a-1860775.2`
-- `<PANFS_CSI_DRIVER_IMAGE>` - PanFS CSI Driver image, e.g: `<your private registry>/panfs-csi-driver:1.0.3`
-- `<PULL-SECRET-NAME>` - Image pull secret for fetching PanFS CSI Driver images from your private registry
+- `<IMAGE_PULL_SECRET_NAME>`: The name of your image pull secret for accessing container images.
+- `<PANFS_DFC_IMAGE>`: The full image reference for the PanFS DFC container.
+- `<KERNEL_VERSION>`: The kernel version required for your environment.
 
 Review other settings relevant to your Kubernetes infrastructure, such as:
 - `replicas`
@@ -228,9 +227,9 @@ module.kmm.sigs.x-k8s.io/panfs created
   status:
     devicePlugin: {}
     moduleLoader:
-      availableNumber: 6
-      desiredNumber: 6
-      nodesMatchingSelectorNumber: 6
+      availableNumber: 10
+      desiredNumber: 10
+      nodesMatchingSelectorNumber: 10
   ```
 
 #### 3. Configure and deploy StorageClass
@@ -245,8 +244,6 @@ Configure authentication based on your PanFS Realm setup by editing the followin
 - `<REALM_PASSWORD>` - Password for user/password authentication with the Realm
 - `<REALM_PRIVATE_KEY>` - Private key for key-based authentication; leave empty if private key access is not configured
 - `<REALM_PRIVATE_KEY_PASSPHRASE>` - Passphrase for encrypted key; leave empty if there's no key encryption passphrase
-- `<CSI_CONTROLLER_SA>` - CSI Driver Controller Service Account Name, you can find it by `kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o yaml | grep '^  *csi-driver-'`
-- `<CSI_NAMESPACE>` - CSI Driver Namespace, you can find it by `kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o yaml | grep '^  *csi-driver-'`
 
 To make this StorageClass the default for your Kubernetes cluster, set the annotation `storageclass.kubernetes.io/is-default-class: "true"` in this StorageClass manifest.
 
