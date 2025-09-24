@@ -73,9 +73,9 @@ spec: # csi-panfs-controller
       # Check with: kubectl get secrets -n {{ .Release.Namespace }}
       # If not, create with:
       # kubectl create secret docker-registry -n {{ .Release.Namespace }} {{ index .Values.imagePullSecrets 0 }} \
-      #   --docker-server={REGISTRY_URL} \
-      #   --docker-username=<{SERNAME} \
-      #   --docker-password={PASSWORD}
+      #   --docker-server=<REGISTRY_URL> \
+      #   --docker-username=<USERNAME> \
+      #   --docker-password=<PASSWORD_OR_TOKEN>
       imagePullSecrets:
         {{- range .Values.imagePullSecrets }}
         - name: {{ . }}

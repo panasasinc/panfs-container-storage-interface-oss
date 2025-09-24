@@ -876,5 +876,5 @@ spec:
 
       # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
-        - literal: <KERNEL_VERSION> # Replace with your Worker node kernel version
-          containerImage: <PANFS_DFC_IMAGE> # Change to Kernel-related corresponding DFC/KMM image
+        - literal: "<KERNEL_VERSION>"         # Replace with your Worker node kernel version
+          containerImage: "<PANFS_DFC_IMAGE>" # Change to Kernel-related corresponding DFC/KMM image
