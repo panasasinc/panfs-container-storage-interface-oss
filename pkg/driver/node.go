@@ -268,6 +268,7 @@ func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*
 			AccessibleTopology: &csi.Topology{
 				Segments: map[string]string{},
 			},
+			MaxVolumesPerNode: 0,
 		}, nil
 	}
 
@@ -278,6 +279,7 @@ func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*
 				NodeLabelKey: nodeLabelValue,
 			},
 		},
+		MaxVolumesPerNode: 0,
 	}, nil
 }
 
