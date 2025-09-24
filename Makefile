@@ -327,7 +327,7 @@ else
 			--set "panfsPlugin.image=$(CSIDRIVER_IMAGE)" \
 			--set "panfsPlugin.pullPolicy=IfNotPresent" \
 			--set "dfcRelease.kernelMappings[0].literal=default" \
-			--set "dfcRelease.kernelMappings[0].image=$(CSIDFCKMM_IMAGE)" \
+			--set "dfcRelease.kernelMappings[0].containerImage=$(CSIDFCKMM_IMAGE)" \
 			--set "dfcRelease.pullPolicy=IfNotPresent" \
 			--set "panfsKmmModule.enabled=false" \
 			--set "seLinux=false"; \
@@ -336,7 +336,7 @@ else
 			--set "imagePullSecrets[0]=$(IMAGE_PULL_SECRET_NAME)" \
 			--set "panfsPlugin.image=$(CSIDRIVER_IMAGE)" \
 			--set "dfcRelease.kernelMappings[0].literal=$(KERNEL_VERSION)" \
-			--set "dfcRelease.kernelMappings[0].image=$(CSIDFCKMM_IMAGE)"; \
+			--set "dfcRelease.kernelMappings[0].containerImage=$(CSIDFCKMM_IMAGE)"; \
 	fi
 endif
 	@echo "$(GREEN)Successfully deployed PanFS CSI Driver$(RESET)"
@@ -433,7 +433,6 @@ deploy-storageclass-with-helm:
 		--namespace $(STORAGE_CLASS_NAME) \
 		--create-namespace \
 		--set csiPanFSDriver.namespace="csi-panfs" \
-		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
 		--set setAsDefaultStorageClass=$(SET_STORAGECLASS_DEFAULT) \
 		--set realm.address="${REALM_ADDRESS}" \
 		--set realm.username="${REALM_USER}" \
