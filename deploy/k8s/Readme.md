@@ -23,21 +23,41 @@ Apply the chosen manifest:
 kubectl apply -f <selected-driver-manifest>.yaml
 ```
 
+
 ## 2. Deploying the StorageClass and Secret
 
 Choose the manifest that matches your namespace and topology requirements:
 
-- **Secret and StorageClass in a dedicated namespace (with KMM topology):**
-  - Use: `storage-class/default.yaml`
-- **Secret and StorageClass in the CSI Driver Namespace:**
-  - Use: `storage-class/with-secret-in-driver-ns.yaml`
-- **Secret and StorageClass in a dedicated namespace (without KMM topology):**
-  - Use: `storage-class/with-secret-in-dedicated-ns-without-kmm.yaml`
+### 1. Dedicated Namespace
+- **Manifests:** 
+  - `storage-class/default.yaml`
+  - `storage-class/with-secret-in-dedicated-ns.yaml` (more placeholders to change)
+- **Configuration:**
+  - Creates a StorageClass
+    - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class-name`)
+    - Set the same name for storage class, secret name and its namespace
+  - Creates a Secret with PanFS Realm credentials in the provided namespace
+    - Replace these placeholders with your actual credentials:
+      - `<REALM_ADDRESS>`
+      - `<REALM_USERNAME>`
+      - `<REALM_PASSWORD>`
+      - (add any other required fields)
+  - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
+  - Configures Role and RoleBinding to allow the CSI Driver ServiceAccount (in the `csi-panfs` namespace) to read the Secret
+    - Update namespace or permissions if needed (`<CSI_NAMESPACE>`)
 
-**Important:**
-- Review all parameters and comments in the manifest.
-- Replace all placeholders (e.g., `<REALM_ADDRESS>`, `<REALM_USERNAME>`, `<REALM_PASSWORD>`, `<REALM_PRIVATE_KEY>`, `<CSI_NAMESPACE>`) with your actual values.
-- Ensure that the namespace values match your deployment.
+### 2. CSI Driver Namespace
+- **Manifest:** `storage-class/with-secret-in-driver-ns.yaml`
+- **Configuration:**
+  - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class-name`)
+  - Creates a Secret (same name as StorageClass) with PanFS Realm credentials in the `csi-panfs` namespace
+    - Replace these placeholders with your actual credentials:
+      - `<REALM_ADDRESS>`
+      - `<REALM_USERNAME>`
+      - `<REALM_PASSWORD>`
+      - (add any other required fields)
+  - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
+  - Update namespace or permissions if your CSI Driver namespace differs
 
 Apply the selected manifest:
 ```bash
