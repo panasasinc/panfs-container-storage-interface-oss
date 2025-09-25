@@ -180,7 +180,7 @@ Check the status of pods, PVCs, and PVs using the provided command.
 kubectl get po,pvc,pv
 ```
 
-If you encounter errors:
+### If you encounter errors:
 
 - Verify the realm credentials in the StorageClass secret.
   ```bash
