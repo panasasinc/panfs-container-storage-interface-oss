@@ -597,3 +597,4 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 
 .PHONY: manifests
 manifests: manifest-driver manifest-storageclass ## Generate manifests for the PanFS CSI Driver and Storage Class
+	helm-docs
