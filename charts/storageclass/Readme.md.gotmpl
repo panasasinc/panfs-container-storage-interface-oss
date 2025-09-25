@@ -46,7 +46,7 @@ Install the chart **in the same namespace** as the PanFS CSI driver.
 ```bash
 helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --namespace <CSI_DRIVER_NAMESPACE> \
-    --set realm.address=realm-address \
+    --set realm.address=panfs-realm.example.com \
     --set realm.username=username \
     --set realm.password=password
 ```
@@ -84,21 +84,22 @@ Install the chart **in a different namespace** than the PanFS CSI driver.
 helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --namespace <REALM_SECRET_NAMESPACE> \
     --create-namespace \
-    --set realm.address=realm-address \
-    --set realm.username=admin \
-    --set realm.password=admin-password \
-    --set csiPanFSDriver.namespace=<CSI_DRIVER_NAMESPACE> \
-    --set csiPanFSDriver.controllerServiceAccount=<CSI_DRIVER_CONTROLLER_SERVICE_ACCOUNT>
+    --set realm.address=panfs-realm.example.com \
+    --set realm.username=username \
+    --set realm.password=password \
+    --set csiPanFSDriver.namespace=<CSI_DRIVER_NAMESPACE>
 ```
 
 > Note: The `--create-namespace` flag is required since installing in a new namespace.
 
-If the PanFS realm credentials secret is in a different namespace, the chart creates the necessary permissions for the CSI driver to read the secret.
+> Note: If the PanFS realm credentials secret is in a different namespace, the chart creates the necessary permissions for the CSI driver to read the secret.
 
-To identify the Service Account used by the PanFS CSI driver controller, run the provided command:
+To identify the PanFS CSI Driver Namespace and its controller Service Account, run the provided command:
 
 ```bash
-kubectl get serviceaccount -A -l app=csi-panfs-controller,product=com.vdura.csi.panfs
+kubectl get csidriver com.vdura.csi.panfs -o yaml | grep csi-driver-
+    csi-driver-controller-sa: csi-panfs-controller
+    csi-driver-namespace: csi-panfs
 ```
 
 #### Using Helm overrides:
@@ -145,18 +146,18 @@ metadata:
   name: single-pod
 spec:
   containers:
-    - name: busybox
+    - name: main-container
       image: ubuntu:latest
-      command: [ "sleep", "1000000" ]
+      command: [ "sleep", "infinity" ]
       volumeMounts:
-        - mountPath: "/data-1"
-          name: my-volume-1
+        - mountPath: "/data"
+          name: panfs-volume
       resources:
         limits:
           memory: 1G
           cpu: "100m"
   volumes:
-    - name: my-volume-1
+    - name: panfs-volume
       persistentVolumeClaim:
         claimName: csi-pvc-single-pod
 ---
@@ -187,10 +188,12 @@ If you encounter errors:
   - For controller issues (volume provisioning), review the controller logs:
     ```
     kubectl logs -n <CSI_DRIVER_NAMESPACE> -l app=csi-panfs-controller --all-pods -c csi-panfs-plugin
+    kubectl logs -n csi-panfs -l app=csi-panfs-controller --all-pods -c csi-panfs-plugin
     ```
   - For node issues (volume mounting), review the node logs:
     ```
     kubectl logs -n <CSI_DRIVER_NAMESPACE> -l app=csi-panfs-node --all-pods -c csi-panfs-plugin
+    kubectl logs -n csi-panfs -l app=csi-panfs-node --all-pods -c csi-panfs-plugin
     ```
 
 ### Uninstalling the chart
