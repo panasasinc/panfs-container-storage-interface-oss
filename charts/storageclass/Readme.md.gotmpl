@@ -184,16 +184,27 @@ kubectl get po,pvc,pv
 If you encounter errors:
 
 - Verify the realm credentials in the StorageClass secret.
+  ```bash
+  # Getting the secret name and its namespace from the StorageClass 
+  kubectl get sc <STORAGE_CLASS_NAME> -o yaml | grep csi.storage.k8s.io
+
+  # Checking the secret content
+  # If you installed the chart in a dedicated namespace, the secret name, its namespace, and the StorageClass name will match the chart release name.
+  # If you installed the chart in the same namespace as the CSI driver, the secret name and StorageClass name will match the chart release name, and the secret will reside in the CSI driver's namespace.
+  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.realm_ip}' | base64 -d
+  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.user}' | base64 -d
+  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.password}' | base64 -d
+  ```
 - Check the logs of the CSI driver:
   - For controller issues (volume provisioning), review the controller logs:
-    ```
-    kubectl logs -n <CSI_DRIVER_NAMESPACE> -l app=csi-panfs-controller --all-pods -c csi-panfs-plugin
-    kubectl logs -n csi-panfs -l app=csi-panfs-controller --all-pods -c csi-panfs-plugin
+    ```bash
+    CSI_DRIVER_NAMESPACE=$(kubectl get csidriver com.vdura.csi.panfs -o yaml | grep csi-driver-namespace | awk '{print $2}')
+    kubectl logs -n $CSI_DRIVER_NAMESPACE -l app=csi-panfs-controller --all-pods -c csi-panfs-plugin
     ```
   - For node issues (volume mounting), review the node logs:
-    ```
-    kubectl logs -n <CSI_DRIVER_NAMESPACE> -l app=csi-panfs-node --all-pods -c csi-panfs-plugin
-    kubectl logs -n csi-panfs -l app=csi-panfs-node --all-pods -c csi-panfs-plugin
+    ```bash
+    CSI_DRIVER_NAMESPACE=$(kubectl get csidriver com.vdura.csi.panfs -o yaml | grep csi-driver-namespace | awk '{print $2}')
+    kubectl logs -n $CSI_DRIVER_NAMESPACE -l app=csi-panfs-node --all-pods -c csi-panfs-plugin
     ```
 
 ### Uninstalling the chart
