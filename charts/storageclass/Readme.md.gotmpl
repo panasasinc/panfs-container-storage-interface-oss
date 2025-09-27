@@ -44,8 +44,12 @@ To use this chart, ensure your Kubernetes cluster has the PanFS CSI driver insta
 Install the chart **in the same namespace** as the PanFS CSI driver.
 
 ```bash
+# Getting a namespace where the Panfs CSI Driver is installed in
+PANFS_CSI_DRIVER_NAMESPACE="$(kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o jsonpath='{.metadata.annotations.csi-driver-namespace}')"
+
+# Installing chart into PanFS CSI Driver namespace
 helm upgrade --install <STORAGE_CLASS_NAME> ./ \
-    --namespace <CSI_DRIVER_NAMESPACE> \
+    --namespace "${PANFS_CSI_DRIVER_NAMESPACE}" \
     --set realm.address=panfs-realm.example.com \
     --set realm.username=username \
     --set realm.password=password
@@ -54,15 +58,10 @@ helm upgrade --install <STORAGE_CLASS_NAME> ./ \
 > Note: The `--create-namespace` flag is not required when installing in an existing namespace.
 
 #### Using Helm overrides:
-```yaml
-realm:
-  address: "panfs-realm.example.com"
-  username: "username"
-  password: "password"
-```
 
 You can also use a YAML file to provide the necessary overrides. Below is an example of such a file:
 ```yaml
+# overrides.yaml
 realm:
   address: "panfs-realm.example.com"
   username: "username"
@@ -72,7 +71,7 @@ realm:
 Install the chart using the overrides file:
 ```bash
 helm upgrade --install <STORAGE_CLASS_NAME> ./ \
-    --namespace <CSI_DRIVER_NAMESPACE> \
+    --namespace "${PANFS_CSI_DRIVER_NAMESPACE}" \
     --values path/to/your/overrides.yaml
 ```
 
@@ -81,39 +80,39 @@ helm upgrade --install <STORAGE_CLASS_NAME> ./ \
 Install the chart **in a different namespace** than the PanFS CSI driver.
 
 ```bash
+# Getting a namespace where the Panfs CSI Driver is installed in
+PANFS_CSI_DRIVER_NAMESPACE="$(kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o jsonpath='{.metadata.annotations.csi-driver-namespace}')"
+
 helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --namespace <REALM_SECRET_NAMESPACE> \
     --create-namespace \
-    --set realm.address=panfs-realm.example.com \
-    --set realm.username=username \
-    --set realm.password=password \
-    --set csiPanFSDriver.namespace=<CSI_DRIVER_NAMESPACE>
+    --set setAsDefaultStorageClass="true" \
+    --set realm.address="panfs-realm.example.com" \
+    --set realm.username="username" \
+    --set realm.password="password" \
+    --set csiPanFSDriver.namespace="${PANFS_CSI_DRIVER_NAMESPACE}"
 ```
 
-> Note: The `--create-namespace` flag is required since installing in a new namespace.
-
-> Note: If the PanFS realm credentials secret is in a different namespace, the chart creates the necessary permissions for the CSI driver to read the secret.
-
-To identify the PanFS CSI Driver Namespace and its controller Service Account, run the provided command:
-
-```bash
-kubectl get csidriver com.vdura.csi.panfs -o yaml | grep csi-driver-
-    csi-driver-controller-sa: csi-panfs-controller
-    csi-driver-namespace: csi-panfs
-```
+> Note: 
+> - The `--create-namespace` flag is required since installing in a new namespace.
+> - The option `setAsDefaultStorageClass=true` is used to set this storage class the default in your Kubernetes cluster
+> - A new namespace is used for keeping Helm release state, the PanFS realm credentials secret and Role/RoleBinding to let CSI Driver read it from its namespace
+> - You can choose any suitable name for `<REALM_SECRET_NAMESPACE>` but we advice set it equal to `<STORAGE_CLASS_NAME>`
 
 #### Using Helm overrides:
 
 You can also use a YAML file to provide the necessary overrides. Below is an example of such a file:
 ```yaml
+# overrides.yaml
 realm:
   address: "panfs-realm.example.com"
   username: "username"
   password: "password"
 
+setAsDefaultStorageClass: "true"
+
 csiPanFSDriver:
   namespace: csi-panfs
-  controllerServiceAccount: csi-panfs-controller
 ```
 
 Install the chart using the overrides file:
@@ -148,7 +147,9 @@ spec:
   containers:
     - name: main-container
       image: ubuntu:latest
-      command: [ "sleep", "infinity" ]
+      command: |
+        mount | grep /data
+        sleep infinity
       volumeMounts:
         - mountPath: "/data"
           name: panfs-volume
@@ -187,7 +188,7 @@ If you encounter errors when creating or running workload Pods, follow these ste
 
 - Verify the realm credentials in the StorageClass secret.
   ```bash
-  # Getting the secret name and its namespace from the StorageClass 
+  # Getting the secret name and its namespace from the StorageClass
   kubectl get sc <STORAGE_CLASS_NAME> -o yaml | grep csi.storage.k8s.io
 
   # Checking the secret content
