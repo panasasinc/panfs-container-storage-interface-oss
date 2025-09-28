@@ -9,11 +9,10 @@ Your Realm credentials are located in the '{{ .Release.Namespace }}' namespace a
 
 Please double-check that the current configuration is correct:
 - The CSI Driver namespace is set to '{{ .Values.csiPanFSDriver.namespace}}'
-- The CSI Driver Controller Service Account is set to '{{ .Values.csiPanFSDriver.controllerServiceAccount }}'
 
 Use this command:
 
-kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o yaml | grep '^  *csi-driver-'
+kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o yaml | grep 'csi-driver-namespace'
 {{ end }}
 
 ## You can now use PVCs like this:

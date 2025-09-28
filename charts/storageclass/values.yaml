@@ -12,13 +12,20 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# -- PanFS CSI Driver details
-# @default -- `{...}`
+# PanFS CSI Driver details
 csiPanFSDriver:
   # -- Namespace where the PanFS CSI driver is deployed
   namespace: csi-panfs
-  # -- Service account used by the PanFS CSI driver controller
-  controllerServiceAccount: csi-panfs-controller
+
+# -- Allowed topologies for volume provisioning
+# This can be used to restrict volume provisioning to specific nodes or zones
+# based on node labels. Uncomment and modify the example below as needed.
+# If left empty, no topology constraints will be applied.
+allowedTopologies: {}
+  # - matchLabelExpressions:
+  #   - key: node.kubernetes.io/csi-panfs.panfs.ready
+  #     values:
+  #       - "true"
 
 # PanFS Realm Endpoint Configuration
 realm:
@@ -30,7 +37,7 @@ realm:
   password: ""
   # -- Private key for the PanFS backend realm
   privateKey: ""
-  # Private Key Passphrase
+  # -- Private Key Passphrase
   privateKeyPassphrase: ""
 
 # -- Whether to set current storage class default for the cluster or not

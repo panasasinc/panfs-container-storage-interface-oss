@@ -223,15 +223,14 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | allowVolumeExpansion | bool | `true` | Allow volume expansion for realms |
-| csiPanFSDriver | object | `{...}` | PanFS CSI Driver details |
-| csiPanFSDriver.controllerServiceAccount | string | `"csi-panfs-controller"` | Service account used by the PanFS CSI driver controller |
+| allowedTopologies | object | `{}` | Allowed topologies for volume provisioning This can be used to restrict volume provisioning to specific nodes or zones based on node labels. Uncomment and modify the example below as needed. If left empty, no topology constraints will be applied. |
 | csiPanFSDriver.namespace | string | `"csi-panfs"` | Namespace where the PanFS CSI driver is deployed |
 | mountOptions | list | `[]` |  |
 | parameters | object | `{...}` | Optional storage class parameters |
 | realm.address | string | `""` | Endpoint address for the backend PanFS realm |
 | realm.password | string | `""` | Password for the PanFS backend realm |
 | realm.privateKey | string | `""` | Private key for the PanFS backend realm |
-| realm.privateKeyPassphrase | string | `""` |  |
+| realm.privateKeyPassphrase | string | `""` | Private Key Passphrase |
 | realm.username | string | `""` | Username for the PanFS backend realm |
 | setAsDefaultStorageClass | bool | `false` | Whether to set current storage class default for the cluster or not |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |
@@ -243,19 +242,19 @@ Refer to the PanCLI User Guide for details on the following parameters:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| parameters."panfs.csi.vdura.com/bladeset" | string | `""` | Name of the bladeset to use for realm volumes |
-| parameters."panfs.csi.vdura.com/recoverypriority" | string | `""` | Recovery priority for the realm volumes |
-| parameters."panfs.csi.vdura.com/efsa" | string | `""` | EFSA volume mode |
+| parameters."panfs.csi.vdura.com/bladeset" | string | `"Set 1"` | Name of the bladeset to use for realm volumes |
+| parameters."panfs.csi.vdura.com/recoverypriority" | string | `"50"` | Recovery priority for the realm volumes |
+| parameters."panfs.csi.vdura.com/efsa" | string | `"retry"` | EFSA volume mode |
 | parameters."panfs.csi.vdura.com/layout" | string | `"raid10+"` | Default layout for the realm volumes |
-| parameters."panfs.csi.vdura.com/maxwidth" | int |  | Maximum number of storages to stripe over |
-| parameters."panfs.csi.vdura.com/stripeunit" | string | `""` | Stripe unit for the realm volumes |
-| parameters."panfs.csi.vdura.com/rgwidth" | int |  | Number of storage nodes to stripe over in a single RAID group |
-| parameters."panfs.csi.vdura.com/rgdepth" | int |  | Number of stripes written to a RAID parity group before advancing to the next parity group |
-| parameters."panfs.csi.vdura.com/volservice" | string | `""` | Volume service id for the realm volumes |
-| parameters."panfs.csi.vdura.com/description" | string | `""` | Description for the realm volumes |
-| parameters."panfs.csi.vdura.com/user" | string | `""` | User name or ID |
-| parameters."panfs.csi.vdura.com/group" | string | `""` | Group name or ID |
-| parameters."panfs.csi.vdura.com/uperm" | string | `""` | User permissions |
-| parameters."panfs.csi.vdura.com/gperm" | string | `""` | Group permissions |
-| parameters."panfs.csi.vdura.com/operm" | string | `""` | Other permissions |
+| parameters."panfs.csi.vdura.com/maxwidth" | int | 3 | Maximum number of storages to stripe over |
+| parameters."panfs.csi.vdura.com/stripeunit" | string | `"64k"` | Stripe unit for the realm volumes |
+| parameters."panfs.csi.vdura.com/rgwidth" | int | 3 | Number of storage nodes to stripe over in a single RAID group |
+| parameters."panfs.csi.vdura.com/rgdepth" | int | 2 | Number of stripes written to a RAID parity group before advancing to the next parity group |
+| parameters."panfs.csi.vdura.com/volservice" | string |  | Volume service id for the realm volumes |
+| parameters."panfs.csi.vdura.com/description" | string |  | Description for the realm volumes |
+| parameters."panfs.csi.vdura.com/user" | string |  | User name or ID |
+| parameters."panfs.csi.vdura.com/group" | string |  | Group name or ID |
+| parameters."panfs.csi.vdura.com/uperm" | string |  | User permissions |
+| parameters."panfs.csi.vdura.com/gperm" | string |  | Group permissions |
+| parameters."panfs.csi.vdura.com/operm" | string | `"all"` | Other permissions |
 

@@ -29,7 +29,10 @@ metadata:
     product: com.vdura.csi.panfs
     release: {{ .Release.Name }}
 
+# The PanFS provisioner name
 provisioner: com.vdura.csi.panfs
+
+# Allow volume expansion for realms. Persistent volumes to be expanded (i.e., resized) after creation.
 allowVolumeExpansion: {{ .Values.allowVolumeExpansion }}
 
 # Possible values for volumeBindingMode:
