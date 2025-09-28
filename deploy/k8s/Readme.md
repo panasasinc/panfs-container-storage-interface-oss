@@ -6,11 +6,11 @@ This guide describes how to deploy the PanFS CSI Driver and StorageClass using t
 ## 1. Choosing the Correct CSI Driver Manifest
 
 - **Default installation (with KMM and SELinux in Enforcing/Permissive mode):**
-  - Use: `csi-driver/default.yaml`
+  - Use: `csi-driver/template-csi-panfs.yaml`
 - **If you do NOT use Kernel Module Manager (KMM) in your cluster:**
-  - Use: `csi-driver/without-kmm.yaml`
+  - Use: `csi-driver/template-csi-panfs-without-kmm.yaml`
 - **If SELinux is disabled in your cluster:**
-  - Use: `csi-driver/without-selinux.yaml`
+  - Use: `csi-driver/template-csi-panfs-without-selinux.yaml`
 
 **Important:**
 Before applying the driver manifest, update the following parameters to match your infrastructure:
@@ -30,11 +30,11 @@ Choose the manifest that matches your namespace and topology requirements:
 
 ### 1. Dedicated Namespace
 - **Manifests:** 
-  - `storage-class/default.yaml`
-  - `storage-class/with-secret-in-dedicated-ns.yaml` (more placeholders to change)
+  - `storage-class/template-secret-in-driver-ns.yaml`
+  - `storage-class/template-secret-in-dedicated-ns.yaml` (more placeholders to change)
 - **Configuration:**
   - Creates a StorageClass
-    - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class-name`)
+    - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class`)
     - Set the same name for storage class, secret name and its namespace
   - Creates a Secret with PanFS Realm credentials in the provided namespace
     - Replace these placeholders with your actual credentials:
@@ -43,13 +43,13 @@ Choose the manifest that matches your namespace and topology requirements:
       - `<REALM_PASSWORD>`
       - (add any other required fields)
   - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
-  - Configures Role and RoleBinding to allow the CSI Driver ServiceAccount (in the `csi-panfs` namespace) to read the Secret
+  - Configures Role and RoleBinding to allow the CSI Driver ServiceAccount to read the Secret
     - Update namespace or permissions if needed (`<CSI_NAMESPACE>`)
 
 ### 2. CSI Driver Namespace
-- **Manifest:** `storage-class/with-secret-in-driver-ns.yaml`
+- **Manifest:** `storage-class/template-secret-in-driver-ns.yaml`
 - **Configuration:**
-  - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class-name`)
+  - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class`)
   - Creates a Secret (same name as StorageClass) with PanFS Realm credentials in the `csi-panfs` namespace
     - Replace these placeholders with your actual credentials:
       - `<REALM_ADDRESS>`
@@ -74,7 +74,7 @@ kind: PersistentVolumeClaim
 metadata:
   name: csi-panfs-sample
 spec:
-  storageClassName: csi-panfs-storage-class-name
+  storageClassName: csi-panfs-storage-class
   accessModes:
     - ReadWriteOnce
   resources:
