@@ -347,7 +347,7 @@ endif
 .PHONY: deploy-driver-with-manifest
 deploy-driver-with-manifest:
 	@echo "Deploying PanFS CSI Driver using manifest file..."
-	@cat deploy/k8s/csi-driver/default.yaml | \
+	@cat deploy/k8s/csi-driver/template-csi-panfs.yaml | \
 	sed 's@^\(  *\)# \(.*\)<IMAGE_PULL_SECRET_NAME.\(.*\)@\1\2$(IMAGE_PULL_SECRET_NAME)\3@' | \
 	sed 's@<PANFS_CSI_DRIVER_IMAGE>@$(CSIDRIVER_IMAGE)@g' | \
 	sed 's@[^ ]*panfs-csi-driver:.*@$(CSIDRIVER_IMAGE)@g' | \
@@ -542,7 +542,7 @@ uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class
 		kubectl get pv | grep $(STORAGE_CLASS_NAME); \
 		exit 1; \
 	fi
-	@kubectl delete -f deploy/k8s/csi-driver/default.yaml --ignore-not-found
+	@kubectl delete -f deploy/k8s/csi-driver/template-csi-panfs.yaml --ignore-not-found
 	@kubectl delete secret -n csi-panfs -l owner=helm 
 	@kubectl delete -f deploy/k8s/storage-class/example-csi-panfs-storage-class.yaml --ignore-not-found
 	@kubectl delete secret -n $(STORAGE_CLASS_NAME) -l owner=helm
@@ -553,9 +553,21 @@ uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class
 manifest-driver: ## Generate manifests for the PanFS CSI Driver
 	@echo "Generating manifests for the PanFS CSI Driver..."
 	@mkdir -p deploy/k8s/csi-driver/
-	helm template csi-panfs charts/panfs --namespace csi-panfs | grep -v '^# Source:' > deploy/k8s/csi-driver/default.yaml
-	helm template csi-panfs charts/panfs --namespace csi-panfs --set seLinux=false | grep -v '^# Source:' > deploy/k8s/csi-driver/without-selinux.yaml
-	helm template csi-panfs charts/panfs --namespace csi-panfs --set panfsKmmModule.enabled=false | grep -v '^# Source:' > deploy/k8s/csi-driver/without-kmm.yaml
+	helm template csi-panfs charts/panfs \
+		--namespace csi-panfs \
+		--set imagePullSecrets[0]="ghcr-docker-registry" \
+		--set dfcRelease.kernelMappings[0].literal="4.18.0-553.el8_10.x86_64" \
+		--set dfcRelease.kernelMappings[0].containerImage="ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.1" \
+		--set dfcRelease.kernelMappings[1].literal="4.18.0-553.62.1.el8_10.x86_64" \
+		--set dfcRelease.kernelMappings[1].containerImage="ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-dfc-kmm:4.18.0-553.62.1.el8_10.x86_64-11.1.1" \
+		--set dfcRelease.kernelMappings[2].literal="4.18.0-553.72.1.el8_10.x86_64" \
+		--set dfcRelease.kernelMappings[2].containerImage="ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-dfc-kmm:4.18.0-553.72.1.el8_10.x86_64-11.1.1" \
+		--set dfcRelease.pullPolicy=IfNotPresent | \
+		sed 's|^\(.*panfs-dfc-kmm:.*\)$$|\1  # !! Dummy Image|' | \
+		grep -v '^# Source:' > deploy/k8s/csi-driver/example-csi-panfs.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs | grep -v '^# Source:' > deploy/k8s/csi-driver/template-csi-panfs.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set seLinux=false | grep -v '^# Source:' > deploy/k8s/csi-driver/template-csi-panfs-without-selinux.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set panfsKmmModule.enabled=false | grep -v '^# Source:' > deploy/k8s/csi-driver/template-csi-panfs-without-kmm.yaml
 
 .PHONY: manifest-storageclass
 manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
