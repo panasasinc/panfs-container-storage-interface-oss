@@ -10,6 +10,7 @@ metadata:
   namespace: csi-panfs
   labels:
     app: csi-panfs-controller
+    product: com.vdura.csi.panfs
 spec:
   minAvailable: 1
   selector:

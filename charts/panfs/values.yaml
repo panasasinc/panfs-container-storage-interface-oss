@@ -201,11 +201,11 @@ dfcRelease:
   # @default -- `[]`
   kernelMappings: []
     # - literal: worker-node-kernel-version-1
-    #   image: panfs-dfc-kmm-image:<worker-node-kernel-version-1>-<dfc-release-version>
+    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-1>-<dfc-release-version>
     # - literal: worker-node-kernel-version-2
-    #   image: panfs-dfc-kmm-image:<worker-node-kernel-version-2>-<dfc-release-version>
+    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-2>-<dfc-release-version>
     # - literal: worker-node-kernel-version-3
-    #   image: panfs-dfc-kmm-image:<worker-node-kernel-version-3>-<dfc-release-version>
+    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-3>-<dfc-release-version>
 
 panfsKmmModule:
   # -- Enable or disable KMM module for PanFS
