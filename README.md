@@ -140,7 +140,7 @@ kubectl create secret docker-registry <your-secret-name> \
 
 This will deploy CSI driver components and the KMM module.
 
-Please update the settings in [deploy/k8s/csi-driver/default.yaml](deploy/k8s/csi-driver/default.yaml) according to your cluster specification and available image tags in your private registry:
+Please update the settings in [deploy/k8s/csi-driver/template-csi-panfs.yaml](deploy/k8s/csi-driver/template-csi-panfs.yaml) according to your cluster specification and available image tags in your private registry:
 
 - `<IMAGE_PULL_SECRET_NAME>`: The name of your image pull secret for accessing container images.
 - `<PANFS_DFC_IMAGE>`: The full image reference for the PanFS DFC container.
@@ -153,7 +153,7 @@ Review other settings relevant to your Kubernetes infrastructure, such as:
 - etc
 
 ```bash
-kubectl apply -f deploy/k8s/csi-driver/default.yaml
+kubectl apply -f deploy/k8s/csi-driver/template-csi-panfs.yaml
 ```
 
 The expected output will look like:
@@ -236,7 +236,7 @@ module.kmm.sigs.x-k8s.io/panfs created
 
 The StorageClass defines how Kubernetes provisions PanFS-backed volumes.
 
-Configure authentication based on your PanFS Realm setup by editing the following placeholders in [deploy/k8s/storage-class/default.yaml](deploy/k8s/storage-class/default.yaml):
+Configure authentication based on your PanFS Realm setup by editing the following placeholders in [deploy/k8s/storage-class/template-secret-in-driver-ns.yaml](deploy/k8s/storage-class/template-secret-in-driver-ns.yaml):
 
 - `<STORAGE_CLASS_NAME>` - Storage Class name, e.g., `csi-panfs-storage-class`
 - `<REALM_ADDRESS>` - PanFS backend address, e.g., `panfs.example.com`
@@ -249,7 +249,7 @@ To make this StorageClass the default for your Kubernetes cluster, set the annot
 
 ```bash
 # Deploy PanFS Storage Class
-kubectl apply -f deploy/k8s/storage-class/default.yaml
+kubectl apply -f deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
 ```
 
 The expected output will look like this:
