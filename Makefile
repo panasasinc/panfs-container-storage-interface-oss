@@ -453,7 +453,7 @@ deploy-storageclass-with-manifest:
 	export CSI_CONTROLLER_SA=csi-panfs-controller; \
 	export CSI_NAMESPACE=csi-panfs; \
 	kubectl create namespace $(STORAGE_CLASS_NAME) --dry-run=client -o yaml | kubectl apply -f -; \
-	cat deploy/k8s/storage-class/default.yaml | \
+	cat deploy/k8s/storage-class/example-csi-panfs-storage-class.yaml | \
 	sed 's|<|$$|;s/\([^ ]\)>/\1/;s|is-default-class: "false"|is-default-class: "$(SET_STORAGECLASS_DEFAULT)"|' | \
 	sed 's|csi-panfs-storage-class-name|$(STORAGE_CLASS_NAME)|' | envsubst | kubectl apply --server-side -f -
 	@echo "$(GREEN)Successfully deployed PanFS CSI Storage Class using manifest file deploy/k8s/csi-panfs-storage-class.yaml$(RESET)"
@@ -544,7 +544,7 @@ uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class
 	fi
 	@kubectl delete -f deploy/k8s/csi-driver/default.yaml --ignore-not-found
 	@kubectl delete secret -n csi-panfs -l owner=helm 
-	@kubectl delete -f deploy/k8s/storage-class/default.yaml --ignore-not-found
+	@kubectl delete -f deploy/k8s/storage-class/example-csi-panfs-storage-class.yaml --ignore-not-found
 	@kubectl delete secret -n $(STORAGE_CLASS_NAME) -l owner=helm
 
 ## Prepare to Release:
@@ -562,17 +562,6 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 	@echo "Generating manifests for the PanFS CSI Storage Class..."
 	@mkdir -p deploy/k8s/storage-class/
 	helm template csi-panfs-storage-class-name charts/storageclass \
-		--namespace csi-panfs \
-		--set setAsDefaultStorageClass=false \
-		--set realm.address="<REALM_ADDRESS>" \
-		--set realm.username="<REALM_USERNAME>" \
-		--set realm.password="<REALM_PASSWORD>" \
-		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
-		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
-		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
-		grep -v '^# Source:' > deploy/k8s/storage-class/with-secret-in-driver-ns.yaml
-
-	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs-storage-class-name \
 		--set csiPanFSDriver.namespace="csi-panfs" \
 		--set setAsDefaultStorageClass=false \
@@ -581,7 +570,7 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--set realm.password="<REALM_PASSWORD>" \
 		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
 		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
-		grep -v '^# Source:' > deploy/k8s/storage-class/default.yaml
+		grep -v '^# Source:' > deploy/k8s/storage-class/example-csi-panfs-storage-class.yaml
 
 	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs-storage-class-name \
@@ -593,7 +582,19 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
 		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
 		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
-		grep -v '^# Source:' > deploy/k8s/storage-class/with-secret-in-dedicated-ns.yaml
+		grep -v '^# Source:' > deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml
+	
+	helm template csi-panfs-storage-class-name charts/storageclass \
+		--namespace csi-panfs \
+		--set setAsDefaultStorageClass=false \
+		--set realm.address="<REALM_ADDRESS>" \
+		--set realm.username="<REALM_USERNAME>" \
+		--set realm.password="<REALM_PASSWORD>" \
+		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
+		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
+		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
+		grep -v '^# Source:' | \
+		sed 's|csi-panfs|<CSI_NAMESPACE>|' > deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
 
 .PHONY: manifests
 manifests: manifest-driver manifest-storageclass ## Generate manifests for the PanFS CSI Driver and Storage Class

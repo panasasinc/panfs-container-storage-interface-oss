@@ -6,10 +6,10 @@
 apiVersion: v1
 kind: Secret
 metadata:
-  name: <STORAGE_CLASS_NAME>
-  namespace: csi-panfs
+  name: csi-panfs-storage-class-name
+  namespace: csi-panfs-storage-class-name
   labels:
-    app: <STORAGE_CLASS_NAME>
+    app: csi-panfs-storage-class-name
     product: com.vdura.csi.panfs
 type: Opaque
 stringData:
@@ -40,14 +40,14 @@ stringData:
 apiVersion: storage.k8s.io/v1
 kind: StorageClass
 metadata:
-  name: <STORAGE_CLASS_NAME>
+  name: csi-panfs-storage-class-name
   annotations:
     # Set this to true to mark this StorageClass as the default
     # This allows Kubernetes to use this StorageClass automatically for PVCs that do not specify a StorageClass
     storageclass.kubernetes.io/is-default-class: "false"
   labels:
     product: com.vdura.csi.panfs
-    release: <STORAGE_CLASS_NAME>
+    release: csi-panfs-storage-class-name
 
 # The PanFS provisioner name
 provisioner: com.vdura.csi.panfs
@@ -68,8 +68,8 @@ reclaimPolicy: Delete
 parameters:
   # Relates to Secret object that contains credentials for the CSI driver
   # This secret is used by the CSI driver to authenticate with the PanFS backend
-  csi.storage.k8s.io/provisioner-secret-name: &secretName <STORAGE_CLASS_NAME>
-  csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace csi-panfs
+  csi.storage.k8s.io/provisioner-secret-name: &secretName csi-panfs-storage-class-name
+  csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace csi-panfs-storage-class-name
   csi.storage.k8s.io/node-publish-secret-name: *secretName
   csi.storage.k8s.io/node-publish-secret-namespace: *secretNamespace
   csi.storage.k8s.io/controller-expand-secret-name: *secretName
@@ -89,3 +89,59 @@ parameters:
 
 # No custom mount options specified; using defaults
 mountOptions: []
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Role that defines permissions for the CSI driver to read secrets
+# This role allows the PanFS CSI driver ServiceAccount to access secrets containing
+# storage credentials and configuration needed for volume operations
+# NOTE: This is a namespace-scoped Role, so it only grants access to secrets
+# in the current namespace (csi-panfs-storage-class-name), not cluster-wide
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-read-secret
+  namespace: csi-panfs-storage-class-name
+  labels:
+    app: csi-panfs-storage-class-name
+    product: com.vdura.csi.panfs
+rules:
+  # Allow access to secrets for CSI driver credentials
+  # The CSI driver needs to read secrets that contain PanFS backend credentials
+  # Permissions are limited to the current namespace only (not cluster-wide)
+  - apiGroups: [""] 
+    resources: ["secrets"]
+    verbs: ["get", "list"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# RoleBinding that connects the CSI driver service account to the secret-read role
+# This binding grants the PanFS CSI controller service account the permissions
+# defined in the role above, allowing it to read secrets in this namespace
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-controller-read-secret-rolebinding
+  namespace: csi-panfs-storage-class-name
+  labels:
+    app: csi-panfs-storage-class-name
+    product: com.vdura.csi.panfs
+subjects:
+  # The service account used by the PanFS CSI driver controller
+  # Relates to PanFS Driver ServiceAccount (controller) 
+  - kind: ServiceAccount
+
+    # The name of the PanFS CSI Driver service account
+    name: csi-panfs-controller
+
+    # The namespace where the PanFS CSI Driver is deployed into
+    # Check this with the following command:
+    # kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o jsonpath='{.metadata.annotations.csi-driver-namespace}'
+    namespace: csi-panfs
+roleRef:
+  # Reference to the Role defined above that grants secret read permissions
+  kind: Role
+  name: csi-panfs-controller-read-secret
+  apiGroup: rbac.authorization.k8s.io
