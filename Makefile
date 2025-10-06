@@ -453,10 +453,10 @@ deploy-storageclass-with-manifest:
 	export CSI_CONTROLLER_SA=csi-panfs-controller; \
 	export CSI_NAMESPACE=csi-panfs; \
 	kubectl create namespace $(STORAGE_CLASS_NAME) --dry-run=client -o yaml | kubectl apply -f -; \
-	cat deploy/k8s/storage-class/template-csi-panfs-storage-class.yaml | \
+	cat deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml | \
 	sed 's|<|$$|;s/\([^ ]\)>/\1/;s|is-default-class: "false"|is-default-class: "$(SET_STORAGECLASS_DEFAULT)"|' | \
 	sed 's|csi-panfs-storage-class|$(STORAGE_CLASS_NAME)|' | envsubst | kubectl apply --server-side -f -
-	@echo "$(GREEN)Successfully deployed PanFS CSI Storage Class using manifest file deploy/k8s/storage-class/template-csi-panfs-storage-class.yaml$(RESET)"
+	@echo "$(GREEN)Successfully deployed PanFS CSI Storage Class using manifest file deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml$(RESET)"
 	@echo
 
 .PHONY: deploy-storageclass
