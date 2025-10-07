@@ -80,6 +80,8 @@ Compatibility matrix between PanFS CSI Driver, Kubernetes, CSI Spec and PanFS ve
 | 1.0.1+            | 1.30.1+            | 1.11.0           |
 | 1.1.0             | 1.30.1+            | 1.11.0           |
 | 1.2.0             | 1.30.1+            | 1.11.0           |
+| 1.2.1             | 1.30.1+            | 1.11.0           |
+| 1.2.2             | 1.30.1+            | 1.11.0           |
 
 
 ## Getting started
@@ -126,7 +128,7 @@ Create the namespace, configure registry credentials, and deploy the driver usin
 # Create PanFS CSI Driver namespace
 kubectl create namespace csi-panfs
 
-# Configure secret for Private Registry with PanFS CSI Driver images
+# Configure secret for Private Registry with PanFS DFC KMM images
 # Example command (replace placeholders with your actual registry settings; do not commit real credentials):
 kubectl create secret docker-registry <your-secret-name> \
   --docker-server=<your-registry-server> \
@@ -142,7 +144,7 @@ This will deploy CSI driver components and the KMM module.
 
 Please update the settings in [deploy/k8s/csi-driver/template-csi-panfs.yaml](deploy/k8s/csi-driver/template-csi-panfs.yaml) according to your cluster specification and available image tags in your private registry:
 
-- `<IMAGE_PULL_SECRET_NAME>`: The name of your image pull secret for accessing container images.
+- `<IMAGE_PULL_SECRET_NAME>`: The name of your image pull secret for accessing DFC KMM container images.
 - `<PANFS_DFC_IMAGE>`: The full image reference for the PanFS DFC container.
 - `<KERNEL_VERSION>`: The kernel version required for your environment.
 
