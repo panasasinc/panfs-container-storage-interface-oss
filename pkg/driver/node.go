@@ -20,6 +20,7 @@ import (
 	"os"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -140,7 +141,45 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 		mountOptions = append(mountOptions, "ro")
 	}
 
-	if err := d.mounterV2.Mount(fmt.Sprintf("panfs://%s/%s", in.GetSecrets()[realmIP], volumeID), publishTargetPath, mountOptions); err != nil {
+	if encryptionVal, ok := in.VolumeContext[utils.VolumeProvisioningContext.Encryption.Key]; ok && encryptionVal == "on" {
+		// Create a temporary KMIP Config file
+		if err := os.MkdirAll("/var/tmp/kmip/", 0o600); err != nil {
+			llog.Error(err, "failed to create temp directory for KMIP config file")
+			return nil, status.Error(codes.Internal, "Failed to create temp directory for KMIP config file: "+err.Error())
+		}
+
+		kmipConfigFile, err := os.CreateTemp("/var/tmp/kmip/", "config_*.conf")
+		if err != nil {
+			llog.Error(err, "failed to create temporary KMIP config file for mounting")
+			return nil, status.Error(codes.Internal, "Failed to create KMIP config file: "+err.Error())
+		}
+
+		// Cleanup the temp file after mount operation
+		defer kmipConfigFile.Close()
+		defer os.Remove(kmipConfigFile.Name())
+
+		// Set file permissions to 0700
+		err = os.Chmod(kmipConfigFile.Name(), 0o700)
+		if err != nil {
+			llog.Error(err, "failed to set '0700' permissions on KMIP config file")
+			return nil, status.Error(codes.Internal, "Failed to set '0700' permissions on KMIP config file: "+err.Error())
+		}
+
+		if in.Secrets[utils.RealmConnectionContext.KMIPConfigData] == "" {
+			llog.Error(fmt.Errorf("%s key is empty", utils.RealmConnectionContext.KMIPConfigData), "KMIP secret must be provided for encrypted volumes")
+			return nil, status.Error(codes.InvalidArgument, "KMIP secret must be provided for encrypted volumes")
+		}
+
+		data := []byte(in.Secrets[utils.RealmConnectionContext.KMIPConfigData])
+		if _, err := kmipConfigFile.Write(data); err != nil {
+			llog.Error(err, "failed to write KMIP config data to temporary file")
+			return nil, status.Error(codes.Internal, "Failed to write KMIP config data to temporary file: "+err.Error())
+		}
+
+		mountOptions = append(mountOptions, fmt.Sprintf("kmip-config-file=%s", kmipConfigFile.Name()))
+	}
+
+	if err := d.mounterV2.Mount(fmt.Sprintf("panfs://%s/%s", in.GetSecrets()[utils.RealmConnectionContext.RealmAddress], volumeID), publishTargetPath, mountOptions); err != nil {
 		llog.Error(fmt.Errorf("failed to publish volume"), UnexpectedErrorInternalStr,
 			"volume_id", volumeID,
 			"publish_target_path", publishTargetPath)
@@ -301,24 +340,4 @@ func (d *Driver) NodeGetVolumeStats(ctx context.Context, in *csi.NodeGetVolumeSt
 		"volume_path", in.VolumePath,
 		"staging_target_path", in.StagingTargetPath)
 	return nil, status.Error(codes.Unimplemented, "")
-}
-
-// makeDir creates a directory at the specified path with 0755 permissions.
-// Returns an error if the directory cannot be created and does not already exist.
-//
-// Parameters:
-//
-//	path - The directory path to create.
-//
-// Returns:
-//
-//	error - Returns an error if creation fails.
-func makeDir(path string) error {
-	err := os.MkdirAll(path, os.FileMode(0o755))
-	if err != nil {
-		if !os.IsExist(err) {
-			return err
-		}
-	}
-	return nil
 }

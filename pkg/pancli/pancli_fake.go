@@ -64,15 +64,35 @@ func (c *FakePancliSSHClient) CreateVolume(volumeName string, params *VolumeCrea
 		return nil, ErrorAlreadyExist
 	}
 
+	bsetName := (*params)[utils.VolumeProvisioningContext.BladeSet.Key]
+	if bsetName == "" {
+		bsetName = "Set 1"
+	}
+
+	soft := (*params)[utils.VolumeProvisioningContext.Soft.Key]
+	if soft == "" {
+		soft = "0"
+	}
+
+	hard := (*params)[utils.VolumeProvisioningContext.Hard.Key]
+	if hard == "" {
+		hard = "0"
+	}
+
+	enc := (*params)[utils.VolumeProvisioningContext.Encryption.Key]
+	if enc == "" {
+		enc = "off"
+	}
+
 	vol := &utils.Volume{
 		Name: utils.VolumeName(volumeName),
 		Bset: utils.Bladeset{
 			ID:   "1",
-			Name: params.BladeSet,
+			Name: bsetName,
 		},
 		State: "Online",
-		Soft:  utils.BytesToGB(params.Soft),
-		Hard:  utils.BytesToGB(params.Hard),
+		Soft:  utils.BytesStringToGB(soft),
+		Hard:  utils.BytesStringToGB(hard),
 		ID:    uuid.New().String(),
 	}
 	c.Volumes = append(c.Volumes, vol)

@@ -26,13 +26,14 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog/v2"
 )
 
 var (
 	defaultSecrets = map[string]string{
-		sshUser:  "user",
-		password: "pass",
-		realmIP:  "realm",
+		utils.RealmConnectionContext.Username:     "user",
+		utils.RealmConnectionContext.Password:     "pass",
+		utils.RealmConnectionContext.RealmAddress: "realm",
 	}
 	validVolumeName = "validVolumeName"
 	emptyVolumeName = ""
@@ -180,6 +181,7 @@ func TestControllerCreateVolume(t *testing.T) {
 		endpoint: "unix:///tmp/csi.sock",
 		host:     "localhost",
 		panfs:    pancliMock,
+		log:      klog.NewKlogr(),
 	}
 
 	testCases := []struct {
@@ -208,6 +210,7 @@ func TestControllerCreateVolume(t *testing.T) {
 				Volume: &csi.Volume{
 					VolumeId:      validVolumeName,
 					CapacityBytes: GB10Bytes,
+					VolumeContext: map[string]string{},
 				},
 			},
 			nil,
@@ -216,6 +219,74 @@ func TestControllerCreateVolume(t *testing.T) {
 					&utils.Volume{
 						Name: utils.VolumeName(validVolumeName),
 						Soft: 10.00,
+					},
+					nil)
+			},
+		},
+		{
+			"CreateEncryptedVolumeSuccess",
+			&csi.CreateVolumeRequest{
+				Name: validVolumeName,
+				Parameters: map[string]string{
+					utils.VolumeProvisioningContext.Encryption.Key: "on",
+				},
+				Secrets: defaultSecrets,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+				},
+			},
+			&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId: validVolumeName,
+					VolumeContext: map[string]string{
+						utils.VolumeProvisioningContext.Encryption.Key: "on",
+					},
+				},
+			},
+			nil,
+			func() {
+				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), defaultSecrets).Times(1).Return(
+					&utils.Volume{
+						Name:       utils.VolumeName(validVolumeName),
+						Encryption: "on",
+					},
+					nil)
+			},
+		},
+		{
+			"CreateEncryptedVolumeModeMistmatch",
+			&csi.CreateVolumeRequest{
+				Name: validVolumeName,
+				Parameters: map[string]string{
+					utils.VolumeProvisioningContext.Encryption.Key: "on",
+				},
+				Secrets: defaultSecrets,
+				VolumeCapabilities: []*csi.VolumeCapability{
+					{
+						AccessType: &csi.VolumeCapability_Mount{
+							Mount: &csi.VolumeCapability_MountVolume{},
+						},
+					},
+				},
+			},
+			&csi.CreateVolumeResponse{
+				Volume: &csi.Volume{
+					VolumeId: validVolumeName,
+					VolumeContext: map[string]string{
+						utils.VolumeProvisioningContext.Encryption.Key: "on",
+					},
+				},
+			},
+			status.Error(codes.Internal, UnexpectedErrorInternalStr),
+			func() {
+				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), defaultSecrets).Times(1).Return(
+					&utils.Volume{
+						Name:       utils.VolumeName(validVolumeName),
+						Encryption: "off",
 					},
 					nil)
 			},
@@ -239,6 +310,7 @@ func TestControllerCreateVolume(t *testing.T) {
 				Volume: &csi.Volume{
 					VolumeId:      validVolumeName,
 					CapacityBytes: GB10Bytes,
+					VolumeContext: map[string]string{},
 				},
 			},
 			nil,

@@ -17,7 +17,9 @@ package pancli
 import (
 	"errors"
 	"fmt"
+	"regexp"
 	"strings"
+	"unicode"
 )
 
 var (
@@ -61,8 +63,35 @@ func parseErrorString(errorStr string) error {
 	case strings.Contains(s, "do not exist"):
 		return fmt.Errorf("%w: %s", ErrorNotFound, errorStr)
 	//	internal errors
-	case strings.Contains(s, "invalid string"):
-		return fmt.Errorf("%w: %s", ErrorInvalidArgument, errorStr)
+	case strings.Contains(s, "must be one of"), strings.Contains(s, "invalid string"):
+		// Normalize NBSP -> space, remove newlines
+		reNBSP := regexp.MustCompile("\u00A0")
+		clean := reNBSP.ReplaceAllString(errorStr, " ")
+
+		// Collapse whitespace, remove newlines
+		clean = strings.Join(strings.Fields(clean), " ")
+
+		// Remove help line at the end
+		reHelpLine := regexp.MustCompile(`\s*Use the command "[^"]*" to get more help\.?\s*$`)
+		clean = reHelpLine.ReplaceAllString(clean, "")
+
+		// Remove trailing ", -f."
+		reTrailingF := regexp.MustCompile(`,\s*-f\.$`)
+		clean = reTrailingF.ReplaceAllString(clean, "")
+
+		// Trim spaces
+		clean = strings.TrimSpace(clean)
+
+		if clean == "" {
+			return fmt.Errorf("%w: %s", ErrorInvalidArgument, errorStr)
+		}
+
+		// Capitalize first rune
+		runes := []rune(clean)
+		runes[0] = unicode.ToUpper(runes[0])
+		clean = string(runes)
+
+		return fmt.Errorf("%w: %s", ErrorInvalidArgument, clean)
 	case strings.Contains(s, "should be"):
 		return fmt.Errorf("%w: %s", ErrorInvalidArgument, errorStr)
 	case strings.Contains(s, "status 255"):

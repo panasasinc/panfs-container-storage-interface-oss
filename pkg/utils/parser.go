@@ -39,25 +39,30 @@ func (v *VolumeName) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error 
 
 // VolumeList represents the XML structure returned by the `pancli` command for listing volumes.
 type VolumeList struct {
-	XMLName       xml.Name      `xml:"pasxml"`
-	Volumes       []Volume      `xml:"volumes>volume"`
-	SupportedUrls SupportedUrls `xml:"supportedUrls"`
+	XMLName       xml.Name `xml:"pasxml"`
+	Volumes       []Volume `xml:"volumes>volume"`
+	SupportedUrls struct {
+		Urls []string `xml:"url"`
+	} `xml:"supportedUrls"`
+}
+
+// Bladeset represents a bladeset in the PanFS system.
+type Bladeset struct {
+	XMLName xml.Name `xml:"bladesetName"`
+	ID      string   `xml:"id,attr"`
+	Name    string   `xml:",chardata"`
 }
 
 // Volume represents a single volume in the PanFS system.
 type Volume struct {
-	XMLName xml.Name   `xml:"volume"`
-	ID      string     `xml:"id,attr"`
-	Name    VolumeName `xml:"name"`
-	State   string     `xml:"state"`
-	Soft    float64    `xml:"softQuotaGB"`
-	Hard    float64    `xml:"hardQuotaGB"`
-	Bset    Bladeset   `xml:"bladesetName"`
-}
-
-// SupportedUrls represents the supported URLs in the PanFS system.
-type SupportedUrls struct {
-	Urls []string `xml:"url"`
+	XMLName    xml.Name   `xml:"volume"`
+	ID         string     `xml:"id,attr"`
+	Name       VolumeName `xml:"name"`
+	State      string     `xml:"state"`
+	Soft       float64    `xml:"softQuotaGB"`
+	Hard       float64    `xml:"hardQuotaGB"`
+	Bset       Bladeset   `xml:"bladesetName"`
+	Encryption string     `xml:"encryption"`
 }
 
 // GetSoftQuotaBytes returns the soft quota in bytes.
@@ -70,11 +75,12 @@ func (v *Volume) GetHardQuotaBytes() int64 {
 	return GBToBytes(v.Hard)
 }
 
-// Bladeset represents a bladeset in the PanFS system.
-type Bladeset struct {
-	XMLName xml.Name `xml:"bladesetName"`
-	ID      string   `xml:"id,attr"`
-	Name    string   `xml:",chardata"`
+// GetEncryptionMode returns the encryption mode of the volume.
+func (vol *Volume) GetEncryptionMode() string {
+	if vol.Encryption != "" {
+		return vol.Encryption
+	}
+	return "off"
 }
 
 // ParseListVolumes parses the XML output from the `pancli` command for listing volumes.

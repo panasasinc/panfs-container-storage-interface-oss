@@ -78,32 +78,11 @@ const (
 	// EphemeralK8SVolumeContext is a volume context key which indicating that k8s requests ephemeral volume. CSI PanFS
 	// plugin does not support ephemeral volumes for now
 	EphemeralK8SVolumeContext = "csi.storage.k8s.io/ephemeral"
-	PanFSFilesystemType       = "panfs"
-	VendorPrefix              = "panfs.csi.vdura.com"
 )
 
 // Volume parameters constants
 const (
 	DefaultDriverName string = "com.vdura.csi.panfs"
-	bladeSet                 = VendorPrefix + "bladeset"
-	recoveryPriority         = VendorPrefix + "recoverypriority"
-	efsa                     = VendorPrefix + "efsa"
-	volService               = VendorPrefix + "volservice"
-	layout                   = VendorPrefix + "layout"
-	maxWidth                 = VendorPrefix + "maxwidth"
-	stripeUnit               = VendorPrefix + "stripeunit"
-	rgWidth                  = VendorPrefix + "rgwidth"
-	rgDepth                  = VendorPrefix + "rgdepth"
-	user                     = VendorPrefix + "user"
-	group                    = VendorPrefix + "group"
-	uPerm                    = VendorPrefix + "uperm"
-	gPerm                    = VendorPrefix + "gperm"
-	oPerm                    = VendorPrefix + "operm"
-
-	realmIP    = "realm_ip"
-	sshUser    = "user"
-	password   = "password"
-	privateKey = "private_key"
 )
 
 // CreateDriver initializes a new Driver instance with the provided configuration and dependencies.

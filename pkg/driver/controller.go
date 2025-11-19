@@ -21,6 +21,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -102,39 +103,30 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 
 	volumeName := in.GetName()
 	parameters := in.GetParameters()
-	volParams := &pancli.VolumeCreateParams{
-		BladeSet:   parameters[bladeSet],
-		VolService: parameters[volService],
 
-		Soft: in.GetCapacityRange().GetRequiredBytes(), // csc flag for soft [--req-bytes]
-		Hard: in.GetCapacityRange().GetLimitBytes(),    // csc flag for hard [--lim-bytes],
-
-		Layout:     parameters[layout],
-		MaxWidth:   parameters[maxWidth],
-		StripeUnit: parameters[stripeUnit],
-		RgWidth:    parameters[rgWidth],
-		RgDepth:    parameters[rgDepth],
-
-		User:  parameters[user],
-		Group: parameters[group],
-		UPerm: parameters[uPerm],
-		GPerm: parameters[gPerm],
-		OPerm: parameters[oPerm],
+	volParams := make(map[string]string, len(parameters))
+	for k, v := range parameters {
+		volParams[k] = v
 	}
+	volParams[utils.VolumeProvisioningContext.Soft.Key] = fmt.Sprintf("%d", in.GetCapacityRange().GetRequiredBytes()) // csc flag for soft [--req-bytes]
+	volParams[utils.VolumeProvisioningContext.Hard.Key] = fmt.Sprintf("%d", in.GetCapacityRange().GetLimitBytes())    // csc flag for hard [--lim-bytes]
 
-	vol, err := d.panfs.CreateVolume(volumeName, volParams, secrets)
+	vpc := pancli.VolumeCreateParams(volParams)
+	vol, err := d.panfs.CreateVolume(volumeName, &vpc, secrets)
 	if err != nil {
 		// if error happens and it is not ErrorAlreadyExist, we return error
 		if !errors.Is(err, pancli.ErrorAlreadyExist) {
 			d.log.Error(err, "failed to create volume", "volume_id", volumeName)
 			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
 		}
+
 		// this is ErrorAlreadyExist error - need to check volume matches capabilities
 		vol, err := d.panfs.GetVolume(volumeName, secrets)
 		if err != nil || vol == nil {
 			llog.Error(err, "volume already exists but failed to verify capabilities", "volume_id", volumeName)
 			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
 		}
+
 		// if volume is not match requested capabilities
 		if err := validateVolumeCapacity(in.GetCapacityRange(), vol); err != nil {
 			llog.Error(err, "volume already exists, but the capacity does not match", "volume_id", volumeName)
@@ -142,22 +134,36 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 		}
 
 		// existing volume matches requested capabilities - return OK with existing volume info
+		llog.Info("volume already exists", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				CapacityBytes: vol.GetSoftQuotaBytes(),
 				VolumeId:      volumeName,
+				VolumeContext: parameters,
 			},
 		}, nil
 	}
 
-	llog.Info("volume created", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes())
+	llog.Info("volume created", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
+
+	e := error(nil)
+	requestedEncMode := volParams[utils.VolumeProvisioningContext.Encryption.Key]
+	if requestedEncMode == "" {
+		requestedEncMode = "off"
+	}
+
+	if requestedEncMode != vol.GetEncryptionMode() {
+		llog.Error(fmt.Errorf("volume encryption mode does not match the requested one"), "Volume creation error", "volume_name", volumeName, "requested_encryption", requestedEncMode, "actual_encryption", vol.GetEncryptionMode())
+		e = status.Error(codes.Internal, UnexpectedErrorInternalStr)
+	}
 
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			CapacityBytes: vol.GetSoftQuotaBytes(),
 			VolumeId:      volumeName,
+			VolumeContext: parameters,
 		},
-	}, nil
+	}, e
 }
 
 // DeleteVolume handles the CSI DeleteVolume request.

@@ -32,35 +32,38 @@ const (
 var (
 	// Dummy secrets for testing only. Do not use real credentials.
 	defaultSecrets = map[string]string{
-		"user":     "testuser",
-		"password": "testpass",
-		"realm_ip": "testrealm",
+		utils.RealmConnectionContext.Username:     "testuser",
+		utils.RealmConnectionContext.Password:     "testpass",
+		utils.RealmConnectionContext.RealmAddress: "testrealm",
 	}
+
 	getValidVolumePasxmlResponse = `<pasxml version="6.0.0">
-  <system>
+<system>
     <name>virtual-realm.local.com</name>
     <IPV4>realm.ip.address</IPV4>
     <alertLevel>warning</alertLevel>
     <state>online</state>
-  </system>
-  <time>2025-06-26T13:10:49Z</time>
-  <volumes>
-      <volume id="371">
-      <name>/validVolumeName</name>
-      <bladesetName id="1">Set 1</bladesetName>
-      <state>Online</state>
-      <raid>Object RAID6+</raid>
-      <director>ASD-1,1</director>
-      <volservice>0x0400000000000008(FM)</volservice>
-      <objectId>I-xD0200000000000008-xG00000000-xU0000000000000000</objectId>
-      <recoveryPriority>50</recoveryPriority>
-      <efsaMode>retry</efsaMode>
-      <spaceUsedGB>0</spaceUsedGB>
-      <spaceAvailableGB>95.00</spaceAvailableGB>
-      <hardQuotaGB>0</hardQuotaGB>
-      <softQuotaGB>0</softQuotaGB>
-      <userQuotaPolicy inherit="1">disabled</userQuotaPolicy>
-    </volume></volumes>
+</system>
+<time>2025-06-26T13:10:49Z</time>
+<volumes>
+		<volume id="371">
+			<name>/validVolumeName</name>
+			<bladesetName id="1">Set 1</bladesetName>
+			<state>Online</state>
+			<raid>Object RAID6+</raid>
+			<director>ASD-1,1</director>
+			<volservice>0x0400000000000008(FM)</volservice>
+			<objectId>I-xD0200000000000008-xG00000000-xU0000000000000000</objectId>
+			<recoveryPriority>50</recoveryPriority>
+			<efsaMode>retry</efsaMode>
+			<spaceUsedGB>0</spaceUsedGB>
+			<spaceAvailableGB>95.00</spaceAvailableGB>
+			<hardQuotaGB>0</hardQuotaGB>
+			<softQuotaGB>0</softQuotaGB>
+			<userQuotaPolicy inherit="1">disabled</userQuotaPolicy>
+			<encryption>off</encryption>
+		</volume>
+	</volumes>
 </pasxml>`
 	validVolumeResponse = &utils.Volume{
 		XMLName: xml.Name{Local: "volume"},
@@ -74,6 +77,7 @@ var (
 			ID:      "1",
 			Name:    "Set 1",
 		},
+		Encryption: "off",
 	}
 )
 
@@ -93,7 +97,7 @@ func TestCreateVolume(t *testing.T) {
 			"VolumeCreated",
 			validVolumeName,
 			VolumeCreateParams{
-				BladeSet: "Set 1",
+				utils.VolumeProvisioningContext.BladeSet.Key: "Set 1",
 			},
 			nil,
 			validVolumeResponse,
@@ -101,7 +105,7 @@ func TestCreateVolume(t *testing.T) {
 				// expect create volume command
 				runnerMock.EXPECT().RunCommand(
 					gomock.Any(),
-					"volume", "create", validVolumeName, "bladeset \"Set 1\"",
+					"volume", "create", validVolumeName, `bladeset "Set 1"`,
 				).Times(1).Return([]byte{}, nil)
 				// then get volume details
 				runnerMock.EXPECT().RunCommand(
@@ -152,7 +156,7 @@ func TestCreateVolume(t *testing.T) {
 			"CreatedButFailedToGetDetails",
 			validVolumeName,
 			VolumeCreateParams{
-				BladeSet: "Set 1",
+				utils.VolumeProvisioningContext.BladeSet.Key: "Set 1",
 			},
 			fmt.Errorf("xml syntax error"),
 			nil,
@@ -160,7 +164,57 @@ func TestCreateVolume(t *testing.T) {
 				// expect create volume command
 				runnerMock.EXPECT().RunCommand(
 					gomock.Any(),
-					"volume", "create", validVolumeName, "bladeset \"Set 1\"",
+					"volume", "create", validVolumeName, `bladeset "Set 1"`,
+				).Times(1).Return([]byte{}, nil)
+				// then get volume details
+				runnerMock.EXPECT().RunCommand(
+					gomock.Any(),
+					"pasxml", "volumes", "volume", validVolumeName,
+				).Times(1).Return([]byte("<invalid xml>"), fmt.Errorf("xml syntax error"))
+			},
+		},
+		{
+			"CreatedEncryptedVolume",
+			validVolumeName,
+			VolumeCreateParams{
+				utils.VolumeProvisioningContext.Encryption.Key: "on",
+			},
+			nil,
+			&utils.Volume{
+				XMLName: xml.Name{
+					Local: "volume",
+				},
+				ID:         "371",
+				Name:       "validVolumeName",
+				Bset:       utils.Bladeset{},
+				Encryption: "on",
+			},
+			func() {
+				// expect create volume command
+				runnerMock.EXPECT().RunCommand(
+					gomock.Any(),
+					"volume", "create", validVolumeName, "encryption on",
+				).Times(1).Return([]byte{}, nil)
+				// then get volume details
+				runnerMock.EXPECT().RunCommand(
+					gomock.Any(),
+					"pasxml", "volumes", "volume", validVolumeName,
+				).Times(1).Return([]byte(`<pasxml version="6.0.0"><volumes><volume id="371"><name>/validVolumeName</name><encryption>on</encryption></volume></volumes></pasxml>`), nil)
+			},
+		},
+		{
+			"CreatedEncryptedVolumeButFailedToGetDetails",
+			validVolumeName,
+			VolumeCreateParams{
+				utils.VolumeProvisioningContext.Encryption.Key: "on",
+			},
+			fmt.Errorf("xml syntax error"),
+			nil,
+			func() {
+				// expect create volume command
+				runnerMock.EXPECT().RunCommand(
+					gomock.Any(),
+					"volume", "create", validVolumeName, "encryption on",
 				).Times(1).Return([]byte{}, nil)
 				// then get volume details
 				runnerMock.EXPECT().RunCommand(
@@ -257,92 +311,99 @@ func TestGetOptionalParameters(t *testing.T) {
 		{
 			name: "BladeSetOnly",
 			params: VolumeCreateParams{
-				BladeSet: "Set 1",
+				utils.VolumeProvisioningContext.BladeSet.Key: "Set 1",
 			},
 			want: []string{`bladeset "Set 1"`},
 		},
 		{
 			name: "VolServiceAndEfsa",
 			params: VolumeCreateParams{
-				VolService: "0x01",
-				Efsa:       "retry",
+				utils.VolumeProvisioningContext.VolService.Key: "0x01",
+				utils.VolumeProvisioningContext.Efsa.Key:       "retry",
 			},
-			want: []string{"volservice 0x01", "efsa", "retry"},
+			want: []string{"volservice 0x01", "efsa retry"},
 		},
 		{
 			name: "SoftAndHard",
 			params: VolumeCreateParams{
-				Soft: 1073741824, // 1GB
-				Hard: 2147483648, // 2GB
+				utils.VolumeProvisioningContext.Soft.Key: "1073741824", // 1GB
+				utils.VolumeProvisioningContext.Hard.Key: "2147483648", // 2GB
 			},
-			want: []string{"soft", "1.00", "hard", "2.00"},
+			want: []string{"soft 1.00", "hard 2.00"},
 		},
 		{
 			name: "AllRAIDParams",
 			params: VolumeCreateParams{
-				Layout:     "RAID6",
-				MaxWidth:   "10",
-				StripeUnit: "64K",
-				RgWidth:    "8",
-				RgDepth:    "2",
+				utils.VolumeProvisioningContext.Layout.Key:     "RAID6",
+				utils.VolumeProvisioningContext.MaxWidth.Key:   "10",
+				utils.VolumeProvisioningContext.StripeUnit.Key: "64K",
+				utils.VolumeProvisioningContext.RgWidth.Key:    "8",
+				utils.VolumeProvisioningContext.RgDepth.Key:    "2",
 			},
 			want: []string{"layout RAID6", "maxwidth 10", "stripeunit 64K", "rgwidth 8", "rgdepth 2"},
 		},
 		{
 			name: "OwnerGroupPerms",
 			params: VolumeCreateParams{
-				User:  "alice",
-				Group: "staff",
-				UPerm: "rwx",
-				GPerm: "r-x",
-				OPerm: "r--",
+				utils.VolumeProvisioningContext.User.Key:  "alice",
+				utils.VolumeProvisioningContext.Group.Key: "staff",
+				utils.VolumeProvisioningContext.UPerm.Key: "rwx",
+				utils.VolumeProvisioningContext.GPerm.Key: "r-x",
+				utils.VolumeProvisioningContext.OPerm.Key: "r--",
 			},
-			want: []string{"user alice", "group staff", "uperm rwx", "gperm r-x", "operm r--"},
+			want: []string{`user "alice"`, `group "staff"`, "uperm rwx", "gperm r-x", "operm r--"},
 		},
 		{
 			name: "DescriptionAndRecoveryPriority",
 			params: VolumeCreateParams{
-				Description:      "test volume",
-				Recoverypriority: "42",
+				utils.VolumeProvisioningContext.Description.Key:      "test volume",
+				utils.VolumeProvisioningContext.RecoveryPriority.Key: "42",
 			},
-			want: []string{"description", "test volume", "recoverypriority", "42"},
+			want: []string{`description "test volume"`, "recoverypriority 42"},
+		},
+		{
+			name: "EncryptionRequested",
+			params: VolumeCreateParams{
+				utils.VolumeProvisioningContext.Encryption.Key: "on",
+			},
+			want: []string{"encryption on"},
 		},
 		{
 			name: "AllFields",
 			params: VolumeCreateParams{
-				BladeSet:         "Set 2",
-				Recoverypriority: "99",
-				Efsa:             "file-unavailable",
-				Soft:             3221225472, // 3GB
-				Hard:             4294967296, // 4GB
-				VolService:       "0x02",
-				Layout:           "RAID5",
-				MaxWidth:         "12",
-				StripeUnit:       "128K",
-				RgWidth:          "6",
-				RgDepth:          "3",
-				User:             "bob",
-				Group:            "users",
-				UPerm:            "rw-",
-				GPerm:            "r--",
-				OPerm:            "---",
-				Description:      "full test",
+				utils.VolumeProvisioningContext.BladeSet.Key:         "Set 2",
+				utils.VolumeProvisioningContext.RecoveryPriority.Key: "99",
+				utils.VolumeProvisioningContext.Efsa.Key:             "file-unavailable",
+				utils.VolumeProvisioningContext.Soft.Key:             "3221225472", // 3GB
+				utils.VolumeProvisioningContext.Hard.Key:             "4294967296", // 4GB
+				utils.VolumeProvisioningContext.VolService.Key:       "0x02",
+				utils.VolumeProvisioningContext.Layout.Key:           "RAID5",
+				utils.VolumeProvisioningContext.MaxWidth.Key:         "12",
+				utils.VolumeProvisioningContext.StripeUnit.Key:       "128K",
+				utils.VolumeProvisioningContext.RgWidth.Key:          "6",
+				utils.VolumeProvisioningContext.RgDepth.Key:          "3",
+				utils.VolumeProvisioningContext.User.Key:             "bob",
+				utils.VolumeProvisioningContext.Group.Key:            "users",
+				utils.VolumeProvisioningContext.UPerm.Key:            "rw-",
+				utils.VolumeProvisioningContext.GPerm.Key:            "r--",
+				utils.VolumeProvisioningContext.OPerm.Key:            "---",
+				utils.VolumeProvisioningContext.Description.Key:      "full test",
 			},
 			want: []string{
 				`bladeset "Set 2"`,
 				"volservice 0x02",
-				"soft", "3.00",
-				"hard", "4.00",
-				"efsa", "file-unavailable",
-				"description", "full test",
-				"recoverypriority", "99",
+				"soft 3.00",
+				"hard 4.00",
+				"efsa file-unavailable",
+				`description "full test"`,
+				"recoverypriority 99",
 				"layout RAID5",
 				"maxwidth 12",
 				"stripeunit 128K",
 				"rgwidth 6",
 				"rgdepth 3",
-				"user bob",
-				"group users",
+				`user "bob"`,
+				`group "users"`,
 				"uperm rw-",
 				"gperm r--",
 				"operm ---",
@@ -353,7 +414,7 @@ func TestGetOptionalParameters(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
 			got := getOptionalParameters(&tc.params)
-			assert.Equal(t, tc.want, got)
+			assert.ElementsMatch(t, tc.want, got)
 		})
 	}
 }

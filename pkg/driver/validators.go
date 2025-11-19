@@ -20,7 +20,6 @@ import (
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 )
 
@@ -116,81 +115,87 @@ func validateCreateVolumeRequest(req *csi.CreateVolumeRequest) error {
 //	error - Returns an error if any parameter is invalid.
 func validateVolumeParameters(parameters map[string]string) error {
 	// Validate optional parameters if they are present
-	if val, exist := parameters[bladeSet]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", bladeSet)
+	if val, exist := parameters[utils.VolumeProvisioningContext.BladeSet.Key]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.BladeSet.Key)
 	}
 
-	if val, exist := parameters[volService]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", volService)
+	if val, exist := parameters[utils.VolumeProvisioningContext.VolService.Key]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.VolService.Key)
 	}
 
-	if val, exist := parameters[layout]; exist && !in(val, layoutList...) {
-		return fmt.Errorf("%s must be one of: %v", layout, layoutList)
+	if val, exist := parameters[utils.VolumeProvisioningContext.Layout.Key]; exist && !utils.In(val, layoutList...) {
+		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.Layout.Key, layoutList)
 	}
 
-	if val, exist := parameters[maxWidth]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.MaxWidth.Key]; exist {
 		intValue, err := strconv.Atoi(val)
 		if err != nil {
-			return fmt.Errorf("%s is not integer", maxWidth)
+			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.MaxWidth.Key)
 		}
 
 		if intValue < 1 {
-			return fmt.Errorf("%s must be greater then 0", maxWidth)
+			return fmt.Errorf("%s must be greater then 0", utils.VolumeProvisioningContext.MaxWidth.Key)
 		}
 		//	todo: The minimum number of OSDs for RAID 5+ is 2; for RAID 6+, the minimum value is 3; for RAID 10+, the minimum value is 2.
 	}
 
-	if val, exist := parameters[stripeUnit]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.StripeUnit.Key]; exist {
 		if valid := validateStripeUnit(val); !valid {
-			return fmt.Errorf("%s is not valid", stripeUnit)
+			return fmt.Errorf("%s is not valid", utils.VolumeProvisioningContext.StripeUnit.Key)
 		}
 	}
 
-	if val, exist := parameters[rgWidth]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.RgWidth.Key]; exist {
 		intValue, err := strconv.Atoi(val)
 		if err != nil {
-			return fmt.Errorf("%s is not integer", rgWidth)
+			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.RgWidth.Key)
 		}
 
 		// Any integer between 3 and 20 (inclusive) is a valid width
 		if intValue < 3 || intValue > 20 {
-			return fmt.Errorf("%s must be between 3 and 20 (inclusive)", rgWidth)
+			return fmt.Errorf("%s must be between 3 and 20 (inclusive)", utils.VolumeProvisioningContext.RgWidth.Key)
 		}
 
 		// todo: Only available for volumes with RAID 6+ or RAID 5+ layout
 	}
 
-	if val, exist := parameters[rgDepth]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.RgDepth.Key]; exist {
 		intValue, err := strconv.Atoi(val)
 		if err != nil {
-			return fmt.Errorf("%s is not integer", rgDepth)
+			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.RgDepth.Key)
 		}
 
 		if intValue < 1 {
-			return fmt.Errorf("%s must be greater then 0", rgDepth)
+			return fmt.Errorf("%s must be greater then 0", utils.VolumeProvisioningContext.RgDepth.Key)
 		}
 
 		// todo: This option is only available for volumes with RAID 6+ or RAID 5+ layout.
 	}
 
-	if val, exist := parameters[user]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", user)
+	if val, exist := parameters[utils.VolumeProvisioningContext.User.Key]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.User.Key)
 	}
 
-	if val, exist := parameters[group]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", group)
+	if val, exist := parameters[utils.VolumeProvisioningContext.Group.Key]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.Group.Key)
 	}
 
-	if val, exist := parameters[uPerm]; exist && !in(val, permList...) {
-		return fmt.Errorf("%s must be one of: %v", uPerm, permList)
+	if val, exist := parameters[utils.VolumeProvisioningContext.UPerm.Key]; exist && !utils.In(val, permList...) {
+		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.UPerm.Key, permList)
 	}
 
-	if val, exist := parameters[gPerm]; exist && !in(val, permList...) {
-		return fmt.Errorf("%s must be one of: %v", gPerm, permList)
+	if val, exist := parameters[utils.VolumeProvisioningContext.GPerm.Key]; exist && !utils.In(val, permList...) {
+		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.GPerm.Key, permList)
 	}
 
-	if val, exist := parameters[oPerm]; exist && !in(val, permList...) {
-		return fmt.Errorf("%s must be one of: %v", oPerm, permList)
+	if val, exist := parameters[utils.VolumeProvisioningContext.OPerm.Key]; exist && !utils.In(val, permList...) {
+		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.OPerm.Key, permList)
+	}
+
+	if val, exist := parameters[utils.VolumeProvisioningContext.Encryption.Key]; exist {
+		if valid := validateEncryptionParameter(val); !valid {
+			return fmt.Errorf("%s must be 'on' or 'off'", utils.VolumeProvisioningContext.Encryption.Key)
+		}
 	}
 
 	// Additional validation rules can be added here as needed.
@@ -211,20 +216,20 @@ func validateReqSecrets(secrets map[string]string) error {
 	if secrets == nil {
 		return fmt.Errorf("secrets must be provided")
 	}
-	if _, ok := secrets[pancli.AuthSecretRealmKey]; !ok {
-		return fmt.Errorf("missing %s in secrets", pancli.AuthSecretRealmKey)
+	if _, ok := secrets[utils.RealmConnectionContext.RealmAddress]; !ok {
+		return fmt.Errorf("missing %s in secrets", utils.RealmConnectionContext.RealmAddress)
 	}
 
-	if _, ok := secrets[pancli.AuthSecretSSHUserKey]; !ok {
-		return fmt.Errorf("missing %s in secrets", pancli.AuthSecretSSHUserKey)
+	if _, ok := secrets[utils.RealmConnectionContext.Username]; !ok {
+		return fmt.Errorf("missing %s in secrets", utils.RealmConnectionContext.Username)
 	}
 
-	password, ok := secrets[pancli.AuthSecretSSHPasswordKey]
+	password, ok := secrets[utils.RealmConnectionContext.Password]
 	if !ok {
 		password = "" // Default to empty if not provided
 	}
 
-	privateKey, ok := secrets[pancli.AuthSecretSSHPrivateKeyKey]
+	privateKey, ok := secrets[utils.RealmConnectionContext.PrivateKey]
 	if !ok {
 		privateKey = "" // Default to empty if not provided
 	}
@@ -290,23 +295,16 @@ func validateStripeUnit(input string) bool {
 	return true
 }
 
-// helpers
-
-// in checks if the value is in the provided list of strings.
+// validateEncryptionParameter checks if the encryption parameter is valid.
+// Accepts only "on" or "off".
 //
 // Parameters:
 //
-//	value - The string value to check.
-//	list  - Variadic list of strings to search.
+//	input - The encryption parameter string to validate.
 //
 // Returns:
 //
-//	bool - True if value is in list, false otherwise.
-func in(value string, list ...string) bool {
-	for i := range list {
-		if value == list[i] {
-			return true
-		}
-	}
-	return false
+//	bool - True if valid, false otherwise.
+func validateEncryptionParameter(input string) bool {
+	return utils.In(input, "on", "off")
 }

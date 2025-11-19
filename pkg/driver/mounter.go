@@ -192,3 +192,23 @@ func (p *PanFSFakeMounter) BindMount(source, target string, options []string) er
 func (p *PanFSFakeMounter) Unmount(target string) error {
 	return p.fakeMounter.Unmount(target)
 }
+
+// makeDir creates a directory at the specified path with 0755 permissions.
+// Returns an error if the directory cannot be created and does not already exist.
+//
+// Parameters:
+//
+//	path - The directory path to create.
+//
+// Returns:
+//
+//	error - Returns an error if creation fails.
+func makeDir(path string) error {
+	err := os.MkdirAll(path, os.FileMode(0o755))
+	if err != nil {
+		if !os.IsExist(err) {
+			return err
+		}
+	}
+	return nil
+}

@@ -20,6 +20,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/driver/mock"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
@@ -118,7 +119,7 @@ func TestNodePublishVolume(t *testing.T) {
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[realmIP], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
 					validPublishTargetPath,
 					[]string{}).Times(1)
 			},
@@ -161,7 +162,7 @@ func TestNodePublishVolume(t *testing.T) {
 			status.Error(codes.Internal, "Failed to publish volume: mounter error"),
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[realmIP], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
 					validPublishTargetPath,
 					[]string{"noatime"}).Return(fmt.Errorf("mounter error")).Times(1)
 			},
@@ -185,7 +186,7 @@ func TestNodePublishVolume(t *testing.T) {
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[realmIP], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
 					validPublishTargetPath,
 					[]string{}).Times(1)
 			},
@@ -281,7 +282,7 @@ func TestNodePublishVolume(t *testing.T) {
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[realmIP], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
 					validPublishTargetPath,
 					[]string{"noatime", "ro"}).Times(1)
 			},
