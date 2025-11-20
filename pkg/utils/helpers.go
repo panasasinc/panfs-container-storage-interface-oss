@@ -14,9 +14,11 @@
 
 package utils
 
-import "slices"
+import (
+	"slices"
+)
 
-// in checks if the value is in the provided list of strings.
+// In checks if the value is in the provided list of strings.
 // Parameters:
 //
 //	value - The string value to check.

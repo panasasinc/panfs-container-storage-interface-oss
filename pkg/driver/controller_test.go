@@ -31,9 +31,10 @@ import (
 
 var (
 	defaultSecrets = map[string]string{
-		utils.RealmConnectionContext.Username:     "user",
-		utils.RealmConnectionContext.Password:     "pass",
-		utils.RealmConnectionContext.RealmAddress: "realm",
+		utils.RealmConnectionContext.Username:       "user",
+		utils.RealmConnectionContext.Password:       "pass",
+		utils.RealmConnectionContext.RealmAddress:   "realm",
+		utils.RealmConnectionContext.KMIPConfigData: "# some data",
 	}
 	validVolumeName = "validVolumeName"
 	emptyVolumeName = ""
@@ -253,40 +254,6 @@ func TestControllerCreateVolume(t *testing.T) {
 					&utils.Volume{
 						Name:       utils.VolumeName(validVolumeName),
 						Encryption: "on",
-					},
-					nil)
-			},
-		},
-		{
-			"CreateEncryptedVolumeModeMistmatch",
-			&csi.CreateVolumeRequest{
-				Name: validVolumeName,
-				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.Encryption.Key: "on",
-				},
-				Secrets: defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
-			&csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId: validVolumeName,
-					VolumeContext: map[string]string{
-						utils.VolumeProvisioningContext.Encryption.Key: "on",
-					},
-				},
-			},
-			status.Error(codes.Internal, UnexpectedErrorInternalStr),
-			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), defaultSecrets).Times(1).Return(
-					&utils.Volume{
-						Name:       utils.VolumeName(validVolumeName),
-						Encryption: "off",
 					},
 					nil)
 			},

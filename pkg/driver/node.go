@@ -35,6 +35,13 @@ var (
 	IsNodeLabelSet = false
 )
 
+// Mockable OS functions
+var (
+	osMkdirAll = os.MkdirAll
+	osChmod    = os.Chmod
+	osRemove   = os.Remove
+)
+
 // NodeStageVolume handles the CSI NodeStageVolume request.
 // Logs the request and returns an unimplemented error.
 //
@@ -143,12 +150,12 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 
 	if encryptionVal, ok := in.VolumeContext[utils.VolumeProvisioningContext.Encryption.Key]; ok && encryptionVal == "on" {
 		// Create a temporary KMIP Config file
-		if err := os.MkdirAll("/var/tmp/kmip/", 0o600); err != nil {
+		if err := osMkdirAll("/var/tmp/kmip/", 0o700); err != nil {
 			llog.Error(err, "failed to create temp directory for KMIP config file")
 			return nil, status.Error(codes.Internal, "Failed to create temp directory for KMIP config file: "+err.Error())
 		}
 
-		kmipConfigFile, err := os.CreateTemp("/var/tmp/kmip/", "config_*.conf")
+		kmipConfigFile, err := d.tempFileFactory.CreateTemp("/var/tmp/kmip/", "config_*.conf")
 		if err != nil {
 			llog.Error(err, "failed to create temporary KMIP config file for mounting")
 			return nil, status.Error(codes.Internal, "Failed to create KMIP config file: "+err.Error())
@@ -156,10 +163,10 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 
 		// Cleanup the temp file after mount operation
 		defer kmipConfigFile.Close()
-		defer os.Remove(kmipConfigFile.Name())
+		defer osRemove(kmipConfigFile.Name())
 
 		// Set file permissions to 0700
-		err = os.Chmod(kmipConfigFile.Name(), 0o700)
+		err = osChmod(kmipConfigFile.Name(), 0o600)
 		if err != nil {
 			llog.Error(err, "failed to set '0700' permissions on KMIP config file")
 			return nil, status.Error(codes.Internal, "Failed to set '0700' permissions on KMIP config file: "+err.Error())

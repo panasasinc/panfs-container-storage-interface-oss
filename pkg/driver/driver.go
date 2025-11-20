@@ -68,6 +68,9 @@ type Driver struct {
 	mounterV2  PanMounter
 	panfs      StorageProviderClient
 	kubeClient *kubernetes.Clientset
+
+	tempFileFactory TempFileFactory
+
 	csi.UnimplementedIdentityServer
 	csi.UnimplementedControllerServer
 	csi.UnimplementedNodeServer
@@ -84,6 +87,38 @@ const (
 const (
 	DefaultDriverName string = "com.vdura.csi.panfs"
 )
+
+// FileWriter defines an interface for writing to files.
+type FileWriter interface {
+	Write([]byte) (int, error)
+	Close() error
+	Name() string
+}
+
+// TempFileFactory defines an interface for creating temporary files.
+type TempFileFactory interface {
+	CreateTemp(dir, pattern string) (FileWriter, error)
+}
+
+// osTempFileFactory is an implementation of TempFileFactory using the os package.
+type osTempFileFactory struct{}
+
+// CreateTemp creates a temporary file in the specified directory with the given pattern.
+func (f *osTempFileFactory) CreateTemp(dir, pattern string) (FileWriter, error) {
+	file, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return nil, err
+	}
+	return &osFileWrapper{file}, nil
+}
+
+// osFileWrapper wraps an *os.File to implement the FileWriter interface.
+type osFileWrapper struct {
+	*os.File
+}
+
+// Name returns the name of the file.
+func (w *osFileWrapper) Name() string { return w.File.Name() }
 
 // CreateDriver initializes a new Driver instance with the provided configuration and dependencies.
 //
@@ -134,14 +169,15 @@ func CreateDriver(
 	}
 
 	return &Driver{
-		Version:    version,
-		Name:       driverName,
-		endpoint:   endpoint,
-		mounterV2:  mounterV2,
-		log:        log,
-		host:       host,
-		panfs:      panfs,
-		kubeClient: kubeClient,
+		Version:         version,
+		Name:            driverName,
+		endpoint:        endpoint,
+		mounterV2:       mounterV2,
+		log:             log,
+		host:            host,
+		panfs:           panfs,
+		kubeClient:      kubeClient,
+		tempFileFactory: &osTempFileFactory{},
 	}
 }
 
