@@ -40,6 +40,7 @@ func (v *VolumeName) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error 
 // VolumeList represents the XML structure returned by the `pancli` command for listing volumes.
 type VolumeList struct {
 	XMLName       xml.Name `xml:"pasxml"`
+	Version       string   `xml:"version,attr"`
 	Volumes       []Volume `xml:"volumes>volume"`
 	SupportedUrls struct {
 		Urls []string `xml:"url"`
@@ -81,6 +82,26 @@ func (vol *Volume) GetEncryptionMode() string {
 		return vol.Encryption
 	}
 	return "off"
+}
+
+// MarshalVolumeToPasXML marshals the Volume struct into XML format compatible with PanFS pasxml output.
+//
+// Returns:
+//
+//	[]byte - The marshaled XML byte slice.
+//	error  - Error if marshaling fails.
+func (v *Volume) MarshalVolumeToPasXML() ([]byte, error) {
+	list := VolumeList{
+		Version: "6.0.0",
+		Volumes: []Volume{*v},
+		SupportedUrls: struct {
+			Urls []string `xml:"url"`
+		}{
+			Urls: []string{},
+		},
+	}
+
+	return xml.MarshalIndent(list, "", "    ")
 }
 
 // ParseListVolumes parses the XML output from the `pancli` command for listing volumes.

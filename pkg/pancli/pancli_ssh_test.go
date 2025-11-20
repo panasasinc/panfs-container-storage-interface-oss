@@ -37,34 +37,7 @@ var (
 		utils.RealmConnectionContext.RealmAddress: "testrealm",
 	}
 
-	getValidVolumePasxmlResponse = `<pasxml version="6.0.0">
-<system>
-    <name>virtual-realm.local.com</name>
-    <IPV4>realm.ip.address</IPV4>
-    <alertLevel>warning</alertLevel>
-    <state>online</state>
-</system>
-<time>2025-06-26T13:10:49Z</time>
-<volumes>
-		<volume id="371">
-			<name>/validVolumeName</name>
-			<bladesetName id="1">Set 1</bladesetName>
-			<state>Online</state>
-			<raid>Object RAID6+</raid>
-			<director>ASD-1,1</director>
-			<volservice>0x0400000000000008(FM)</volservice>
-			<objectId>I-xD0200000000000008-xG00000000-xU0000000000000000</objectId>
-			<recoveryPriority>50</recoveryPriority>
-			<efsaMode>retry</efsaMode>
-			<spaceUsedGB>0</spaceUsedGB>
-			<spaceAvailableGB>95.00</spaceAvailableGB>
-			<hardQuotaGB>0</hardQuotaGB>
-			<softQuotaGB>0</softQuotaGB>
-			<userQuotaPolicy inherit="1">disabled</userQuotaPolicy>
-			<encryption>off</encryption>
-		</volume>
-	</volumes>
-</pasxml>`
+	// validVolumeResponse represents a valid volume response for testing
 	validVolumeResponse = &utils.Volume{
 		XMLName: xml.Name{Local: "volume"},
 		Name:    validVolumeName,
@@ -107,11 +80,13 @@ func TestCreateVolume(t *testing.T) {
 					gomock.Any(),
 					"volume", "create", validVolumeName, `bladeset "Set 1"`,
 				).Times(1).Return([]byte{}, nil)
+
+				genPasXML, _ := validVolumeResponse.MarshalVolumeToPasXML()
 				// then get volume details
 				runnerMock.EXPECT().RunCommand(
 					gomock.Any(),
 					"pasxml", "volumes", "volume", validVolumeName,
-				).Times(1).Return([]byte(getValidVolumePasxmlResponse), nil)
+				).Times(1).Return(genPasXML, nil)
 			},
 		},
 		{
@@ -181,12 +156,13 @@ func TestCreateVolume(t *testing.T) {
 			},
 			nil,
 			&utils.Volume{
-				XMLName: xml.Name{
-					Local: "volume",
+				XMLName: xml.Name{Local: "volume"},
+				Name:    validVolumeName,
+				ID:      "371",
+				State:   "Online",
+				Bset: utils.Bladeset{
+					XMLName: xml.Name{Local: "bladesetName"},
 				},
-				ID:         "371",
-				Name:       "validVolumeName",
-				Bset:       utils.Bladeset{},
 				Encryption: "on",
 			},
 			func() {
@@ -195,11 +171,19 @@ func TestCreateVolume(t *testing.T) {
 					gomock.Any(),
 					"volume", "create", validVolumeName, "encryption on",
 				).Times(1).Return([]byte{}, nil)
+
+				genPasXML, _ := (&utils.Volume{
+					ID:         "371",
+					Name:       "validVolumeName",
+					State:      "Online",
+					Encryption: "on",
+				}).MarshalVolumeToPasXML()
+
 				// then get volume details
 				runnerMock.EXPECT().RunCommand(
 					gomock.Any(),
 					"pasxml", "volumes", "volume", validVolumeName,
-				).Times(1).Return([]byte(`<pasxml version="6.0.0"><volumes><volume id="371"><name>/validVolumeName</name><encryption>on</encryption></volume></volumes></pasxml>`), nil)
+				).Times(1).Return(genPasXML, nil)
 			},
 		},
 		{
