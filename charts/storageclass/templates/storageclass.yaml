@@ -57,7 +57,14 @@ parameters:
 
   # Specific parameters for volumes (to be) created in the PanFS Realm
   {{- range $k, $v := .Values.parameters }}
+  {{- if eq $k "panfs.csi.vdura.com/encryption" }}
+  
+  # Enable/Disable E2EE for volumes created with this StorageClass
+  # Set to "true" to enable encryption, "false" to disable encryption
   {{ $k }}: {{ $v | quote }}
+  {{else }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
   {{- end }}
 
 {{- if .Values.mountOptions }}

@@ -119,8 +119,11 @@ The `values.yaml` file contains configurable parameters.
 | csiDriver.fsGroupPolicy | string | `"File"` | Specifies the policy for fsGroup handling |
 | csiDriver.requiresRepublish | bool | `false` | Indicates if the driver requires NodePublishVolume to be periodically called for already published volumes |
 | csiDriver.seLinuxMount | bool | `true` | Enables SELinux mount support for the CSI driver |
-| dfcRelease.kernelMappings | list | `[]` | **PanFS DFC images** for different kernel versions |
+| dfcRelease.e2eeSupport | bool | `true` | Enable encryption support in DFC |
+| dfcRelease.image | string | `"panfs-dfc:{{ .Values.dfcRelease.version }}"` | DFC container image |
+| dfcRelease.kernelMappings | list | `[...]` | **PanFS DFC images** for different kernel versions |
 | dfcRelease.pullPolicy | string | `"Always"` | Image pull policy for the DFC binary |
+| dfcRelease.version | string | `dummy-version` | DFC release version |
 | imagePullSecrets | list | `[]` | List of image pull secrets for private registries |
 | labels | object | `{}` | Labels for the CSI driver workloads |
 | nodeServer.driverRegistrar.image | string | `"k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0"` | CSI node driver registrar image |

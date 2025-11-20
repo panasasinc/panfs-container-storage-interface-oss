@@ -194,30 +194,39 @@ panfsPlugin:
       memory: 600Mi
 
 dfcRelease:
+  # -- DFC release version
+  # @default -- `dummy-version`
+  version: "<dfc-release-version> # Update with the desired DFC release version"
+
   # -- Image pull policy for the DFC binary
   pullPolicy: Always
 
+  # -- DFC container image
+  image: "panfs-dfc:{{ .Values.dfcRelease.version }}"
+
+  # -- Enable encryption support in DFC
+  e2eeSupport: true
+
   # -- **PanFS DFC images** for different kernel versions
-  # @default -- `[]`
-  kernelMappings: []
-    # - literal: worker-node-kernel-version-1
-    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-1>-<dfc-release-version>
-    # - literal: worker-node-kernel-version-2
-    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-2>-<dfc-release-version>
-    # - literal: worker-node-kernel-version-3
-    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-3>-<dfc-release-version>
+  # @default -- `[...]`
+  kernelMappings: 
+    - regexp: '^.*.x86_64$'
+      containerImage: "panfs-kmm:${KERNEL_FULL_VERSION}-{{ .Values.dfcRelease.version }}"
 
 panfsKmmModule:
   # -- Enable or disable KMM module for PanFS
   enabled: true
+
   # -- Image pull policy for the KMM module
   pullPolicy: Always
+
   # -- Label applied to nodes when the PanFS kernel module is successfully loaded
   # @default -- `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}`
   kmmNodeReadyLabel:
     # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
     name: kmm.node.kubernetes.io/{{ .Release.Namespace }}.panfs.ready 
     value: ""
+
   # -- Node selector for node pods
   selector:
     node-role.kubernetes.io/worker: ""

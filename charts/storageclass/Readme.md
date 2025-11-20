@@ -228,6 +228,7 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | mountOptions | list | `[]` |  |
 | parameters | object | `{...}` | Optional storage class parameters |
 | realm.address | string | `""` | Endpoint address for the backend PanFS realm |
+| realm.kmipConfigData | string | `""` | KMIP configuration data for volume encryption key management |
 | realm.password | string | `""` | Password for the PanFS backend realm |
 | realm.privateKey | string | `""` | Private key for the PanFS backend realm |
 | realm.privateKeyPassphrase | string | `""` | Private Key Passphrase |

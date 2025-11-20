@@ -64,12 +64,27 @@ spec:
     container:
       modprobe:
         moduleName: panfs
+        {{- if .Values.dfcRelease.e2eeSupport }}
+
+        # If encryption support is enabled, load wolfssl module before panfs, 
+        # otherwise only panfs module needs to be loaded. Comment out to disable.
+        modulesLoadingOrder: 
+          - panfs
+          - wolfssl
+        {{- end }}
+
       imagePullPolicy: {{ .Values.panfsKmmModule.pullPolicy | default "Always" }}
 
       # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
       {{- range .Values.dfcRelease.kernelMappings }}
-        - {{ toYaml . | nindent 10 }}
+      {{- if .literal }}
+        - literal: {{ .literal }}
+      {{- end }}
+      {{- if .regexp }}
+        - regexp: '{{ .regexp }}'
+      {{- end }}
+          containerImage: {{ .containerImage | replace "{{ .Values.dfcRelease.version }}" $.Values.dfcRelease.version }}
       {{- else }}
         - literal: "<KERNEL_VERSION>"         # Replace with your Worker node kernel version
           containerImage: "<PANFS_DFC_IMAGE>" # Change to Kernel-related corresponding DFC/KMM image

@@ -40,6 +40,9 @@ realm:
   # -- Private Key Passphrase
   privateKeyPassphrase: ""
 
+  # -- KMIP configuration data for volume encryption key management
+  kmipConfigData: ""
+
 # -- Whether to set current storage class default for the cluster or not
 setAsDefaultStorageClass: false
 
@@ -75,5 +78,8 @@ parameters:
   # panfs.csi.vdura.com/uperm: "all"
   # panfs.csi.vdura.com/gperm: "write-execute"
   # panfs.csi.vdura.com/operm: "read-write"
+
+  # Enable/Disable E2EE for volumes created with this StorageClass
+  panfs.csi.vdura.com/encryption: "false"
 
 mountOptions: []

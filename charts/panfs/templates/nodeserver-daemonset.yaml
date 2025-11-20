@@ -114,23 +114,18 @@ spec: # csi-panfs-node
 
       initContainers:
         # Init container to enable PanFS mount helper
-        - name: get-dfc-bin
-          {{- $firstKernel := dict }}
-          {{- $imageIsNotSet := "<PANFS_DFC_IMAGE> # Change to relevant DFC/KMM image" }}
-          {{- if .Values.dfcRelease.kernelMappings }}
-          {{- $firstKernel = index .Values.dfcRelease.kernelMappings 0 }}
-          {{- end }}
-          image: {{ if $firstKernel.image }}{{ $firstKernel.image }}{{ else if $firstKernel.containerImage }}{{ $firstKernel.containerImage }}{{ else }}{{ $imageIsNotSet }}{{ end }}
-          imagePullPolicy: {{ .Values.dfcRelease.pullPolicy }}
+        - name: get-plugin-bin
+          image: {{ .Values.panfsPlugin.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
+          imagePullPolicy: IfNotPresent
           command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
           volumeMounts:
-            - name: dfc-bin
-              mountPath: /var/lib/panfs
+            - name: csi-plugin-bin
+              mountPath: /var/panfs
 
       containers:
         # Main PanFS CSI node plugin container
         - name: csi-panfs-plugin
-          image: {{ .Values.panfsPlugin.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
+          image: {{ .Values.dfcRelease.image | replace "{{ .Values.dfcRelease.version }}" $.Values.dfcRelease.version }}
           imagePullPolicy: {{ .Values.panfsPlugin.pullPolicy }}
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -169,9 +164,8 @@ spec: # csi-panfs-node
             {{- end }}
 
           volumeMounts:
-            - name: dfc-bin
-              mountPath: /usr/sbin/mount.panfs
-              subPath: mount.panfs
+            - name: csi-plugin-bin
+              mountPath: /var/panfs
 
             - name: socket-dir
               mountPath: /csi
