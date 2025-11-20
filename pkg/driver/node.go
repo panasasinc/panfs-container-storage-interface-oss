@@ -161,9 +161,18 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 			return nil, status.Error(codes.Internal, "Failed to create KMIP config file: "+err.Error())
 		}
 
-		// Cleanup the temp file after mount operation
-		defer kmipConfigFile.Close()
-		defer osRemove(kmipConfigFile.Name())
+		// Cleanup the temp file after mount operation, checking errors
+		defer func() {
+			if err := kmipConfigFile.Close(); err != nil {
+				llog.Error(err, "failed to close KMIP config file")
+			}
+		}()
+
+		defer func() {
+			if err := osRemove(kmipConfigFile.Name()); err != nil {
+				llog.Error(err, "failed to remove KMIP config file")
+			}
+		}()
 
 		// Set file permissions to 0700
 		err = osChmod(kmipConfigFile.Name(), 0o600)
