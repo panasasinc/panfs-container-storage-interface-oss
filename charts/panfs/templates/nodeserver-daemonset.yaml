@@ -117,7 +117,7 @@ spec: # csi-panfs-node
         - name: get-plugin-bin
           image: {{ .Values.panfsPlugin.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
           imagePullPolicy: IfNotPresent
-          command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
+          command: ["cp", "/panfs-csi", "/var/panfs/"]
           volumeMounts:
             - name: csi-plugin-bin
               mountPath: /var/panfs

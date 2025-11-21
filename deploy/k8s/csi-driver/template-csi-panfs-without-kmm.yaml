@@ -475,7 +475,7 @@ spec: # csi-panfs-node
         - name: get-plugin-bin
           image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.3
           imagePullPolicy: IfNotPresent
-          command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
+          command: ["cp", "/panfs-csi", "/var/panfs/"]
           volumeMounts:
             - name: csi-plugin-bin
               mountPath: /var/panfs

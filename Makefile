@@ -318,19 +318,16 @@ overrides = $(wildcard charts/panfs/override.yaml)
 deploy-driver-with-helm:
 	@echo "Deploying PanFS CSI Driver using Helm chart since USE_HELM is set..."
 ifneq ($(overrides),)
-	helm upgrade --install csi-panfs charts/panfs \
+	@helm upgrade --install csi-panfs charts/panfs \
 		--namespace csi-panfs \
 		--values $(overrides) \
 		--wait
 else
 	@echo $(CSIDFCKMM_IMAGE) | grep -q ':stub'; if [ $$? -eq 0 ]; then \
 		helm upgrade --install csi-panfs charts/panfs --namespace csi-panfs \
-			--set "imagePullSecrets[0]=$(IMAGE_PULL_SECRET_NAME)" \
-			--set "panfsPlugin.pullPolicy=IfNotPresent" \
 			--set "panfsPlugin.image=$(CSIDRIVER_IMAGE)" \
 			--set "dfcRelease.image=$(CSIDFCKMM_IMAGE)" \
-			--set "dfcRelease.kernelMappings[0].literal=default" \
-			--set "dfcRelease.kernelMappings[0].containerImage=$(CSIDFCKMM_IMAGE)" \
+			--set "panfsPlugin.pullPolicy=IfNotPresent" \
 			--set "dfcRelease.pullPolicy=IfNotPresent" \
 			--set "panfsKmmModule.enabled=false" \
 			--set "seLinux=false"; \
