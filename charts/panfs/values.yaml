@@ -205,7 +205,7 @@ dfcRelease:
   image: "panfs-dfc:{{ .Values.dfcRelease.version }}"
 
   # -- Enable encryption support in DFC
-  e2eeSupport: true
+  encryptionSupport: true
 
   # -- **PanFS DFC images** for different kernel versions
   # @default -- `[...]`

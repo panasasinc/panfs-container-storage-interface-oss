@@ -64,13 +64,21 @@ spec:
     container:
       modprobe:
         moduleName: panfs
-        {{- if .Values.dfcRelease.e2eeSupport }}
 
-        # If encryption support is enabled, load wolfssl module before panfs, 
-        # otherwise only panfs module needs to be loaded. Comment out to disable.
+        {{- if .Values.dfcRelease.encryptionSupport }}
+
+        # Encryption support requires loading the wolfssl module.
+        # If encryption is not needed or , comment out the modulesLoadingOrder below.
         modulesLoadingOrder: 
-          - panfs
           - wolfssl
+          - panfs
+        {{- else }}
+
+        # If encryption support is required, load the wolfssl module before panfs.
+        # To enable encryption, uncomment and set modulesLoadingOrder as shown below.
+        # modulesLoadingOrder: 
+        #  - wolfssl
+        #  - panfs
         {{- end }}
 
       imagePullPolicy: {{ .Values.panfsKmmModule.pullPolicy | default "Always" }}
@@ -82,6 +90,9 @@ spec:
         - literal: {{ .literal }}
       {{- end }}
       {{- if .regexp }}
+        # For each node running a kernel matching the regexp below,
+        # KMM will create a DaemonSet running the image specified in containerImage
+        # with ${KERNEL_FULL_VERSION} replaced with the kernel version.
         - regexp: '{{ .regexp }}'
       {{- end }}
           containerImage: {{ .containerImage | replace "{{ .Values.dfcRelease.version }}" $.Values.dfcRelease.version }}

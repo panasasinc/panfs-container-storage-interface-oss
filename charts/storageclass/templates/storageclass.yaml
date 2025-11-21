@@ -61,6 +61,7 @@ parameters:
   
   # Enable/Disable E2EE for volumes created with this StorageClass
   # Set to "true" to enable encryption, "false" to disable encryption
+  # If enabled, please ensure that KMIP server connection details are provided in the Secret used by this StorageClass
   {{ $k }}: {{ $v | quote }}
   {{else }}
   {{ $k }}: {{ $v | quote }}

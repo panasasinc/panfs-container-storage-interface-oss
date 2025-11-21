@@ -15,5 +15,5 @@
 apiVersion: v2
 name: csi-panfs
 description: A Helm chart for deploying VDURA PanFS CSI controller, node components, and KMM module
-version: "1.2.2"
-appVersion: "1.2.2"
+version: "1.2.3"
+appVersion: "1.2.3"

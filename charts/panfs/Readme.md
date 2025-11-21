@@ -3,7 +3,7 @@
 
 A Helm chart for deploying VDURA PanFS CSI controller, node components, and KMM module
 
-![Version: 1.2.2](https://img.shields.io/badge/Version-1.2.2-informational?style=flat-square) ![AppVersion: 1.2.2](https://img.shields.io/badge/AppVersion-1.2.2-informational?style=flat-square)
+![Version: 1.2.3](https://img.shields.io/badge/Version-1.2.3-informational?style=flat-square) ![AppVersion: 1.2.3](https://img.shields.io/badge/AppVersion-1.2.3-informational?style=flat-square)
 
 ## Prerequisites
 
@@ -119,7 +119,7 @@ The `values.yaml` file contains configurable parameters.
 | csiDriver.fsGroupPolicy | string | `"File"` | Specifies the policy for fsGroup handling |
 | csiDriver.requiresRepublish | bool | `false` | Indicates if the driver requires NodePublishVolume to be periodically called for already published volumes |
 | csiDriver.seLinuxMount | bool | `true` | Enables SELinux mount support for the CSI driver |
-| dfcRelease.e2eeSupport | bool | `true` | Enable encryption support in DFC |
+| dfcRelease.encryptionSupport | bool | `true` | Enable encryption support in DFC |
 | dfcRelease.image | string | `"panfs-dfc:{{ .Values.dfcRelease.version }}"` | DFC container image |
 | dfcRelease.kernelMappings | list | `[...]` | **PanFS DFC images** for different kernel versions |
 | dfcRelease.pullPolicy | string | `"Always"` | Image pull policy for the DFC binary |
