@@ -485,7 +485,8 @@ spec: # csi-panfs-node
         - name: csi-panfs-plugin
           image: <PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-dfc:<DFC_RELEASE_VERSION> # Update with the desired DFC release version
           imagePullPolicy: Always
-          args:
+          command:
+            - "/var/panfs/panfs-csi"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--v=5"
           env:

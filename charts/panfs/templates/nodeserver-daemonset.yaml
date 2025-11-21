@@ -127,9 +127,10 @@ spec: # csi-panfs-node
         - name: csi-panfs-plugin
           image: {{ .Values.dfcRelease.image | replace "{{ .Values.dfcRelease.version }}" $.Values.dfcRelease.version }}
           imagePullPolicy: {{ .Values.panfsPlugin.pullPolicy }}
-          args:
+          command:
+            - "/var/panfs/panfs-csi"
             - "--endpoint=$(CSI_ENDPOINT)"
-            - "--v={{ .Values.panfsPlugin.logLevel }}"
+            - "--v=5"
           env:
             - name: CSI_ENDPOINT
               value: /csi/csi.sock

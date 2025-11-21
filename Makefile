@@ -326,8 +326,9 @@ else
 	@echo $(CSIDFCKMM_IMAGE) | grep -q ':stub'; if [ $$? -eq 0 ]; then \
 		helm upgrade --install csi-panfs charts/panfs --namespace csi-panfs \
 			--set "imagePullSecrets[0]=$(IMAGE_PULL_SECRET_NAME)" \
-			--set "panfsPlugin.image=$(CSIDRIVER_IMAGE)" \
 			--set "panfsPlugin.pullPolicy=IfNotPresent" \
+			--set "panfsPlugin.image=$(CSIDRIVER_IMAGE)" \
+			--set "dfcRelease.image=$(CSIDFCKMM_IMAGE)" \
 			--set "dfcRelease.kernelMappings[0].literal=default" \
 			--set "dfcRelease.kernelMappings[0].containerImage=$(CSIDFCKMM_IMAGE)" \
 			--set "dfcRelease.pullPolicy=IfNotPresent" \
@@ -337,6 +338,7 @@ else
 		helm upgrade --install csi-panfs charts/panfs --namespace csi-panfs \
 			--set "imagePullSecrets[0]=$(IMAGE_PULL_SECRET_NAME)" \
 			--set "panfsPlugin.image=$(CSIDRIVER_IMAGE)" \
+			--set "dfcRelease.image=$(CSIDFCKMM_IMAGE)" \
 			--set "dfcRelease.kernelMappings[0].literal=$(KERNEL_VERSION)" \
 			--set "dfcRelease.kernelMappings[0].containerImage=$(CSIDFCKMM_IMAGE)"; \
 	fi
@@ -431,7 +433,7 @@ sc: deploy-storageclass ## Alias for deploy-storageclass
 overrides_sc = $(wildcard charts/storageclass/override.yaml)
 deploy-storageclass-with-helm:
 	@echo "Deploying PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)' with Helm since USE_HELM is set..."
-	helm upgrade --install $(STORAGE_CLASS_NAME) charts/storageclass \
+	@helm upgrade --install $(STORAGE_CLASS_NAME) charts/storageclass \
 		--namespace $(STORAGE_CLASS_NAME) \
 		--create-namespace \
 		--set csiPanFSDriver.namespace="csi-panfs" \
