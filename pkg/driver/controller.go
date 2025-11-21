@@ -103,9 +103,21 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 
 	volumeName := in.GetName()
 	parameters := in.GetParameters()
+	if parameters == nil {
+		parameters = make(map[string]string)
+	}
 
-	parameters[utils.VolumeProvisioningContext.Soft.GetKey()] = fmt.Sprintf("%d", in.GetCapacityRange().GetRequiredBytes())
-	parameters[utils.VolumeProvisioningContext.Hard.GetKey()] = fmt.Sprintf("%d", in.GetCapacityRange().GetLimitBytes())
+	// handle capacity range
+	cr := in.GetCapacityRange()
+	soft, hard := int64(0), int64(0)
+
+	if cr != nil {
+		soft = cr.GetRequiredBytes()
+		hard = cr.GetLimitBytes()
+	}
+
+	parameters[utils.VolumeProvisioningContext.Soft.GetKey()] = fmt.Sprintf("%d", soft)
+	parameters[utils.VolumeProvisioningContext.Hard.GetKey()] = fmt.Sprintf("%d", hard)
 
 	vol, err := d.panfs.CreateVolume(volumeName, parameters, secrets)
 	if err != nil {
