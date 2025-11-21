@@ -70,7 +70,31 @@ Apply the selected manifest:
 kubectl apply -f <selected-storageclass-manifest>.yaml
 ```
 
-## 3. Example: Creating a PersistentVolumeClaim (PVC)
+## 3. Optional: Enabling End-to-End Volume Encryption
+
+To enable transparent, end-to-end volume encryption using a KMIP provider:
+
+1.  **Enable Encryption in StorageClass**: Set the parameter below to `"true"` in the StorageClass manifest:
+    ```yaml
+    kind: StorageClass
+    parameters:
+      panfs.csi.vdura.com/encryption: "true" # Enables encryption for volumes
+    ```
+2.  **Configure KMIP Client**: The KMIP client configuration file content must be placed in the Secret under the `kmip_config_data` key as a YAML multi-line string:
+    ```yaml
+    kind: Secret
+    stringData:
+      kmip_config_data: |-
+        # Insert the full KMIP client configuration file content here.
+        # This typically includes server addresses, port, and client TLS/PKI settings.
+    ```
+3. Make sure KMM module is configured to load `wolfssl` kermel module. Check this:
+    ```bash
+    kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
+    ["panfs","wolfssl"]
+    ```
+
+## 4. Example: Creating a PersistentVolumeClaim (PVC)
 
 After deploying the StorageClass, you can create PVCs referencing your StorageClass. Example:
 
@@ -93,7 +117,7 @@ Apply with:
 kubectl apply -f <your-pvc-manifest>.yaml
 ```
 
-## 4. Additional Notes
+## 5. Additional Notes
 
 - Review all comments in the manifests for guidance on configuration and permissions.
 - Ensure that any referenced ServiceAccounts, Roles, and RoleBindings are created and configured as described.
