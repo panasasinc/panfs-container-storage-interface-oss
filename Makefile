@@ -91,6 +91,8 @@ else
 SET_STORAGECLASS_DEFAULT := false
 endif
 
+TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
+
 ## Build Driver and DFC Images:
 
 .PHONNY: compile-driver-bin
@@ -178,10 +180,10 @@ sanity-check: ## Run static code analysis
 	fi
 
 	@CSI_TEST_IMAGE=$(TEST_IMAGE) \
-	 CSI_IMAGE=$(CSIDRIVER_IMAGE) \
-	 docker compose -f tests/csi_sanity/docker-compose.yaml up \
-	   --abort-on-container-exit \
-	   --exit-code-from sanity_tests
+	CSI_IMAGE=$(CSIDRIVER_IMAGE) \
+	docker compose -f tests/csi_sanity/docker-compose.yaml up \
+	    --abort-on-container-exit \
+	    --exit-code-from sanity_tests
 
 .PHONY: e2e-ns
 e2e-ns: ## Create e2e namespace and image pull secret
@@ -553,21 +555,12 @@ uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class
 manifest-driver: ## Generate manifests for the PanFS CSI Driver
 	@echo "Generating manifests for the PanFS CSI Driver..."
 	@mkdir -p deploy/k8s/csi-driver/
-	helm template csi-panfs charts/panfs \
-		--namespace csi-panfs \
-		--set imagePullSecrets[0]="ghcr-docker-registry" \
-		--set dfcRelease.kernelMappings[0].literal="4.18.0-553.el8_10.x86_64" \
-		--set dfcRelease.kernelMappings[0].containerImage="ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.1" \
-		--set dfcRelease.kernelMappings[1].literal="4.18.0-553.62.1.el8_10.x86_64" \
-		--set dfcRelease.kernelMappings[1].containerImage="ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-dfc-kmm:4.18.0-553.62.1.el8_10.x86_64-11.1.1" \
-		--set dfcRelease.kernelMappings[2].literal="4.18.0-553.72.1.el8_10.x86_64" \
-		--set dfcRelease.kernelMappings[2].containerImage="ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-dfc-kmm:4.18.0-553.72.1.el8_10.x86_64-11.1.1" \
-		--set dfcRelease.pullPolicy=IfNotPresent | \
-		sed 's|^\(.*panfs-dfc-kmm:.*\)$$|\1  # !! Dummy Image|' | \
-		grep -v '^# Source:' > deploy/k8s/csi-driver/example-csi-panfs.yaml
-	helm template csi-panfs charts/panfs --namespace csi-panfs | grep -v '^# Source:' > deploy/k8s/csi-driver/template-csi-panfs.yaml
-	helm template csi-panfs charts/panfs --namespace csi-panfs --set seLinux=false | grep -v '^# Source:' > deploy/k8s/csi-driver/template-csi-panfs-without-selinux.yaml
-	helm template csi-panfs charts/panfs --namespace csi-panfs --set panfsKmmModule.enabled=false | grep -v '^# Source:' > deploy/k8s/csi-driver/template-csi-panfs-without-kmm.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set dfcRelease.version="1.2.3-4 # Update with the desired DFC release version" --set imagePullSecrets[0]="github-container-registry" > deploy/k8s/csi-driver/example-csi-panfs.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs > deploy/k8s/csi-driver/template-csi-panfs.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set seLinux=false > deploy/k8s/csi-driver/template-csi-panfs-without-selinux.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set panfsKmmModule.enabled=false > deploy/k8s/csi-driver/template-csi-panfs-without-kmm.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set dfcRelease.encryptionSupport=true > deploy/k8s/csi-driver/template-csi-panfs-with-e2ee.yaml
+	sed -i $(shell sed -h 2>&1 | grep GNU >/dev/null || echo "''") '/^# Source:/d' deploy/k8s/csi-driver/*.yaml
 
 .PHONY: manifest-storageclass
 manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class

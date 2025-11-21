@@ -472,18 +472,18 @@ spec: # csi-panfs-node
 
       initContainers:
         # Init container to enable PanFS mount helper
-        - name: get-dfc-bin
-          image: <PANFS_DFC_IMAGE> # Change to relevant DFC/KMM image
-          imagePullPolicy: Always
+        - name: get-plugin-bin
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.3
+          imagePullPolicy: IfNotPresent
           command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
           volumeMounts:
-            - name: dfc-bin
-              mountPath: /var/lib/panfs
+            - name: csi-plugin-bin
+              mountPath: /var/panfs
 
       containers:
         # Main PanFS CSI node plugin container
         - name: csi-panfs-plugin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.2
+          image: panfs-dfc:<dfc-release-version> # Update with the desired DFC release version
           imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -523,9 +523,8 @@ spec: # csi-panfs-node
               user: system_u
 
           volumeMounts:
-            - name: dfc-bin
-              mountPath: /usr/sbin/mount.panfs
-              subPath: mount.panfs
+            - name: csi-plugin-bin
+              mountPath: /var/panfs
 
             - name: socket-dir
               mountPath: /csi
@@ -682,7 +681,7 @@ spec: # csi-panfs-controller
       containers:
         # Main PanFS CSI plugin container
         - name: csi-panfs-plugin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.2
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.3
           imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"

@@ -30,6 +30,12 @@ stringData:
 
   # Leave empty if not not using private key passphrase
   private_key_passphrase:
+
+  # KMIP server connection details for volume encryption key management
+  # If E2E encryption required, these values are used by the CSI driver to connect to the KMIP server,
+  #   make sure that parapmeter `panfs.csi.vdura.com/encryption` is set to "true" in the StorageClass parameters
+  # Otherwise, these values can be left empty
+  kmip_config_data:
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -77,6 +83,12 @@ parameters:
   panfs.csi.vdura.com/bladeset: "Set 1"
   panfs.csi.vdura.com/description: "PanFS CSI Storage Class"
   panfs.csi.vdura.com/efsa: "retry"
+  
+  # Enable/Disable E2EE for volumes created with this StorageClass
+  # Set to "true" to enable encryption, "false" to disable encryption
+  # If enabled, please ensure that KMIP server connection details are provided in the Secret used by this StorageClass
+  panfs.csi.vdura.com/encryption: "false"
+  
   panfs.csi.vdura.com/layout: "raid6+"
   panfs.csi.vdura.com/maxwidth: "3"
   panfs.csi.vdura.com/operm: "all"
