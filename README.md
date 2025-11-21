@@ -27,6 +27,7 @@ The official CSI Driver for integrating **PanFS** storage with Container Orchest
       * [2.2 Configure and Deploy](#22-configure-and-deploy)
     * [3. Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)
 * [Deploying Workloads](#deploying-workloads)
+* [CSI Driver Uninstallation](#csi-driver-uninstallation)
 * [API Documentation](#api-documentation)
   * [How to Use pkgsite](#how-to-use-pkgsite)
 * [Testing](#testing)
@@ -126,6 +127,8 @@ Ensure the following Kubernetes ecosystem tools are installed in your cluster:
   * **cert-manager**: Follow the [installation guide](https://cert-manager.io/docs/installation/).
   * **KMM (Kernel Module Manager)**: Follow the [installation guide](https://kmm.sigs.k8s.io/documentation/install/).
 
+---
+
 #### 2. Deploy CSI driver with KMM Module
 
 Create the namespace, configure registry credentials, and deploy the driver using the Kubernetes manifest file
@@ -213,6 +216,8 @@ Check the status of the deployed components:
     kubectl get module panfs -n csi-panfs -o yaml | sed -n '/status:$/,/^$/p'
     ```
 
+---
+
 #### 3. Configure and deploy StorageClass
 
 The StorageClass defines the provisioned volume properties and provides PanFS Realm access credentials.
@@ -295,6 +300,92 @@ If the StorageClass is missing or misconfigured, verify the configuration variab
 ## Deploying Workloads
 
 Refer to [usage-guide.md](./docs/usage-guide.md) for YAML manifests and examples of deploying workloads with the PanFS CSI Driver.
+
+---
+
+## CSI Driver Uninstallation
+
+A complete uninstallation ensures that all associated resources—workloads, PersistentVolumes, the StorageClass, driver components, and kernel modules—are cleanly removed from the Kubernetes cluster.
+
+### Identify and Terminate Dependent Workloads
+
+Before deleting the driver, you must ensure no running applications are actively using PanFS volumes.
+
+1.  **Identify all PanFS PersistentVolumes (PVs):**
+    This command lists the names of all PVs provisioned by the PanFS CSI driver.
+
+    ```bash
+    kubectl get pv -o jsonpath='{.items[?(@.spec.csi.driver=="com.vdura.csi.panfs")].metadata.name}'
+    ```
+
+2.  **Delete PVCs and Workloads:**
+    **Manually delete** all **PersistentVolumeClaims (PVCs)** and the **workloads** (Pods, Deployments, StatefulSets) that rely on the identified PVs.
+
+    > ⚠️ **Important:** Deleting the PVCs will trigger the deletion of the associated **PersistentVolumes (PVs)**, which in turn will cause the CSI Controller to delete the corresponding volume data on the backend PanFS storage, based on the `reclaimPolicy` defined in your StorageClass (typically **`Delete`**).
+
+### Remove StorageClass and Credentials
+
+Delete the StorageClass(es) and the associated Secret containing the PanFS Realm credentials.
+
+```bash
+# Delete the StorageClass and the Secret containing the Realm credentials.
+# Replace 'panfs-storage-class.yaml' with the actual file name you used.
+kubectl delete -f panfs-storage-class.yaml
+```
+
+### Uninstall CSI Driver Components and KMM Module
+
+Use the original deployment manifest to remove the Controller, Node DaemonSet, KMM Module, and all associated RBAC and custom resources.
+
+```bash
+# Delete the CSI driver Deployment, DaemonSet, CSIDriver object, and KMM Module.
+# Replace 'panfs-csi-driver.yaml' with the actual file name you used.
+kubectl delete -f panfs-csi-driver.yaml
+```
+
+**Remove Node Labels:**
+
+The KMM deployment sets labels on worker nodes. These labels must be removed to signal a complete cleanup.
+
+```bash
+# Removes the panfs readiness label from all nodes.
+kubectl label node -l node-role.kubernetes.io/worker= node.kubernetes.io/csi-driver.panfs.ready- --overwrite
+```
+
+**Verify Label Removal:**
+
+Ensure no nodes still have the `node.kubernetes.io/csi-driver.panfs.ready` label set. The count should be **0**.
+
+```bash
+kubectl get nodes --show-labels | grep node.kubernetes.io/csi-driver.panfs.ready | wc -l
+0
+```
+
+### Clean Up Cluster Resources
+
+Remove the namespace and any labels or secrets created during the prerequisite steps.
+
+1.  **Remove the CSI Driver Namespace:**
+
+    ```bash
+    kubectl delete namespace csi-panfs
+    ```
+
+2.  **Remove Registry Secret (if it was created in a separate namespace):**
+    If you created the private registry secret in a different namespace, delete it now.
+
+    ```bash
+    kubectl delete secret <your-secret-name> --namespace=<your-namespace>
+    ```
+
+### Remove Dependencies (Optional)
+
+If the cluster was solely dedicated to running the PanFS CSI driver, you may optionally uninstall the dependencies that were installed as prerequisites.
+
+  * **Uninstall KMM (Kernel Module Manager)**: Refer to the [KMM documentation](https://kmm.sigs.k8s.io/documentation/install/).
+  * **Uninstall cert-manager**: Refer to the [cert-manager documentation](https://cert-manager.io/docs/installation/).
+
+---
 
 ## API Documentation
 
