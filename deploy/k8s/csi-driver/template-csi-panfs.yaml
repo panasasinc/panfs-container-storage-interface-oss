@@ -584,7 +584,7 @@ spec: # csi-panfs-node
 
       volumes:
         # For DFC binary
-        - name: dfc-bin
+        - name: csi-plugin-bin
           emptyDir: {}
 
         # For kubelet plugin registration
