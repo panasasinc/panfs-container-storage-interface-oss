@@ -43,24 +43,26 @@ type VolumeCreateParams map[string]string
 // Returns:
 //
 //	[]string - Slice of command-line arguments.
-func getOptionalParameters(params *VolumeCreateParams) []string {
+func getOptionalParameters(params VolumeCreateParams) []string {
+	llog := klog.NewKlogr().WithName("getOptionalParameters")
+	llog.V(5).Info("Input params", "params", params)
 	opts := []string{}
 
 	volumeParams := map[string]string{}
 	val := reflect.ValueOf(utils.VolumeProvisioningContext)
 	for i := range val.NumField() {
 		field := val.Field(i)
-		key := field.Interface().(utils.ContextParameterData).Key
-		value := field.Interface().(utils.ContextParameterData).Fmt
+		key := field.Interface().(utils.ContextParameterData).GetKey()
+		value := field.Interface().(utils.ContextParameterData).Arg
 		volumeParams[key] = value
 	}
 
-	for key, value := range *params {
+	for key, value := range params {
 		if value == "" {
 			continue
 		}
 
-		if key == utils.VolumeProvisioningContext.Soft.Key || key == utils.VolumeProvisioningContext.Hard.Key {
+		if key == utils.VolumeProvisioningContext.Soft.GetKey() || key == utils.VolumeProvisioningContext.Hard.GetKey() {
 			// convert size from bytes to gigabytes for soft and hard quota parameters
 			sizeBytes, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
@@ -280,7 +282,7 @@ func NewPancliSSHClient(runner SSHRunner) *PancliSSHClient {
 //
 //	*utils.Volume - The created volume object.
 //	error         - Error if creation or retrieval fails.
-func (p *PancliSSHClient) CreateVolume(volumeName string, params *VolumeCreateParams, secrets map[string]string) (*utils.Volume, error) {
+func (p *PancliSSHClient) CreateVolume(volumeName string, params VolumeCreateParams, secrets map[string]string) (*utils.Volume, error) {
 	cmd := []string{"volume", "create", volumeName}
 
 	optionalParams := getOptionalParameters(params)

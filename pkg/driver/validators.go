@@ -115,86 +115,86 @@ func validateCreateVolumeRequest(req *csi.CreateVolumeRequest) error {
 //	error - Returns an error if any parameter is invalid.
 func validateVolumeParameters(parameters map[string]string) error {
 	// Validate optional parameters if they are present
-	if val, exist := parameters[utils.VolumeProvisioningContext.BladeSet.Key]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.BladeSet.Key)
+	if val, exist := parameters[utils.VolumeProvisioningContext.BladeSet.GetKey()]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.BladeSet.GetKey())
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.VolService.Key]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.VolService.Key)
+	if val, exist := parameters[utils.VolumeProvisioningContext.VolService.GetKey()]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.VolService.GetKey())
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.Layout.Key]; exist && !utils.In(val, layoutList...) {
-		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.Layout.Key, layoutList)
+	if val, exist := parameters[utils.VolumeProvisioningContext.Layout.GetKey()]; exist && !utils.In(val, layoutList...) {
+		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.Layout.GetKey(), layoutList)
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.MaxWidth.Key]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.MaxWidth.GetKey()]; exist {
 		intValue, err := strconv.Atoi(val)
 		if err != nil {
-			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.MaxWidth.Key)
+			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.MaxWidth.GetKey())
 		}
 
 		if intValue < 1 {
-			return fmt.Errorf("%s must be greater then 0", utils.VolumeProvisioningContext.MaxWidth.Key)
+			return fmt.Errorf("%s must be greater then 0", utils.VolumeProvisioningContext.MaxWidth.GetKey())
 		}
 		//	todo: The minimum number of OSDs for RAID 5+ is 2; for RAID 6+, the minimum value is 3; for RAID 10+, the minimum value is 2.
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.StripeUnit.Key]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.StripeUnit.GetKey()]; exist {
 		if valid := validateStripeUnit(val); !valid {
-			return fmt.Errorf("%s is not valid", utils.VolumeProvisioningContext.StripeUnit.Key)
+			return fmt.Errorf("%s is not valid", utils.VolumeProvisioningContext.StripeUnit.GetKey())
 		}
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.RgWidth.Key]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.RgWidth.GetKey()]; exist {
 		intValue, err := strconv.Atoi(val)
 		if err != nil {
-			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.RgWidth.Key)
+			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.RgWidth.GetKey())
 		}
 
 		// Any integer between 3 and 20 (inclusive) is a valid width
 		if intValue < 3 || intValue > 20 {
-			return fmt.Errorf("%s must be between 3 and 20 (inclusive)", utils.VolumeProvisioningContext.RgWidth.Key)
+			return fmt.Errorf("%s must be between 3 and 20 (inclusive)", utils.VolumeProvisioningContext.RgWidth.GetKey())
 		}
 
 		// todo: Only available for volumes with RAID 6+ or RAID 5+ layout
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.RgDepth.Key]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.RgDepth.GetKey()]; exist {
 		intValue, err := strconv.Atoi(val)
 		if err != nil {
-			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.RgDepth.Key)
+			return fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.RgDepth.GetKey())
 		}
 
 		if intValue < 1 {
-			return fmt.Errorf("%s must be greater then 0", utils.VolumeProvisioningContext.RgDepth.Key)
+			return fmt.Errorf("%s must be greater then 0", utils.VolumeProvisioningContext.RgDepth.GetKey())
 		}
 
 		// todo: This option is only available for volumes with RAID 6+ or RAID 5+ layout.
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.User.Key]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.User.Key)
+	if val, exist := parameters[utils.VolumeProvisioningContext.User.GetKey()]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.User.GetKey())
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.Group.Key]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.Group.Key)
+	if val, exist := parameters[utils.VolumeProvisioningContext.Group.GetKey()]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.Group.GetKey())
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.UPerm.Key]; exist && !utils.In(val, permList...) {
-		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.UPerm.Key, permList)
+	if val, exist := parameters[utils.VolumeProvisioningContext.UPerm.GetKey()]; exist && !utils.In(val, permList...) {
+		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.UPerm.GetKey(), permList)
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.GPerm.Key]; exist && !utils.In(val, permList...) {
-		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.GPerm.Key, permList)
+	if val, exist := parameters[utils.VolumeProvisioningContext.GPerm.GetKey()]; exist && !utils.In(val, permList...) {
+		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.GPerm.GetKey(), permList)
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.OPerm.Key]; exist && !utils.In(val, permList...) {
-		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.OPerm.Key, permList)
+	if val, exist := parameters[utils.VolumeProvisioningContext.OPerm.GetKey()]; exist && !utils.In(val, permList...) {
+		return fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.OPerm.GetKey(), permList)
 	}
 
-	if val, exist := parameters[utils.VolumeProvisioningContext.Encryption.Key]; exist {
+	if val, exist := parameters[utils.VolumeProvisioningContext.Encryption.GetKey()]; exist {
 		if valid := validateEncryptionParameter(val); !valid {
-			return fmt.Errorf("%s must be 'on' or 'off'", utils.VolumeProvisioningContext.Encryption.Key)
+			return fmt.Errorf("%s must be 'on' or 'off'", utils.VolumeProvisioningContext.Encryption.GetKey())
 		}
 	}
 

@@ -43,7 +43,7 @@ import (
 
 // StorageProviderClient defines an interface for managing volumes with a storage provider.
 type StorageProviderClient interface {
-	CreateVolume(volumeName string, params *pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error)
+	CreateVolume(volumeName string, params pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error)
 	DeleteVolume(volID string, secret map[string]string) error
 	ExpandVolume(volumeName string, targetSize int64, secret map[string]string) error
 	ListVolumes(secret map[string]string) (*utils.VolumeList, error)

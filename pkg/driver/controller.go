@@ -104,15 +104,10 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 	volumeName := in.GetName()
 	parameters := in.GetParameters()
 
-	volParams := make(map[string]string, len(parameters))
-	for k, v := range parameters {
-		volParams[k] = v
-	}
-	volParams[utils.VolumeProvisioningContext.Soft.Key] = fmt.Sprintf("%d", in.GetCapacityRange().GetRequiredBytes()) // csc flag for soft [--req-bytes]
-	volParams[utils.VolumeProvisioningContext.Hard.Key] = fmt.Sprintf("%d", in.GetCapacityRange().GetLimitBytes())    // csc flag for hard [--lim-bytes]
+	parameters[utils.VolumeProvisioningContext.Soft.GetKey()] = fmt.Sprintf("%d", in.GetCapacityRange().GetRequiredBytes())
+	parameters[utils.VolumeProvisioningContext.Hard.GetKey()] = fmt.Sprintf("%d", in.GetCapacityRange().GetLimitBytes())
 
-	vpc := pancli.VolumeCreateParams(volParams)
-	vol, err := d.panfs.CreateVolume(volumeName, &vpc, secrets)
+	vol, err := d.panfs.CreateVolume(volumeName, parameters, secrets)
 	if err != nil {
 		// if error happens and it is not ErrorAlreadyExist, we return error
 		if !errors.Is(err, pancli.ErrorAlreadyExist) {
@@ -139,31 +134,29 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 			Volume: &csi.Volume{
 				CapacityBytes: vol.GetSoftQuotaBytes(),
 				VolumeId:      volumeName,
-				VolumeContext: parameters,
+				VolumeContext: vol.VolumeContext(),
 			},
 		}, nil
 	}
 
 	llog.Info("volume created", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
 
-	e := error(nil)
-	requestedEncMode := volParams[utils.VolumeProvisioningContext.Encryption.Key]
+	requestedEncMode := parameters[utils.VolumeProvisioningContext.Encryption.GetKey()]
 	if requestedEncMode == "" {
 		requestedEncMode = "off"
 	}
 
 	if requestedEncMode != vol.GetEncryptionMode() {
 		llog.Error(fmt.Errorf("volume encryption mode does not match the requested one"), "Volume creation error", "volume_name", volumeName, "requested_encryption", requestedEncMode, "actual_encryption", vol.GetEncryptionMode())
-		e = status.Error(codes.Internal, UnexpectedErrorInternalStr)
 	}
 
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			CapacityBytes: vol.GetSoftQuotaBytes(),
 			VolumeId:      volumeName,
-			VolumeContext: parameters,
+			VolumeContext: vol.VolumeContext(),
 		},
-	}, e
+	}, nil
 }
 
 // DeleteVolume handles the CSI DeleteVolume request.

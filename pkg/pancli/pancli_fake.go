@@ -58,28 +58,28 @@ type FakePancliSSHClient struct {
 //
 //	*utils.Volume - The created volume object.
 //	error         - Error if volume exists.
-func (c *FakePancliSSHClient) CreateVolume(volumeName string, params *VolumeCreateParams, _ map[string]string) (*utils.Volume, error) {
+func (c *FakePancliSSHClient) CreateVolume(volumeName string, params VolumeCreateParams, _ map[string]string) (*utils.Volume, error) {
 	if _, err := c.getVolume(volumeName); err == nil {
 		// no error means volume already exists
 		return nil, ErrorAlreadyExist
 	}
 
-	bsetName := (*params)[utils.VolumeProvisioningContext.BladeSet.Key]
+	bsetName := params[utils.VolumeProvisioningContext.BladeSet.GetKey()]
 	if bsetName == "" {
 		bsetName = "Set 1"
 	}
 
-	soft := (*params)[utils.VolumeProvisioningContext.Soft.Key]
+	soft := params[utils.VolumeProvisioningContext.Soft.GetKey()]
 	if soft == "" {
 		soft = "0"
 	}
 
-	hard := (*params)[utils.VolumeProvisioningContext.Hard.Key]
+	hard := params[utils.VolumeProvisioningContext.Hard.GetKey()]
 	if hard == "" {
 		hard = "0"
 	}
 
-	encryption := (*params)[utils.VolumeProvisioningContext.Encryption.Key]
+	encryption := params[utils.VolumeProvisioningContext.Encryption.GetKey()]
 	if encryption == "" {
 		encryption = "off"
 	}

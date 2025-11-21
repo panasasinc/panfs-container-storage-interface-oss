@@ -229,7 +229,7 @@ func TestControllerCreateVolume(t *testing.T) {
 			&csi.CreateVolumeRequest{
 				Name: validVolumeName,
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.Encryption.Key: "on",
+					utils.VolumeProvisioningContext.Encryption.GetKey(): "on",
 				},
 				Secrets: defaultSecrets,
 				VolumeCapabilities: []*csi.VolumeCapability{
@@ -244,7 +244,7 @@ func TestControllerCreateVolume(t *testing.T) {
 				Volume: &csi.Volume{
 					VolumeId: validVolumeName,
 					VolumeContext: map[string]string{
-						utils.VolumeProvisioningContext.Encryption.Key: "on",
+						utils.VolumeProvisioningContext.Encryption.PasXMLKey: "on",
 					},
 				},
 			},

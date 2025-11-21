@@ -14,12 +14,18 @@
 
 package utils
 
+import "strings"
+
 // Vendor Prefix for PanFS CSI Driver
 const VendorPrefix = "panfs.csi.vdura.com/"
 
 type ContextParameterData struct {
-	Key string
-	Fmt string
+	PasXMLKey string
+	Arg       string
+}
+
+func (c ContextParameterData) GetKey() string {
+	return VendorPrefix + strings.Fields(c.Arg)[0]
 }
 
 type VolumeProvisioningContextData struct {
@@ -45,24 +51,24 @@ type VolumeProvisioningContextData struct {
 
 // Supported Volume Parameters Keys
 var VolumeProvisioningContext = VolumeProvisioningContextData{
-	Description:      ContextParameterData{Key: VendorPrefix + "description", Fmt: `description "%s"`},
-	BladeSet:         ContextParameterData{Key: VendorPrefix + "bladeset", Fmt: `bladeset "%s"`},
-	RecoveryPriority: ContextParameterData{Key: VendorPrefix + "recoverypriority", Fmt: "recoverypriority %s"},
-	Efsa:             ContextParameterData{Key: VendorPrefix + "efsa", Fmt: "efsa %s"},
-	VolService:       ContextParameterData{Key: VendorPrefix + "volservice", Fmt: "volservice %s"},
-	Layout:           ContextParameterData{Key: VendorPrefix + "layout", Fmt: "layout %s"},
-	MaxWidth:         ContextParameterData{Key: VendorPrefix + "maxwidth", Fmt: "maxwidth %s"},
-	StripeUnit:       ContextParameterData{Key: VendorPrefix + "stripeunit", Fmt: "stripeunit %s"},
-	RgWidth:          ContextParameterData{Key: VendorPrefix + "rgwidth", Fmt: "rgwidth %s"},
-	RgDepth:          ContextParameterData{Key: VendorPrefix + "rgdepth", Fmt: "rgdepth %s"},
-	User:             ContextParameterData{Key: VendorPrefix + "user", Fmt: `user "%s"`},
-	Group:            ContextParameterData{Key: VendorPrefix + "group", Fmt: `group "%s"`},
-	UPerm:            ContextParameterData{Key: VendorPrefix + "uperm", Fmt: "uperm %s"},
-	GPerm:            ContextParameterData{Key: VendorPrefix + "gperm", Fmt: "gperm %s"},
-	OPerm:            ContextParameterData{Key: VendorPrefix + "operm", Fmt: "operm %s"},
-	Encryption:       ContextParameterData{Key: VendorPrefix + "encryption", Fmt: "encryption %s"},
-	Soft:             ContextParameterData{Key: "soft", Fmt: "soft %v"},
-	Hard:             ContextParameterData{Key: "hard", Fmt: "hard %v"},
+	Description:      ContextParameterData{PasXMLKey: "description", Arg: `description "%s"`},
+	BladeSet:         ContextParameterData{PasXMLKey: "bladesetName/Name", Arg: `bladeset "%s"`},
+	RecoveryPriority: ContextParameterData{PasXMLKey: "recoverypriority", Arg: "recoverypriority %s"},
+	Efsa:             ContextParameterData{PasXMLKey: "efsa", Arg: "efsa %s"},
+	VolService:       ContextParameterData{PasXMLKey: "volservice", Arg: "volservice %s"},
+	Layout:           ContextParameterData{PasXMLKey: "layout", Arg: "layout %s"},
+	MaxWidth:         ContextParameterData{PasXMLKey: "maxwidth", Arg: "maxwidth %s"},
+	StripeUnit:       ContextParameterData{PasXMLKey: "stripeunit", Arg: "stripeunit %s"},
+	RgWidth:          ContextParameterData{PasXMLKey: "rgwidth", Arg: "rgwidth %s"},
+	RgDepth:          ContextParameterData{PasXMLKey: "rgdepth", Arg: "rgdepth %s"},
+	User:             ContextParameterData{PasXMLKey: "user", Arg: `user "%s"`},
+	Group:            ContextParameterData{PasXMLKey: "group", Arg: `group "%s"`},
+	UPerm:            ContextParameterData{PasXMLKey: "uperm", Arg: "uperm %s"},
+	GPerm:            ContextParameterData{PasXMLKey: "gperm", Arg: "gperm %s"},
+	OPerm:            ContextParameterData{PasXMLKey: "operm", Arg: "operm %s"},
+	Encryption:       ContextParameterData{PasXMLKey: "encryption", Arg: "encryption %s"},
+	Soft:             ContextParameterData{PasXMLKey: "hardQuotaGB", Arg: "soft %v"},
+	Hard:             ContextParameterData{PasXMLKey: "softQuotaGB", Arg: "hard %v"},
 }
 
 // Realm Connection Parameters Keys
