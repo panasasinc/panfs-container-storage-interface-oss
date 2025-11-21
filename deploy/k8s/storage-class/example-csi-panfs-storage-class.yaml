@@ -31,7 +31,7 @@ stringData:
   # Leave empty if not not using private key passphrase
   private_key_passphrase:
 
-  # KMIP server connection details for volume encryption key management
+  # KMIP server connection details for volume encryption
   # If E2E encryption required, these values are used by the CSI driver to connect to the KMIP server,
   #   make sure that parapmeter `panfs.csi.vdura.com/encryption` is set to "true" in the StorageClass parameters
   # Otherwise, these values can be left empty

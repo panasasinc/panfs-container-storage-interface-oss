@@ -483,7 +483,7 @@ spec: # csi-panfs-node
       containers:
         # Main PanFS CSI node plugin container
         - name: csi-panfs-plugin
-          image: panfs-dfc:<dfc-release-version> # Update with the desired DFC release version
+          image: <PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-dfc:<DFC_RELEASE_VERSION> # Update with the desired DFC release version
           imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"

@@ -12,17 +12,23 @@ This guide describes how to deploy the PanFS CSI Driver and StorageClass using t
 - **If SELinux is disabled in your cluster:**
   - Use: `csi-driver/template-csi-panfs-without-selinux.yaml`
 
-**Important:**
-Before applying the driver manifest, update the following parameters to match your infrastructure:
-- `<IMAGE_PULL_SECRET_NAME>`: The name of your image pull secret for accessing container images.
-- `<PANFS_DFC_IMAGE>`: The full image reference for the PanFS DFC container.
-- `<KERNEL_VERSION>`: The kernel version required for your environment.
+**Key Place Holders:**
 
-Apply the chosen manifest:
+  * `<IMAGE_PULL_SECRET_NAME>`: The name of the secret created above.
+  * `<PANFS_DFC_KMM_PRIVATE_REGISTRY>`: The URL of your private registry hosting the DFC/KMM images.
+  * `<DFC_RELEASE_VERSION>`: The specific version tag of the DFC release you are deploying.
+
+> **Note:** Review other settings relevant to your Kubernetes infrastructure, such as:
+> - `replicas`
+> - `tolerations`
+> - `nodeSelector`
+> - etc
+
+Once configured, deploy the driver and KMM module:
+
 ```bash
 kubectl apply -f <selected-driver-manifest>.yaml
 ```
-
 
 ## 2. Deploying the StorageClass and Secret
 

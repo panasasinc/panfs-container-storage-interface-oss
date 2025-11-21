@@ -488,7 +488,7 @@ spec: # csi-panfs-node
       containers:
         # Main PanFS CSI node plugin container
         - name: csi-panfs-plugin
-          image: panfs-dfc:1.2.3-4 # Update with the desired DFC release version
+          image: <PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-dfc:1.2.3-4 # Update with the desired DFC release version
           imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -938,4 +938,4 @@ spec:
         # KMM will create a DaemonSet running the image specified in containerImage
         # with ${KERNEL_FULL_VERSION} replaced with the kernel version.
         - regexp: '^.*.x86_64$'
-          containerImage: panfs-kmm:${KERNEL_FULL_VERSION}-1.2.3-4 # Update with the desired DFC release version
+          containerImage: <PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-kmm:${KERNEL_FULL_VERSION}-1.2.3-4 # Update with the desired DFC release version

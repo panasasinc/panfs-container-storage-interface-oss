@@ -585,7 +585,8 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--set realm.username="<REALM_USERNAME>" \
 		--set realm.password="<REALM_PASSWORD>" \
 		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
-		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
+		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" \
+		--set realm.kmipConfigData="<KMIP_CONFIG_DATA>" | \
 		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
 		grep -v '^# Source:' > deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml
 	
@@ -596,7 +597,8 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--set realm.username="<REALM_USERNAME>" \
 		--set realm.password="<REALM_PASSWORD>" \
 		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
-		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" | \
+		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" \
+		--set realm.kmipConfigData="<KMIP_CONFIG_DATA>" | \
 		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
 		grep -v '^# Source:' | \
 		sed 's|csi-panfs|<CSI_NAMESPACE>|' > deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
