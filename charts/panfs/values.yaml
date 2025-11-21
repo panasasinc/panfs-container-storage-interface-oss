@@ -196,13 +196,13 @@ panfsPlugin:
 dfcRelease:
   # -- DFC release version
   # @default -- `dummy-version`
-  version: "<dfc-release-version> # Update with the desired DFC release version"
+  version: "<DFC_RELEASE_VERSION> # Update with the desired DFC release version"
 
   # -- Image pull policy for the DFC binary
   pullPolicy: Always
 
   # -- DFC container image
-  image: "panfs-dfc:{{ .Values.dfcRelease.version }}"
+  image: "<PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-dfc:{{ .Values.dfcRelease.version }}"
 
   # -- Enable encryption support in DFC
   encryptionSupport: true
@@ -211,7 +211,7 @@ dfcRelease:
   # @default -- `[...]`
   kernelMappings: 
     - regexp: '^.*.x86_64$'
-      containerImage: "panfs-kmm:${KERNEL_FULL_VERSION}-{{ .Values.dfcRelease.version }}"
+      containerImage: "<PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-kmm:${KERNEL_FULL_VERSION}-{{ .Values.dfcRelease.version }}"
 
 panfsKmmModule:
   # -- Enable or disable KMM module for PanFS

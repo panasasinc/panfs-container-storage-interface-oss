@@ -120,7 +120,7 @@ The `values.yaml` file contains configurable parameters.
 | csiDriver.requiresRepublish | bool | `false` | Indicates if the driver requires NodePublishVolume to be periodically called for already published volumes |
 | csiDriver.seLinuxMount | bool | `true` | Enables SELinux mount support for the CSI driver |
 | dfcRelease.encryptionSupport | bool | `true` | Enable encryption support in DFC |
-| dfcRelease.image | string | `"panfs-dfc:{{ .Values.dfcRelease.version }}"` | DFC container image |
+| dfcRelease.image | string | `"<PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-dfc:{{ .Values.dfcRelease.version }}"` | DFC container image |
 | dfcRelease.kernelMappings | list | `[...]` | **PanFS DFC images** for different kernel versions |
 | dfcRelease.pullPolicy | string | `"Always"` | Image pull policy for the DFC binary |
 | dfcRelease.version | string | `dummy-version` | DFC release version |
