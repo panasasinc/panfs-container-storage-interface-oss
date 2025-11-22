@@ -26,7 +26,6 @@ import (
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"k8s.io/klog/v2"
 )
 
 var (
@@ -182,7 +181,6 @@ func TestControllerCreateVolume(t *testing.T) {
 		endpoint: "unix:///tmp/csi.sock",
 		host:     "localhost",
 		panfs:    pancliMock,
-		log:      klog.NewKlogr(),
 	}
 
 	testCases := []struct {
