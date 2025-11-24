@@ -16,18 +16,21 @@ package utils
 
 import "strings"
 
-// Vendor Prefix for PanFS CSI Driver
+// VendorPrefix for PanFS CSI Driver
 const VendorPrefix = "panfs.csi.vdura.com/"
 
+// ContextParameterData defines structure for context parameter data
 type ContextParameterData struct {
 	PasXMLKey string
 	Arg       string
 }
 
+// GetKey returns context parameter key with vendor prefix
 func (c ContextParameterData) GetKey() string {
 	return VendorPrefix + strings.Fields(c.Arg)[0]
 }
 
+// VolumeProvisioningContextData holds supported volume provisioning context parameters
 type VolumeProvisioningContextData struct {
 	Description      ContextParameterData
 	BladeSet         ContextParameterData

@@ -79,9 +79,9 @@ func (v *Volume) GetHardQuotaBytes() int64 {
 }
 
 // GetEncryptionMode returns the encryption mode of the volume.
-func (vol *Volume) GetEncryptionMode() string {
-	if vol.Encryption != "" {
-		return vol.Encryption
+func (v *Volume) GetEncryptionMode() string {
+	if v.Encryption != "" {
+		return v.Encryption
 	}
 	return "off"
 }
