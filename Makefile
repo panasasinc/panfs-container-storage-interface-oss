@@ -209,6 +209,7 @@ deploy-driver-with-helm:
 			--set csi.image=$(CSI_IMAGE)" \
 			--set csi.pullPolicy=IfNotPresent \
 			--set dfc.version=$(DFC_VERSION) \
+			--set dfc.privateRegistry="$(DFC_REGISTRY)" \
 			--set dfc.pullPolicy=IfNotPresent \
 			--set kmm.enabled=false \
 			--set seLinux=false \

@@ -27,14 +27,14 @@ inputs:
     default: ""
     description: Docker image URL for the driver
     type: string
-  kmm-image-url:
-    default: ""
-    description: Docker image URL for KMM
+  dfc-image-name:
+    description: DFC Image Name
     type: string
-  kernel-version:
-    default: "default"
-    description: Kernel version of PanFS DFC
+    default: "ghcr.io/${{ github.repository }}/panfs-dfc"
+  dfc-version:
+    description: DFC version to use
     type: string
+    default: "stub"
   ref:
     description: Git ref to clone
     required: true
@@ -95,10 +95,10 @@ runs:
     - name: Deploy CSI driver
       if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'driver' }}
       env:
-        CSIDFCKMM_IMAGE: ${{ inputs.kmm-image-url }}
-        CSIDRIVER_IMAGE: ${{ inputs.driver-image-url }}
-        KERNEL_VERSION: "${{ inputs.kernel-version }}"
         USE_HELM: "${{ inputs.driver-installation-type == 'helm' }}"
+        CSI_IMAGE: "${{ inputs.driver-image-url }}"
+        DFC_REGISTRY: "${{ inputs.dfc-image-name }}"
+        DFC_VERSION: "${{ inputs.dfc-version }}"
       shell: bash
       run: |
         echo "::group::Installing PanFS CSI Driver"
@@ -108,9 +108,9 @@ runs:
     - name: Validate installation
       if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'driver' }}
       env:
-        CSIDRIVER_IMAGE: "${{ inputs.driver-image-url }}"
-        CSIDFCKMM_IMAGE: "${{ inputs.kmm-image-url }}"
-        KERNEL_VERSION: "${{ inputs.kernel-version }}"
+        CSI_IMAGE: "${{ inputs.driver-image-url }}"
+        DFC_REGISTRY: "${{ inputs.dfc-image-name }}"
+        DFC_VERSION: "${{ inputs.dfc-version }}"
       shell: bash
       run: |
         echo "::group::Validating installation"

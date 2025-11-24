@@ -29,10 +29,14 @@ on:
         description: CSI Driver Image URL
         type: string
         default: ""
-      kmm-image-url:
-        description: DFC KMM Image URL
+      dfc-image-name:
+        description: DFC Image Name
         type: string
-        default: ""
+        default: "ghcr.io/${{ github.repository }}/panfs-dfc"
+      dfc-version:
+        description: DFC version to use
+        type: string
+        default: "stub"
       realm_user:
         description: PanFS Realm user
         required: false
@@ -87,24 +91,24 @@ jobs:
           echo "::endgroup::"
 
       - name: Build Stub DFC Image
-        if: ${{ endsWith(inputs.kmm-image-url, ':stub') }}
+        if: ${{ input.dfc-version == 'stub' }}
         shell: bash
         run: |
           echo "::group::Build Stub DFC Image"
-          docker build -t ${{ inputs.kmm-image-url }} -f dfc/Dockerfile.stub ./dfc/
+          docker build -t ${{ input.dfc-image-name }}:${{ input.dfc-version }} -f dfc/Dockerfile.stub ./dfc/
           echo "::endgroup::"
           echo "::group::Load Stub DFC Image into Kind cluster"
           echo "::endgroup::"
 
       - name: Load CSI Driver an Stub DFC Images into Kind Cluster
-        if: ${{ endsWith(inputs.kmm-image-url, ':stub') }}
+        if: ${{ input.dfc-version == 'stub' }}
         shell: bash
         run: |
           echo "::group::Load CSI Driver Image into Kind cluster"
-          kind load docker-image ${{ inputs.driver-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
+          kind load docker-image ${{ inputs.driver-image-name }}:${{ inputs.dfc-version }} --name=${{ steps.kind.outputs.cluster-name }}
           echo "::endgroup::"
           echo "::group::Load Stub DFC Image into Kind cluster"
-          kind load docker-image ${{ inputs.kmm-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
+          kind load docker-image ${{ inputs.driver-image-name }}:${{ inputs.dfc-version }} --name=${{ steps.kind.outputs.cluster-name }}
           echo "::endgroup::"
 
       - name: Deploy CSI Driver
@@ -113,7 +117,8 @@ jobs:
           deployment-target: driver
           driver-installation-type: "${{ inputs.driver-installation-type }}"
           driver-image-url: "${{ inputs.driver-image-url }}"
-          kmm-image-url: "${{ inputs.kmm-image-url }}"
+          dfc-image-name: "${{ input.dfc-image-name }}"
+          dfc-version: "${{ input.dfc-version }}"
           ref: "${{ github.ref }}"
 
       - name: Deploy Storage Class
