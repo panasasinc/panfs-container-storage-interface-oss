@@ -80,9 +80,9 @@ spec: # csi-panfs-node
 
       # SELinux security context
       securityContext:
-        {{- if .Values.panfsPlugin.seLinuxOptions }}
+        {{- if .Values.csi.seLinuxOptions }}
         seLinuxOptions:
-          {{- toYaml .Values.panfsPlugin.seLinuxOptions | nindent 10 }}
+          {{- toYaml .Values.csi.seLinuxOptions | nindent 10 }}
         {{- end }}
       {{- end }}
 
@@ -95,13 +95,13 @@ spec: # csi-panfs-node
       tolerations:
         {{- toYaml .Values.nodeServer.tolerations | nindent 8 }}
       {{- end }}
-      {{- if .Values.panfsKmmModule.enabled }}
+      {{- if .Values.kmm.enabled }}
 
       # Ensure the DaemonSet pods are scheduled only on nodes with the PanFS kernel module loaded
       # This label is applied by the KMM operator when the PanFS module is successfully loaded
       nodeSelector:
         # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
-        {{ .Values.panfsKmmModule.kmmNodeReadyLabel.name | replace "{{ .Release.Namespace }}" .Release.Namespace }}: "{{ .Values.panfsKmmModule.kmmNodeReadyLabel.value }}"
+        {{ .Values.kmm.nodeReadyLabel.name | replace "{{ .Release.Namespace }}" .Release.Namespace }}: "{{ .Values.kmm.nodeReadyLabel.value }}"
       {{- else if .Values.nodeServer.selector }}
 
       # Node selector for scheduling the DaemonSet pods
@@ -115,7 +115,7 @@ spec: # csi-panfs-node
       initContainers:
         # Init container to enable PanFS mount helper
         - name: get-plugin-bin
-          image: {{ .Values.panfsPlugin.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
+          image: {{ .Values.csi.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
           imagePullPolicy: IfNotPresent
           command: ["cp", "/panfs-csi", "/var/panfs/"]
           volumeMounts:
@@ -125,8 +125,8 @@ spec: # csi-panfs-node
       containers:
         # Main PanFS CSI node plugin container
         - name: csi-panfs-plugin
-          image: {{ .Values.dfcRelease.image | replace "{{ .Values.dfcRelease.version }}" $.Values.dfcRelease.version }}
-          imagePullPolicy: {{ .Values.panfsPlugin.pullPolicy }}
+          image: {{ .Values.dfc.privateRegistry }}/panfs-dfc:{{ .Values.dfc.version }}
+          imagePullPolicy: {{ .Values.csi.pullPolicy }}
           command:
             - "/var/panfs/panfs-csi"
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -135,13 +135,13 @@ spec: # csi-panfs-node
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
 
-          {{- if .Values.panfsPlugin.resources }}
+          {{- if .Values.csi.resources }}
 
           # Resource requests and limits for the driver registrar sidecar
           # Limits should be set to prevent excessive resource consumption
           # Requests should be set to ensure the container gets scheduled
           resources:
-            {{- toYaml .Values.panfsPlugin.resources | nindent 12 }}
+            {{- toYaml .Values.csi.resources | nindent 12 }}
           {{- end }}
 
           livenessProbe:
@@ -157,10 +157,10 @@ spec: # csi-panfs-node
           securityContext:
             privileged: true
             {{- if .Values.seLinux }}
-            {{- if .Values.panfsPlugin.seLinuxOptions }}
+            {{- if .Values.csi.seLinuxOptions }}
             # SELinux security context
             seLinuxOptions:
-              {{- toYaml .Values.panfsPlugin.seLinuxOptions | nindent 14 }}
+              {{- toYaml .Values.csi.seLinuxOptions | nindent 14 }}
             {{- end }}
             {{- end }}
 

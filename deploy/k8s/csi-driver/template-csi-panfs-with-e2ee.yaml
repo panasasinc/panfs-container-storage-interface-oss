@@ -909,10 +909,10 @@ spec:
         moduleName: panfs
 
         # Encryption support requires loading the wolfssl module.
-        # If encryption is not needed or , comment out the modulesLoadingOrder below.
+        # If encryption is not needed or, comment out the modulesLoadingOrder below.
         modulesLoadingOrder: 
-          - wolfssl
           - panfs
+          - wolfssl
 
       imagePullPolicy: Always
 

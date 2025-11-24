@@ -99,22 +99,22 @@ spec: # csi-panfs-controller
       containers:
         # Main PanFS CSI plugin container
         - name: csi-panfs-plugin
-          image: {{ .Values.panfsPlugin.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
-          imagePullPolicy: {{ .Values.panfsPlugin.pullPolicy }}
+          image: {{ .Values.csi.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
+          imagePullPolicy: {{ .Values.csi.pullPolicy }}
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
-            - "--v={{ .Values.panfsPlugin.logLevel }}"
+            - "--v={{ .Values.csi.logLevel }}"
           env:
             - name: CSI_ENDPOINT
               value: /var/lib/csi/sockets/pluginproxy/csi.sock
-          {{- if .Values.panfsPlugin.resources }}
+          {{- if .Values.csi.resources }}
 
           # Resource requests and limits for the driver main container
           # Adjust as necessary based on your cluster capacity and requirements
           # Limits should be set to prevent excessive resource consumption
           # Requests should be set to ensure the container gets scheduled
           resources:
-            {{- toYaml .Values.panfsPlugin.resources | nindent 12 }}
+            {{- toYaml .Values.csi.resources | nindent 12 }}
           {{- end }}
 
           volumeMounts:

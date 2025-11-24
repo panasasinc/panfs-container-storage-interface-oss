@@ -13,7 +13,7 @@
   # See the License for the specific language governing permissions and
   # limitations under the License.
 */}}
-{{- if .Values.panfsKmmModule.enabled }}
+{{- if .Values.kmm.enabled }}
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
@@ -50,14 +50,14 @@ spec:
   imageRepoSecret:
     # name: <IMAGE_PULL_SECRET_NAME>
   {{- end }}
-  {{- if .Values.panfsKmmModule.selector }}
+  {{- if .Values.kmm.selector }}
 
   # Node selector for scheduling the KMM Module pods (to load the PanFS kernel module)
   # Should match the nodes where the PanFS consumer workloads supposed to run
   # Ensure that the nodes have the appropriate labels
   # kubectl get nodes --show-labels
   selector:
-    {{- toYaml .Values.panfsKmmModule.selector | nindent 4 }}
+    {{- toYaml .Values.kmm.selector | nindent 4 }}
   {{- end }}
 
   moduleLoader:
@@ -65,27 +65,27 @@ spec:
       modprobe:
         moduleName: panfs
 
-        {{- if .Values.dfcRelease.encryptionSupport }}
+        {{- if .Values.kmm.encryptionSupport }}
 
         # Encryption support requires loading the wolfssl module.
-        # If encryption is not needed or , comment out the modulesLoadingOrder below.
+        # If encryption is not needed or, comment out the modulesLoadingOrder below.
         modulesLoadingOrder: 
-          - wolfssl
           - panfs
+          - wolfssl
         {{- else }}
 
         # If encryption support is required, load the wolfssl module before panfs.
         # To enable encryption, uncomment and set modulesLoadingOrder as shown below.
         # modulesLoadingOrder: 
-        #  - wolfssl
         #  - panfs
+        #  - wolfssl
         {{- end }}
 
-      imagePullPolicy: {{ .Values.panfsKmmModule.pullPolicy | default "Always" }}
+      imagePullPolicy: {{ .Values.kmm.pullPolicy | default "Always" }}
 
       # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
-      {{- range .Values.dfcRelease.kernelMappings }}
+      {{- range .Values.kmm.kernelMappings }}
       {{- if .literal }}
         - literal: {{ .literal }}
       {{- end }}
@@ -95,7 +95,7 @@ spec:
         # with ${KERNEL_FULL_VERSION} replaced with the kernel version.
         - regexp: '{{ .regexp }}'
       {{- end }}
-          containerImage: {{ .containerImage | replace "{{ .Values.dfcRelease.version }}" $.Values.dfcRelease.version }}
+          containerImage: {{ .containerImage | replace "{{ .Values.dfc.privateRegistry }}" $.Values.dfc.privateRegistry | replace "{{ .Values.dfc.version }}" $.Values.dfc.version }}
       {{- else }}
         - literal: "<KERNEL_VERSION>"         # Replace with your Worker node kernel version
           containerImage: "<PANFS_DFC_IMAGE>" # Change to Kernel-related corresponding DFC/KMM image

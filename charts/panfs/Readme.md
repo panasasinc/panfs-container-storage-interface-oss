@@ -116,15 +116,24 @@ The `values.yaml` file contains configurable parameters.
 | controllerServer.resizer.timeout | string | `"60s"` | Timeout for resizer operations |
 | controllerServer.strategy | object | `{...}` | Deployment strategy type |
 | controllerServer.tolerations | list | `[...]` | Tolerations for controller pods |
-| csiDriver.fsGroupPolicy | string | `"File"` | Specifies the policy for fsGroup handling |
-| csiDriver.requiresRepublish | bool | `false` | Indicates if the driver requires NodePublishVolume to be periodically called for already published volumes |
-| csiDriver.seLinuxMount | bool | `true` | Enables SELinux mount support for the CSI driver |
-| dfcRelease.encryptionSupport | bool | `true` | Enable encryption support in DFC |
-| dfcRelease.image | string | `"<PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-dfc:{{ .Values.dfcRelease.version }}"` | DFC container image |
-| dfcRelease.kernelMappings | list | `[...]` | **PanFS DFC images** for different kernel versions |
-| dfcRelease.pullPolicy | string | `"Always"` | Image pull policy for the DFC binary |
-| dfcRelease.version | string | `dummy-version` | DFC release version |
+| csi.fsGroupPolicy | string | `"File"` | Specifies the policy for fsGroup handling |
+| csi.image | string | `...` | Image for the PanFS CSI plugin |
+| csi.logLevel | int | `5` | Log level for the PanFS CSI plugin |
+| csi.pullPolicy | string | `"Always"` | Image pull policy for the PanFS CSI plugin |
+| csi.requiresRepublish | bool | `false` | Indicates if the driver requires NodePublishVolume to be periodically called for already published volumes |
+| csi.resources | object | `{"limits":{"cpu":"300m","memory":"600Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}` | Resource requests and limits for the PanFS CSI plugin |
+| csi.seLinuxMount | bool | `true` | Enables SELinux mount support for the CSI driver |
+| csi.seLinuxOptions | object | `{"level":"s0","role":"system_r","type":"container_t","user":"system_u"}` | Security options for the PanFS CSI plugin |
+| dfc.privateRegistry | string | `"<PANFS_DFC_KMM_PRIVATE_REGISTRY>"` | Private registry for DFC images |
+| dfc.pullPolicy | string | `"Always"` | Image pull policy for the DFC binary |
+| dfc.version | string | `dummy-version` | DFC release version |
 | imagePullSecrets | list | `[]` | List of image pull secrets for private registries |
+| kmm.enabled | bool | `true` | Enable or disable KMM module for PanFS |
+| kmm.encryptionSupport | bool | `true` | Enable encryption support in DFC |
+| kmm.kernelMappings | list | `[...]` | **PanFS DFC images** for different kernel versions |
+| kmm.nodeReadyLabel | object | `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}` | Label applied to nodes when the PanFS kernel module is successfully loaded |
+| kmm.pullPolicy | string | `"Always"` | Image pull policy for the KMM module |
+| kmm.selector | object | `{"node-role.kubernetes.io/worker":""}` | Node selector for node pods |
 | labels | object | `{}` | Labels for the CSI driver workloads |
 | nodeServer.driverRegistrar.image | string | `"k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0"` | CSI node driver registrar image |
 | nodeServer.driverRegistrar.logLevel | int | `5` | Log level for driver registrar |
@@ -136,15 +145,6 @@ The `values.yaml` file contains configurable parameters.
 | nodeServer.tolerations | list | `[...]` | Tolerations for node pods |
 | nodeServer.updateStrategy.rollingUpdate.maxUnavailable | string | `"100%"` |  |
 | nodeServer.updateStrategy.type | string | `"RollingUpdate"` |  |
-| panfsKmmModule.enabled | bool | `true` | Enable or disable KMM module for PanFS |
-| panfsKmmModule.kmmNodeReadyLabel | object | `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}` | Label applied to nodes when the PanFS kernel module is successfully loaded |
-| panfsKmmModule.pullPolicy | string | `"Always"` | Image pull policy for the KMM module |
-| panfsKmmModule.selector | object | `{"node-role.kubernetes.io/worker":""}` | Node selector for node pods |
-| panfsPlugin.image | string | `...` | Image for the PanFS CSI plugin |
-| panfsPlugin.logLevel | int | `5` | Log level for the PanFS CSI plugin |
-| panfsPlugin.pullPolicy | string | `"Always"` | Image pull policy for the PanFS CSI plugin |
-| panfsPlugin.resources | object | `{"limits":{"cpu":"300m","memory":"600Mi"},"requests":{"cpu":"100m","memory":"200Mi"}}` | Resource requests and limits for the PanFS CSI plugin |
-| panfsPlugin.seLinuxOptions | object | `{"level":"s0","role":"system_r","type":"container_t","user":"system_u"}` | Security options for the PanFS CSI plugin |
 | seLinux | bool | `true` |  |
 
 > **NOTE:** Please refer to the `values.yaml` file for a complete list of configurable parameters.

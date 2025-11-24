@@ -444,9 +444,15 @@ spec: # csi-panfs-node
       # ServiceAccount for node plugin
       serviceAccount: csi-panfs-node
 
-      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      # Please make sure you have created the image pull secret in the same namespace
+      # Check with: kubectl get secrets -n csi-panfs
+      # If not, create with:
+      # kubectl create secret docker-registry -n csi-panfs <IMAGE_PULL_SECRET_NAME> \
+      #   --docker-server=<REGISTRY_URL> \
+      #   --docker-username=<USERNAME> \
+      #   --docker-password=<PASSWORD_OR_TOKEN>
       imagePullSecrets:
-        # - name: <IMAGE_PULL_SECRET_NAME>
+        - name: <IMAGE_PULL_SECRET_NAME>
 
       # SELinux security context
       securityContext:
@@ -674,9 +680,15 @@ spec: # csi-panfs-controller
       # ServiceAccount for the controller pods
       serviceAccount: csi-panfs-controller
 
-      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      # Please make sure you have created the image pull secret in the same namespace
+      # Check with: kubectl get secrets -n csi-panfs
+      # If not, create with:
+      # kubectl create secret docker-registry -n csi-panfs <IMAGE_PULL_SECRET_NAME> \
+      #   --docker-server=<REGISTRY_URL> \
+      #   --docker-username=<USERNAME> \
+      #   --docker-password=<PASSWORD_OR_TOKEN>
       imagePullSecrets:
-        # - name: <IMAGE_PULL_SECRET_NAME>
+        - name: <IMAGE_PULL_SECRET_NAME>
 
       containers:
         # Main PanFS CSI plugin container
@@ -891,10 +903,15 @@ metadata:
     product: com.vdura.csi.panfs
 spec:
 
-  # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-  # uncomment the line below and set the secret name to enable pulling images from a private registry.
+  # Please make sure you have created the image pull secret in the same namespace
+  # Check with: kubectl get secrets -n csi-panfs
+  # If not, create with:
+  #   kubectl create secret docker-registry -n csi-panfs <IMAGE_PULL_SECRET_NAME> \
+  #     --docker-server=<REGISTRY_URL> \
+  #     --docker-username=<USERNAME> \
+  #     --docker-password=<PASSWORD>
   imageRepoSecret:
-    # name: <IMAGE_PULL_SECRET_NAME>
+    name: <IMAGE_PULL_SECRET_NAME>
 
   # Node selector for scheduling the KMM Module pods (to load the PanFS kernel module)
   # Should match the nodes where the PanFS consumer workloads supposed to run
@@ -909,10 +926,10 @@ spec:
         moduleName: panfs
 
         # Encryption support requires loading the wolfssl module.
-        # If encryption is not needed or , comment out the modulesLoadingOrder below.
+        # If encryption is not needed or, comment out the modulesLoadingOrder below.
         modulesLoadingOrder: 
-          - wolfssl
           - panfs
+          - wolfssl
 
       imagePullPolicy: Always
 
