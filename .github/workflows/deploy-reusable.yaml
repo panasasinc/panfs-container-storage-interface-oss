@@ -108,7 +108,7 @@ jobs:
           kind load docker-image ${{ inputs.driver-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
           echo "::endgroup::"
           echo "::group::Load Stub DFC Image into Kind cluster"
-          kind load docker-image ${{ inputs.dfc-image-registry }}/panfs-dfc/panfs-dfc:${{ inputs.dfc-version }} --name=${{ steps.kind.outputs.cluster-name }}
+          kind load docker-image ${{ inputs.dfc-image-registry }}/panfs-dfc:${{ inputs.dfc-version }} --name=${{ steps.kind.outputs.cluster-name }}
           echo "::endgroup::"
 
       - name: Deploy CSI Driver
