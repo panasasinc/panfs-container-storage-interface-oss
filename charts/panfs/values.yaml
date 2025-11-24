@@ -67,6 +67,7 @@ controllerServer:
     retryIntervalStart: 5s
 
     # -- Resource requests and limits for provisioner
+    # @default -- `{...}`
     resources:
       requests:
         cpu: 100m
@@ -86,6 +87,7 @@ controllerServer:
     # -- Timeout for attacher operations
     timeout: 60s
     # -- Resource requests and limits for attacher
+    # @default -- `{...}`
     resources:
       requests:
         cpu: 100m
@@ -105,6 +107,7 @@ controllerServer:
     # -- Timeout for resizer operations
     timeout: 60s
     # -- Resource requests and limits for resizer
+    # @default -- `{...}`
     resources:
       requests:
         cpu: 100m
@@ -141,6 +144,7 @@ nodeServer:
     # -- Timeout for driver registrar operations
     timeout: 60s
     # -- Resource requests and limits for driver registrar
+    # @default -- `{...}`
     resources:
       requests:
         cpu: 100m
@@ -167,7 +171,7 @@ seLinux: true
 
 dfc:
   # -- DFC release version
-  # @default -- `dummy-version`
+  # @default -- `<DFC_RELEASE_VERSION>`
   version: "<DFC_RELEASE_VERSION> # Update with the desired DFC release version"
 
   # -- Private registry for DFC images
@@ -228,6 +232,7 @@ csi:
     level: s0
 
   # -- Resource requests and limits for the PanFS CSI plugin
+  # @default -- `{...}`
   resources:
     requests:
       cpu: 100m
