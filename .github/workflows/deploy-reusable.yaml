@@ -91,17 +91,17 @@ jobs:
           echo "::endgroup::"
 
       - name: Build Stub DFC Image
-        if: ${{ input.dfc-version == 'stub' }}
+        if: ${{ inputs.dfc-version == 'stub' }}
         shell: bash
         run: |
           echo "::group::Build Stub DFC Image"
-          docker build -t ${{ input.dfc-image-name }}:${{ input.dfc-version }} -f dfc/Dockerfile.stub ./dfc/
+          docker build -t ${{ inputs.dfc-image-name }}:${{ inputs.dfc-version }} -f dfc/Dockerfile.stub ./dfc/
           echo "::endgroup::"
           echo "::group::Load Stub DFC Image into Kind cluster"
           echo "::endgroup::"
 
       - name: Load CSI Driver an Stub DFC Images into Kind Cluster
-        if: ${{ input.dfc-version == 'stub' }}
+        if: ${{ inputs.dfc-version == 'stub' }}
         shell: bash
         run: |
           echo "::group::Load CSI Driver Image into Kind cluster"
@@ -117,8 +117,8 @@ jobs:
           deployment-target: driver
           driver-installation-type: "${{ inputs.driver-installation-type }}"
           driver-image-url: "${{ inputs.driver-image-url }}"
-          dfc-image-name: "${{ input.dfc-image-name }}"
-          dfc-version: "${{ input.dfc-version }}"
+          dfc-image-name: "${{ inputs.dfc-image-name }}"
+          dfc-version: "${{ inputs.dfc-version }}"
           ref: "${{ github.ref }}"
 
       - name: Deploy Storage Class
