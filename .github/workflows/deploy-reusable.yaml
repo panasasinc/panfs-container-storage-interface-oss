@@ -105,10 +105,10 @@ jobs:
         shell: bash
         run: |
           echo "::group::Load CSI Driver Image into Kind cluster"
-          kind load docker-image ${{ inputs.driver-image-name }}:${{ inputs.dfc-version }} --name=${{ steps.kind.outputs.cluster-name }}
+          kind load docker-image ${{ inputs.driver-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
           echo "::endgroup::"
           echo "::group::Load Stub DFC Image into Kind cluster"
-          kind load docker-image ${{ inputs.driver-image-name }}:${{ inputs.dfc-version }} --name=${{ steps.kind.outputs.cluster-name }}
+          kind load docker-image ${{ inputs.dfc-image-name }}:${{ inputs.dfc-version }} --name=${{ steps.kind.outputs.cluster-name }}
           echo "::endgroup::"
 
       - name: Deploy CSI Driver
