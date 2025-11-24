@@ -1,6 +1,23 @@
 #!/bin/bash
-# Create a safe temporary directory
-#!/bin/bash
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Purpose:
+# This script validates the health and deployment status of the PanFS CSI Driver components
+# (Controller, Node, and Kernel Module) in a Kubernetes cluster. It checks for resource presence,
+# readiness, image versions, and provides a summary of any detected issues.
+
 # Create a safe temporary directory
 TMPDIR=$(mktemp -d)
 cleanup() { rm -rf "$TMPDIR"; }
@@ -33,9 +50,7 @@ print_list() {
 errors=0
 NS="csi-panfs"
 
-#############################
-# 1. Controller             #
-#############################
+## Controller
 print "${BOLD}CSI/Controller health...${RESET}"
 print "\n  Checks:\n"
 
@@ -91,9 +106,8 @@ else
     print_list "$names" "$images"
 fi
 
-###########################
-# 2. Node                 #
-###########################
+
+## Node
 dfc_image=""
 if [ -n "${DFC_REGISTRY}" ] && [ -n "${DFC_VERSION}" ]; then
     dfc_image="${DFC_REGISTRY}/panfs-dfc:${DFC_VERSION}"
@@ -154,9 +168,7 @@ else
     print_list "$names" "$images"
 fi
 
-###########################
-# 3. Kernel Module Status #
-###########################
+## Kernel Module Status
 print "\n${BOLD}Kernel Module status...${RESET}"
 print "\n  Checks:"
 if ! kubectl get module -n "${NS}" panfs >/dev/null 2>&1; then
@@ -175,9 +187,7 @@ else
     kubectl describe module -n "${NS}" panfs | sed -n '/^Status/,/^$/p' | sed 's/^/    /'
 fi
 
-###########################
-# Final verdict           #
-###########################
+## Final verdict
 print "\n${BOLD}Validation Status:${RESET}"
 if [ "$errors" -eq 0 ]; then
     if [ -n "${csi_controller_deployed}" ] && [ -n "${csi_node_deployed}" ]; then
