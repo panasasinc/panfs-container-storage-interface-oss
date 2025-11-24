@@ -27,10 +27,10 @@ inputs:
     default: ""
     description: Docker image URL for the driver
     type: string
-  dfc-image-name:
-    description: DFC Image Name
+  dfc-image-registry:
+    description: DFC Image Registry
     type: string
-    default: "ghcr.io/${{ github.repository }}/panfs-dfc"
+    default: "ghcr.io/${{ github.repository }}"
   dfc-version:
     description: DFC version to use
     type: string
@@ -97,7 +97,7 @@ runs:
       env:
         USE_HELM: "${{ inputs.driver-installation-type == 'helm' }}"
         CSI_IMAGE: "${{ inputs.driver-image-url }}"
-        DFC_REGISTRY: "${{ inputs.dfc-image-name }}"
+        DFC_REGISTRY: "${{ inputs.dfc-image-registry }}"
         DFC_VERSION: "${{ inputs.dfc-version }}"
       shell: bash
       run: |
@@ -109,7 +109,7 @@ runs:
       if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'driver' }}
       env:
         CSI_IMAGE: "${{ inputs.driver-image-url }}"
-        DFC_REGISTRY: "${{ inputs.dfc-image-name }}"
+        DFC_REGISTRY: "${{ inputs.dfc-image-registry }}"
         DFC_VERSION: "${{ inputs.dfc-version }}"
       shell: bash
       run: |

@@ -206,13 +206,13 @@ deploy-driver-with-helm:
 	@if [ '$(DFC_VERSION)' = 'stub' ]; then \
 		helm upgrade --install csi-panfs charts/panfs \
 			--namespace csi-panfs \
-			--set csi.image=$(CSI_IMAGE)" \
-			--set csi.pullPolicy=IfNotPresent \
-			--set dfc.version=$(DFC_VERSION) \
+			--set csi.image="$(CSI_IMAGE)" \
+			--set csi.pullPolicy="IfNotPresent" \
+			--set dfc.version="$(DFC_VERSION)" \
 			--set dfc.privateRegistry="$(DFC_REGISTRY)" \
-			--set dfc.pullPolicy=IfNotPresent \
-			--set kmm.enabled=false \
-			--set seLinux=false \
+			--set dfc.pullPolicy="IfNotPresent" \
+			--set kmm.enabled="false" \
+			--set seLinux="false" \
 			--wait; \
 	else \
 		helm upgrade --install csi-panfs charts/panfs \
