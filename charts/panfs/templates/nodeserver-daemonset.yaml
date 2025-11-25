@@ -127,7 +127,7 @@ spec: # csi-panfs-node
         - name: csi-panfs-plugin
           image: {{ .Values.dfc.privateRegistry }}/panfs-dfc:{{ .Values.dfc.version }}
           imagePullPolicy: {{ .Values.csi.pullPolicy }}
-          command:
+          args:
             - "/var/panfs/panfs-csi"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--v=5"
