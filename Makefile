@@ -248,11 +248,7 @@ deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
 		make deploy-driver-with-manifest; \
 	fi
 
-	@echo "Waiting for the PanFS CSI Controller deployment to be ready..."
-	@timeout 30m kubectl -n csi-panfs rollout status deployment csi-panfs-controller
-
-	@echo "Waiting for the PanFS CSI Node daemonset to be ready..."
-	@timeout 30m kubectl -n csi-panfs rollout status daemonset csi-panfs-node
+	@timeout 30m sh tests/helper/lib/wait.sh
 	@echo "$(GREEN)PanFS CSI Driver is successfully enrolled!$(RESET)"
 	@echo
 
