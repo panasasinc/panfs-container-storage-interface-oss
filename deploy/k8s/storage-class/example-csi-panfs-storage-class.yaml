@@ -85,9 +85,9 @@ parameters:
   panfs.csi.vdura.com/efsa: "retry"
   
   # Enable/Disable E2EE for volumes created with this StorageClass
-  # Set to "true" to enable encryption, "false" to disable encryption
+  # Set to "on" to enable encryption, "off" to disable encryption
   # If enabled, please ensure that KMIP server connection details are provided in the Secret used by this StorageClass
-  panfs.csi.vdura.com/encryption: "false"
+  panfs.csi.vdura.com/encryption: "off"
   
   panfs.csi.vdura.com/layout: "raid6+"
   panfs.csi.vdura.com/maxwidth: "3"

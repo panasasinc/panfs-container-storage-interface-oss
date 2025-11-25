@@ -80,6 +80,8 @@ parameters:
   # panfs.csi.vdura.com/operm: "read-write"
 
   # Enable/Disable E2EE for volumes created with this StorageClass
-  panfs.csi.vdura.com/encryption: "false"
+  # Set to "on" to enable encryption, "off" to disable encryption
+  # If enabled, please ensure that KMIP server connection details are provided in the Secret used
+  panfs.csi.vdura.com/encryption: "off"
 
 mountOptions: []
