@@ -140,7 +140,7 @@ else
     if [ -z "$bad_node_pods" ] && [ "$ds_ready" != "0" ]; then
         print "    ${GREEN}✔ All node pods Running & Ready${RESET}"
     else
-        if [ "$ds_ready" == "0" ]; then
+        if [ "$ds_ready" = "0" ]; then
             print "    ${RED}✘ No node pods are running${RESET}"
         else
             print "    ${RED}✘ Some node pods are not ready:${RESET}"
