@@ -198,7 +198,8 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 	if err := d.mounterV2.Mount(fmt.Sprintf("panfs://%s/%s", in.GetSecrets()[utils.RealmConnectionContext.RealmAddress], volumeID), publishTargetPath, mountOptions); err != nil {
 		llog.Error(fmt.Errorf("failed to publish volume"), UnexpectedErrorInternalStr,
 			"volume_id", volumeID,
-			"publish_target_path", publishTargetPath)
+			"publish_target_path", publishTargetPath,
+			"mount_options", mountOptions)
 		return nil, status.Error(codes.Internal, "Failed to publish volume: "+err.Error())
 	}
 
