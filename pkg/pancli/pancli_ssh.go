@@ -300,6 +300,8 @@ func (p *PancliSSHClient) CreateVolume(volumeName string, params VolumeCreatePar
 		return nil, err
 	}
 
+	// Set encryption field based on provisioning context
+	volume.Encryption = params[utils.VolumeProvisioningContext.Encryption.GetKey()]
 	return volume, nil
 }
 
