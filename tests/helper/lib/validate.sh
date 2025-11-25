@@ -59,7 +59,11 @@ if ! kubectl get deploy -n "${NS}" csi-panfs-controller >/dev/null 2>&1; then
 else
     csi_controller_deployed="true"
     controller_ready=$(kubectl get deploy -n "${NS}" csi-panfs-controller -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+    [ -z "$controller_ready" ] && controller_ready="0"
+
     controller_expected=$(kubectl get deploy -n "${NS}" csi-panfs-controller -o jsonpath='{.status.replicas}' 2>/dev/null || echo "0")
+    [ -z "$controller_expected" ] && controller_expected="0"
+
     if [ "$controller_ready" = "$controller_expected" ] && [ "$controller_ready" != "0" ]; then
         print "    ${GREEN}✔ Controller deployment is healthy ($controller_ready/$controller_expected Ready)${RESET}"
     else
@@ -85,7 +89,7 @@ else
             print "    ${RED}✘ CSI image mismatch. Expected: ${CSI_IMAGE}, Found: ${csi_image}${RESET}"
             errors=$((errors+1))
         else
-            print "    ${GREEN}✔ CSI image matches expected: ${CSI_IMAGE}${RESET}"
+            print "    ${GREEN}✔ CSI image matches expected: ${BOLD}${CSI_IMAGE}${RESET}"
         fi
     else 
         if [ "$controller_ready" != "0" ]; then
@@ -120,7 +124,10 @@ if ! kubectl get ds -n "${NS}" csi-panfs-node >/dev/null 2>&1; then
 else
     csi_node_deployed="true"
     ds_ready=$(kubectl get ds -n "${NS}" csi-panfs-node -o jsonpath='{.status.numberReady}' 2>/dev/null || echo "0")
+    [ -z "$ds_ready" ] && ds_ready="0"
+
     ds_expected=$(kubectl get ds -n "${NS}" csi-panfs-node -o jsonpath='{.status.desiredNumberScheduled}' 2>/dev/null || echo "0")
+    [ -z "$ds_expected" ] && ds_expected="0"
 
     if [ "$ds_ready" = "$ds_expected" ] && [ "$ds_ready" != "0" ]; then
         print "    ${GREEN}✔ Node DaemonSet is healthy ($ds_ready/$ds_expected Ready)${RESET}"
@@ -147,7 +154,7 @@ else
             print "    ${RED}✘ DFC image mismatch. Expected: ${dfc_image}, Found: ${node_image}${RESET}"
             errors=$((errors+1))
         else
-            print "    ${GREEN}✔ DFC image matches expected: ${dfc_image}${RESET}"
+            print "    ${GREEN}✔ DFC image matches expected: ${BOLD}${dfc_image}${RESET}"
         fi
     else
         if [ "$ds_ready" != "0" ]; then
@@ -184,21 +191,25 @@ else
     fi
 
     print "\n  Details:"
-    kubectl describe module -n "${NS}" panfs | sed -n '/^Status/,/^$/p' | sed 's/^/    /'
+    kubectl describe module -n "${NS}" panfs | sed -n '/^Status/,/^$/p' | sed 's/^Status/Module Status/' | sed 's/^/    /'
+    kubectl get nodes -l node-role.kubernetes.io/worker= -o name | while read -r node; do
+        print "\n    Node ${node}:"
+        kubectl describe "${node}" | sed -n '/^Events/,/^$/p' | sed 's/^/      /'
+    done
 fi
 
 ## Final verdict
 print "\n${BOLD}Validation Status:${RESET}"
 if [ "$errors" -eq 0 ]; then
     if [ -n "${csi_controller_deployed}" ] && [ -n "${csi_node_deployed}" ]; then
-        print "${GREEN}✔ All checks passed. Safe to deploy the StorageClass.${RESET}"
+        print "  ${GREEN}✔ All checks passed. Safe to deploy the StorageClass.${RESET}"
         exit 0
     else
         if [ -n "${csi_controller_deployed}" ] || [ -n "${csi_node_deployed}" ]; then
-            print "${YELLOW}⚠ Partial CSI components detected in the cluster. Please ensure that both the PanFS CSI Controller and Node components are deployed in the ${NS} namespace.${RESET}"
+            print "  ${YELLOW}⚠ Partial CSI components detected in the cluster. Please ensure that both the PanFS CSI Controller and Node components are deployed in the ${NS} namespace.${RESET}"
             exit 1
         else
-            print "${YELLOW}⚠ No CSI components detected in the cluster.${RESET}"
+            print "  ${YELLOW}⚠ No CSI components detected in the cluster.${RESET}"
             exit 0
         fi
     fi

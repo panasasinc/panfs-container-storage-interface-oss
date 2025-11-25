@@ -249,10 +249,12 @@ deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
 	fi
 
 	@echo "Waiting for the PanFS CSI Controller deployment to be ready..."
-	@timeout 60 kubectl -n csi-panfs rollout status deployment csi-panfs-controller
+	@timeout 30m kubectl -n csi-panfs rollout status deployment csi-panfs-controller
 
 	@echo "Waiting for the PanFS CSI Node daemonset to be ready..."
-	@timeout 60 kubectl -n csi-panfs rollout status daemonset csi-panfs-node
+	@timeout 30m kubectl -n csi-panfs rollout status daemonset csi-panfs-node
+	@echo "$(GREEN)PanFS CSI Driver is successfully enrolled!$(RESET)"
+	@echo
 
 .PHONY: deploy-storageclass-info
 deploy-storageclass-info: ## Display information about the PanFS CSI Storage Class to be deployed
@@ -361,7 +363,7 @@ uninstall-storageclass: ## Uninstall the PanFS CSI Storage Class
 .PHONY: uninstall
 uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class 
 	@make uninstall-driver
-# 	@make uninstall-storageclass
+	@make uninstall-storageclass
 
 ## Prepare to Release:
 
