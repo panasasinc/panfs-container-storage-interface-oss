@@ -8,6 +8,8 @@ export CYAN="\033[36m"
 export GRAY="\033[90m"
 export BOLD="\033[1m"
 
+trap 'echo -e "\n${RED}Interrupted. Exiting.${RESET}"; exit 130' SIGINT SIGTERM
+
 print() {
     printf "%b\n" "$1"
 }
@@ -53,7 +55,7 @@ if kubectl get module panfs -n csi-panfs >/dev/null 2>&1; then
 
     kubectl get module panfs -n csi-panfs -o yaml | sed -n '/^status:/,$p' | sed 's/status:/Kernel module status:/'
 else
-    print "${CYAN}KMM module 'panfs' not found. Skipping KMM readiness check.${RESET}"
+    print "\n${CYAN}KMM module 'panfs' not found. Skipping KMM readiness check.${RESET}"
 fi
 
 print "\n${BOLD}Waiting for the PanFS CSI Node daemonset to be ready...${RESET}"

@@ -14,7 +14,7 @@
 
 FROM alpine:3.22
 
-RUN mkdir -p /usr/sbin && \
-    touch /usr/sbin/mount.panfs
+COPY entrypoint /
+RUN chmod a+x /entrypoint
 
-ENTRYPOINT [ "/bin/sh"]
+ENTRYPOINT [ "/entrypoint" ]

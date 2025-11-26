@@ -43,7 +43,8 @@ help:
 	@echo
 	@echo "  $(GRAY)Deploying CSI Driver:$(RESET)"
 	@echo "    export CSI_IMAGE=..."
-	@echo "    export CSIDFCKMM_IMAGE=..."
+	@echo "    export DFC_VERSION=..."
+	@echo "    export DFC_REGISTRY=..."
 	@echo "    $(BLUE)make deploy-driver$(RESET)"
 	@echo
 	@echo "  $(GRAY)Deploying Storage Class:$(RESET)"
@@ -60,8 +61,9 @@ help:
 	@echo
 	@echo "  $(GREEN)Build/Deploy Settings:$(RESET)"
 	@echo '    TEST_IMAGE                               Full image name for the test image (for sanity/e2e tests).'
-	@echo '    CSI_IMAGE                          Full image name for the PanFS CSI Driver.'
-	@echo '    CSIDFCKMM_IMAGE                          Full image name for the Kernel Module Management image.'
+	@echo '    CSI_IMAGE                                Full image name for the PanFS CSI Driver.'
+	@echo '    DFC_IMAGE                                Full image name for the Kernel Module Management image.'
+	@echo '    DFC_VERSION                              Version of the DFC to deploy.'
 	@echo
 	@echo "  $(GREEN)Pull/Push Images:$(RESET)"
 	@echo '    REGISTRY_CREDS_FILE *                    Path to the file containing GCR credentials (JSON format).'
@@ -105,7 +107,11 @@ BUILD_DATE ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 
 .PHONY: build-driver-image
 build-driver-image: ## Build the PanFS CSI Driver Docker image
-	docker build -t $(CSI_IMAGE) \
+	@if [ -z "$(CSI_IMAGE)" ]; then \
+		echo "$(RED)Error: CSI_IMAGE is not set$(RESET)"; \
+		exit 1; \
+	fi
+	docker build --arch=amd64 -t $(CSI_IMAGE) \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--build-arg APP_VERSION=$(APP_VERSION) \
 		--build-arg GIT_COMMIT=$(shell git rev-parse --short HEAD) \
@@ -113,9 +119,11 @@ build-driver-image: ## Build the PanFS CSI Driver Docker image
 
 .PHONY: build-dfc-image
 build-dfc-image: ## Build the Kernel Module Management Docker image
-	docker build -t $(CSIDFCKMM_IMAGE) \
-		-f dfc/Dockerfile.stub \
-		.
+	@if [ -z "$(DFC_IMAGE)" ]; then \
+		echo "$(RED)Error: DFC_IMAGE is not set$(RESET)"; \
+		exit 1; \
+	fi
+	docker build --arch=amd64 -t $(DFC_IMAGE) -f dfc/Dockerfile.stub dfc/
 
 .PHONY: build-test-image
 build-test-image: ## Build the test image for the PanFS CSI Driver
@@ -123,8 +131,7 @@ build-test-image: ## Build the test image for the PanFS CSI Driver
 		echo "$(RED)Error: TEST_IMAGE is not set$(RESET)"; \
 		exit 1; \
 	fi
-
-	docker build -t $(TEST_IMAGE) \
+	docker build --arch=amd64 -t $(TEST_IMAGE) \
 		-f tests/csi_sanity/Dockerfile \
 		tests/csi_sanity/
 
@@ -242,7 +249,7 @@ deploy-driver-with-manifest:
 
 .PHONY: deploy-driver
 deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
-	@if [ "$(USE_HELM)" = "true" ]; then \
+	@if [ "$(USE_HELM)" = "true" ] || [ "$(DFC_VERSION)" = "stub" ] ; then \
 		make deploy-driver-with-helm; \
 	else \
 		make deploy-driver-with-manifest; \
@@ -330,14 +337,17 @@ deploy-storageclass: deploy-storageclass-info ## Deploy PanFS CSI Storage Class
 .PHONY: validate verify
 validate: verify
 verify: deploy-driver-info ## Verify the installation of the PanFS CSI Driver and its components
-	@CSI_IMAGE=$(CSI_IMAGE) DFC_VERSION=$(DFC_VERSION) sh tests/helper/lib/validate.sh
+	@CSI_IMAGE=$(CSI_IMAGE) DFC_VERSION=$(DFC_VERSION) exec tests/helper/lib/validate.sh
 
 ## Uninstall CSI Driver and Storage Class:
 .PHONY: uninstall-check
 uninstall-check: ## Check if it is safe to uninstall the PanFS CSI Storage Class
-	@if kubectl get pv 2>&1 | grep $(STORAGE_CLASS_NAME) 2>/dev/null; then \
-		echo "$(RED)Error: There are still Persistent Volumes using the storage class '$(STORAGE_CLASS_NAME)'. Please delete them before uninstalling the storage class.$(RESET)"; \
-		kubectl get pv | grep $(STORAGE_CLASS_NAME); \
+	@if kubectl get pv -o jsonpath='{range .items[?(@.metadata.annotations.pv\.kubernetes\.io/provisioned-by=="com.vdura.csi.panfs")]}{.metadata.name}{end}' | grep -q .; then \
+		echo "$(RED)Error: There are Persistent Volumes provisioned with com.vdura.csi.panfs CSI driver.$(RESET)"; \
+		echo "$(RED)       Please delete them before uninstalling the storage class and driver.$(RESET)"; \
+		echo; \
+		echo "The following Persistent Volumes are still present:"; \
+		kubectl get pv -o jsonpath='{range .items[*]}{.metadata.name}{"\t"}{.metadata.annotations.pv\.kubernetes\.io/provisioned-by}{"\t"}{.spec.storageClassName}{"\n"}{end}' | grep com.vdura.csi.panfs; \
 		exit 1; \
 	fi
 
@@ -357,7 +367,7 @@ uninstall-storageclass: ## Uninstall the PanFS CSI Storage Class
 	@echo
 
 .PHONY: uninstall
-uninstall: ## Uninstall both the PanFS CSI Driver and Storage Class 
+uninstall: uninstall-check ## Uninstall both the PanFS CSI Driver and Storage Class
 	@make uninstall-driver
 	@make uninstall-storageclass
 

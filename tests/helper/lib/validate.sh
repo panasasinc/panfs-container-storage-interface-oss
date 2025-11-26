@@ -58,10 +58,10 @@ if ! kubectl get deploy -n "${NS}" csi-panfs-controller >/dev/null 2>&1; then
     print "    ${YELLOW}⚠ Controller deployment not found. Skipping controller checks.${RESET}"
 else
     csi_controller_deployed="true"
-    controller_ready=$(kubectl get deploy -n "${NS}" csi-panfs-controller -o jsonpath='{.status.readyReplicas}' 2>/dev/null || echo "0")
+    controller_ready=$(kubectl get deploy -n "${NS}" csi-panfs-controller -o jsonpath='{.status.readyReplicas}' 2>/dev/null)
     [ -z "$controller_ready" ] && controller_ready="0"
 
-    controller_expected=$(kubectl get deploy -n "${NS}" csi-panfs-controller -o jsonpath='{.status.replicas}' 2>/dev/null || echo "0")
+    controller_expected=$(kubectl get deploy -n "${NS}" csi-panfs-controller -o jsonpath='{.status.replicas}' 2>/dev/null)
     [ -z "$controller_expected" ] && controller_expected="0"
 
     if [ "$controller_ready" = "$controller_expected" ] && [ "$controller_ready" != "0" ]; then
@@ -84,7 +84,7 @@ else
     fi
 
     if [ -n "${CSI_IMAGE}" ] && [ "$controller_ready" != "0" ] ; then
-        csi_image=$(kubectl get deploy -n "${NS}" csi-panfs-controller -o jsonpath='{.spec.template.spec.containers[?(@.name=="csi-panfs-plugin")].image}' 2>/dev/null || print "")
+        csi_image=$(kubectl get deploy -n "${NS}" csi-panfs-controller -o jsonpath='{.spec.template.spec.containers[?(@.name=="csi-panfs-plugin")].image}' 2>/dev/null)
         if [ "${csi_image}" != "${CSI_IMAGE}" ]; then
             print "    ${RED}✘ CSI image mismatch. Expected: ${CSI_IMAGE}, Found: ${csi_image}${RESET}"
             errors=$((errors+1))
@@ -181,8 +181,11 @@ print "\n  Checks:"
 if ! kubectl get module -n "${NS}" panfs >/dev/null 2>&1; then
     print "    ${YELLOW}⚠ Kernel module CR not found — continuing (only needed if kernel module mode is enabled)${RESET}"
 else
-    module_ready=$(kubectl get module -n "${NS}" panfs -o jsonpath='{.status.moduleLoader.availableNumber}' 2>/dev/null || echo "0")
-    module_desired=$(kubectl get module -n "${NS}" panfs -o jsonpath='{.status.moduleLoader.desiredNumber}' 2>/dev/null || echo "0")
+    module_ready=$(kubectl get module -n "${NS}" panfs -o jsonpath='{.status.moduleLoader.availableNumber}' 2>/dev/null)
+    [ -z "$module_ready" ] && module_ready="0"
+    module_desired=$(kubectl get module -n "${NS}" panfs -o jsonpath='{.status.moduleLoader.desiredNumber}' 2>/dev/null)
+    [ -z "$module_desired" ] && module_desired="0"
+
     if [ "$module_ready" = "$module_desired" ] && [ "$module_ready" != "0" ]; then
         print "    ${GREEN}✔ Kernel module is healthy ($module_ready/$module_desired Loaded)${RESET}"
     else
