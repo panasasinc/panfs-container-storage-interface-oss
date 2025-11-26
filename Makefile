@@ -97,7 +97,7 @@ TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi
 
 .PHONNY: compile-driver-bin
 compile-driver-bin: ## Compile the PanFS CSI Driver binary
-	docker run -it --arch=amd64 -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 go build -o build/panfs-csi pkg/csi-plugin/main.go
+	docker run -it -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 go build -o build/panfs-csi pkg/csi-plugin/main.go
 
 .PHONNY: build
 build: build-driver-image build-dfc-image ## Build both the PanFS CSI Driver and DFC images
@@ -111,7 +111,7 @@ build-driver-image: ## Build the PanFS CSI Driver Docker image
 		echo "$(RED)Error: CSI_IMAGE is not set$(RESET)"; \
 		exit 1; \
 	fi
-	docker build --arch=amd64 -t $(CSI_IMAGE) \
+	docker build -t $(CSI_IMAGE) \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--build-arg APP_VERSION=$(APP_VERSION) \
 		--build-arg GIT_COMMIT=$(shell git rev-parse --short HEAD) \
@@ -123,7 +123,7 @@ build-dfc-image: ## Build the Kernel Module Management Docker image
 		echo "$(RED)Error: DFC_IMAGE is not set$(RESET)"; \
 		exit 1; \
 	fi
-	docker build --arch=amd64 -t $(DFC_IMAGE) -f dfc/Dockerfile.stub dfc/
+	docker build -t $(DFC_IMAGE) -f dfc/Dockerfile.stub dfc/
 
 .PHONY: build-test-image
 build-test-image: ## Build the test image for the PanFS CSI Driver
@@ -131,17 +131,17 @@ build-test-image: ## Build the test image for the PanFS CSI Driver
 		echo "$(RED)Error: TEST_IMAGE is not set$(RESET)"; \
 		exit 1; \
 	fi
-	docker build --arch=amd64 -t $(TEST_IMAGE) \
+	docker build -t $(TEST_IMAGE) \
 		-f tests/csi_sanity/Dockerfile \
 		tests/csi_sanity/
 
 .PHONY: run-unit-tests
 run-unit-tests: ## Run unit tests for the PanFS CSI Driver
-	docker run -it --arch=amd64 -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 go test -v -race ./pkg/...
+	docker run -it -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 go test -v -race ./pkg/...
 
 .PHONY: coverage
 coverage: ## Get code coverage report
-	docker run -it --rm --arch=amd64 -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 bash -c ' \
+	docker run -it --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 bash -c ' \
 		go test -coverprofile=coverage.out ./...; \
 		go tool cover -html=coverage.out -o coverage.html \
 	'
