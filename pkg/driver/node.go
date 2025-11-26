@@ -148,7 +148,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 		mountOptions = append(mountOptions, "ro")
 	}
 
-	if encryptionVal, ok := in.VolumeContext[utils.VolumeProvisioningContext.Encryption.GetKey()]; ok && encryptionVal == "on" {
+	if encryptionVal, ok := in.VolumeContext["encryption"]; ok && encryptionVal == "on" {
 		// Create a temporary KMIP Config file
 		if err := osMkdirAll("/var/tmp/kmip/", 0o700); err != nil {
 			llog.Error(err, "failed to create temp directory for KMIP config file")
