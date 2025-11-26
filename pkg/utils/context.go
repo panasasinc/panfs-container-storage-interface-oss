@@ -14,64 +14,69 @@
 
 package utils
 
-import "strings"
+import (
+	"strings"
+)
 
 // VendorPrefix for PanFS CSI Driver
 const VendorPrefix = "panfs.csi.vdura.com/"
 
-// ContextParameterData defines structure for context parameter data
-type ContextParameterData struct {
-	PasXMLKey string
-	Arg       string
+// VolumeParametersData defines structure for volume parameters data
+type VolumeParametersData map[string]string
+
+// VolumeParameters holds supported volume provisioning context parameters
+var VolumeParameters = VolumeParametersData{
+	"description": `description "%s"`,
+	"bladeset":    `bladeset "%s"`,
+	"recovery":    "recoverypriority %s",
+	"efsa":        "efsa %s",
+	"volservice":  "volservice %s",
+	"layout":      "layout %s",
+	"maxwidth":    "maxwidth %s",
+	"stripeunit":  "stripeunit %s",
+	"rgwidth":     "rgwidth %s",
+	"rgdepth":     "rgdepth %s",
+	"user":        `user "%s"`,
+	"group":       `group "%s"`,
+	"uperm":       "uperm %s",
+	"gperm":       "gperm %s",
+	"operm":       "operm %s",
+	"encryption":  "encryption %s",
+	"soft":        "soft %v", // softQuotaGB
+	"hard":        "hard %v", // hardQuotaGB
 }
 
-// GetKey returns context parameter key with vendor prefix
-func (c ContextParameterData) GetKey() string {
-	return VendorPrefix + strings.Fields(c.Arg)[0]
+// GetSCKey retrieves the CSI Driver specific key for a given context parameter key
+func (c VolumeParametersData) GetSCKey(k string) string {
+	if _, ok := c[k]; ok {
+		return k
+	}
+
+	prefixed := VendorPrefix + k
+	if _, ok := c[prefixed]; ok {
+		return prefixed
+	}
+
+	return ""
 }
 
-// VolumeProvisioningContextData holds supported volume provisioning context parameters
-type VolumeProvisioningContextData struct {
-	Description      ContextParameterData
-	BladeSet         ContextParameterData
-	RecoveryPriority ContextParameterData
-	Efsa             ContextParameterData
-	VolService       ContextParameterData
-	Layout           ContextParameterData
-	MaxWidth         ContextParameterData
-	StripeUnit       ContextParameterData
-	RgWidth          ContextParameterData
-	RgDepth          ContextParameterData
-	User             ContextParameterData
-	Group            ContextParameterData
-	UPerm            ContextParameterData
-	GPerm            ContextParameterData
-	OPerm            ContextParameterData
-	Encryption       ContextParameterData
-	Soft             ContextParameterData
-	Hard             ContextParameterData
+// GetPanKey retrieves the PanFS CSI Driver specific key for a given context parameter key
+func (c VolumeParametersData) GetPanKey(k string) string {
+	if _, ok := c[k]; ok {
+		return strings.TrimPrefix(k, VendorPrefix)
+	}
+
+	prefixed := VendorPrefix + k
+	if _, ok := c[prefixed]; ok {
+		return k // `k` is already without prefix
+	}
+
+	return ""
 }
 
-// Supported Volume Parameters Keys
-var VolumeProvisioningContext = VolumeProvisioningContextData{
-	Description:      ContextParameterData{PasXMLKey: "description", Arg: `description "%s"`},
-	BladeSet:         ContextParameterData{PasXMLKey: "bladesetName/Name", Arg: `bladeset "%s"`},
-	RecoveryPriority: ContextParameterData{PasXMLKey: "recoverypriority", Arg: "recoverypriority %s"},
-	Efsa:             ContextParameterData{PasXMLKey: "efsa", Arg: "efsa %s"},
-	VolService:       ContextParameterData{PasXMLKey: "volservice", Arg: "volservice %s"},
-	Layout:           ContextParameterData{PasXMLKey: "layout", Arg: "layout %s"},
-	MaxWidth:         ContextParameterData{PasXMLKey: "maxwidth", Arg: "maxwidth %s"},
-	StripeUnit:       ContextParameterData{PasXMLKey: "stripeunit", Arg: "stripeunit %s"},
-	RgWidth:          ContextParameterData{PasXMLKey: "rgwidth", Arg: "rgwidth %s"},
-	RgDepth:          ContextParameterData{PasXMLKey: "rgdepth", Arg: "rgdepth %s"},
-	User:             ContextParameterData{PasXMLKey: "user", Arg: `user "%s"`},
-	Group:            ContextParameterData{PasXMLKey: "group", Arg: `group "%s"`},
-	UPerm:            ContextParameterData{PasXMLKey: "uperm", Arg: "uperm %s"},
-	GPerm:            ContextParameterData{PasXMLKey: "gperm", Arg: "gperm %s"},
-	OPerm:            ContextParameterData{PasXMLKey: "operm", Arg: "operm %s"},
-	Encryption:       ContextParameterData{PasXMLKey: "encryption", Arg: "encryption %s"},
-	Soft:             ContextParameterData{PasXMLKey: "hardQuotaGB", Arg: "soft %v"},
-	Hard:             ContextParameterData{PasXMLKey: "softQuotaGB", Arg: "hard %v"},
+// GetFmt retrieves the formatting string for a given context parameter key
+func (c VolumeParametersData) GetFmt(k string) string {
+	return c[c.GetSCKey(k)]
 }
 
 // Realm Connection Parameters Keys

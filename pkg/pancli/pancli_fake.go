@@ -64,24 +64,19 @@ func (c *FakePancliSSHClient) CreateVolume(volumeName string, params VolumeCreat
 		return nil, ErrorAlreadyExist
 	}
 
-	bsetName := params[utils.VolumeProvisioningContext.BladeSet.GetKey()]
+	bsetName := params[utils.VolumeParameters.GetSCKey("bladeset")]
 	if bsetName == "" {
 		bsetName = "Set 1"
 	}
 
-	soft := params[utils.VolumeProvisioningContext.Soft.GetKey()]
+	soft := params[utils.VolumeParameters.GetSCKey("soft")]
 	if soft == "" {
 		soft = "0"
 	}
 
-	hard := params[utils.VolumeProvisioningContext.Hard.GetKey()]
+	hard := params[utils.VolumeParameters.GetSCKey("hard")]
 	if hard == "" {
 		hard = "0"
-	}
-
-	encryption := params[utils.VolumeProvisioningContext.Encryption.GetKey()]
-	if encryption == "" {
-		encryption = "off"
 	}
 
 	vol := &utils.Volume{
@@ -94,8 +89,13 @@ func (c *FakePancliSSHClient) CreateVolume(volumeName string, params VolumeCreat
 		Soft:       utils.BytesStringToGB(soft),
 		Hard:       utils.BytesStringToGB(hard),
 		ID:         uuid.New().String(),
-		Encryption: encryption,
+		Encryption: "OFF",
 	}
+
+	if val, ok := params[utils.VolumeParameters.GetSCKey("encryption")]; ok {
+		vol.Encryption = val
+	}
+
 	c.Volumes = append(c.Volumes, vol)
 	return vol, nil
 }

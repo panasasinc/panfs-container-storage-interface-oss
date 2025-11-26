@@ -171,10 +171,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.BladeSet.GetKey(): "",
+					utils.VolumeParameters.GetSCKey("bladeset"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.BladeSet.GetKey()),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("bladeset")),
 		},
 		{
 			name: "empty volservice parameter",
@@ -185,10 +185,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.VolService.GetKey(): "",
+					utils.VolumeParameters.GetSCKey("volservice"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.VolService.GetKey()),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("volservice")),
 		},
 		{
 			name: "invalid layout parameter",
@@ -199,10 +199,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.Layout.GetKey(): "invalid",
+					utils.VolumeParameters.GetSCKey("layout"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.Layout.GetKey(), layoutList),
+			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("layout"), layoutList),
 		},
 		{
 			name: "invalid maxwidth parameter (alphanumeric)",
@@ -213,10 +213,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.MaxWidth.GetKey(): "q1",
+					utils.VolumeParameters.GetSCKey("maxwidth"): "q1",
 				},
 			},
-			err: fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.MaxWidth.GetKey()),
+			err: fmt.Errorf("%s is not integer", utils.VolumeParameters.GetSCKey("maxwidth")),
 		},
 		{
 			name: "invalid maxwidth parameter",
@@ -227,10 +227,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.MaxWidth.GetKey(): "abc",
+					utils.VolumeParameters.GetSCKey("maxwidth"): "abc",
 				},
 			},
-			err: fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.MaxWidth.GetKey()),
+			err: fmt.Errorf("%s is not integer", utils.VolumeParameters.GetSCKey("maxwidth")),
 		},
 		{
 			name: "invalid maxwidth parameter",
@@ -241,10 +241,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.MaxWidth.GetKey(): "0",
+					utils.VolumeParameters.GetSCKey("maxwidth"): "0",
 				},
 			},
-			err: fmt.Errorf("%s must be greater then 0", utils.VolumeProvisioningContext.MaxWidth.GetKey()),
+			err: fmt.Errorf("%s must be greater then 0", utils.VolumeParameters.GetSCKey("maxwidth")),
 		},
 		{
 			// todo: add more cases
@@ -256,10 +256,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.StripeUnit.GetKey(): "abc",
+					utils.VolumeParameters.GetSCKey("stripeunit"): "abc",
 				},
 			},
-			err: fmt.Errorf("%s is not valid", utils.VolumeProvisioningContext.StripeUnit.GetKey()),
+			err: fmt.Errorf("%s is not valid", utils.VolumeParameters.GetSCKey("stripeunit")),
 		},
 		{
 			name: "invalid rgwidth parameter",
@@ -270,10 +270,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.RgWidth.GetKey(): "",
+					utils.VolumeParameters.GetSCKey("rgwidth"): "",
 				},
 			},
-			err: fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.RgWidth.GetKey()),
+			err: fmt.Errorf("%s is not integer", utils.VolumeParameters.GetSCKey("rgwidth")),
 		},
 		{
 			name: "rgwidth parameter is not in range",
@@ -284,10 +284,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.RgWidth.GetKey(): "2",
+					utils.VolumeParameters.GetSCKey("rgwidth"): "2",
 				},
 			},
-			err: fmt.Errorf("%s must be between 3 and 20 (inclusive)", utils.VolumeProvisioningContext.RgWidth.GetKey()),
+			err: fmt.Errorf("%s must be between 3 and 20 (inclusive)", utils.VolumeParameters.GetSCKey("rgwidth")),
 		},
 		{
 			name: "invalid rgdepth parameter",
@@ -298,10 +298,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.RgDepth.GetKey(): "q",
+					utils.VolumeParameters.GetSCKey("rgdepth"): "q",
 				},
 			},
-			err: fmt.Errorf("%s is not integer", utils.VolumeProvisioningContext.RgDepth.GetKey()),
+			err: fmt.Errorf("%s is not integer", utils.VolumeParameters.GetSCKey("rgdepth")),
 		},
 		{
 			name: "rgdepth parameter is less then minimum",
@@ -312,10 +312,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.RgDepth.GetKey(): "0",
+					utils.VolumeParameters.GetSCKey("rgdepth"): "0",
 				},
 			},
-			err: fmt.Errorf("%s must be greater then 0", utils.VolumeProvisioningContext.RgDepth.GetKey()),
+			err: fmt.Errorf("%s must be greater then 0", utils.VolumeParameters.GetSCKey("rgdepth")),
 		},
 		{
 			name: "empty user parameter",
@@ -326,10 +326,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.User.GetKey(): "",
+					utils.VolumeParameters.GetSCKey("user"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.User.GetKey()),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("user")),
 		},
 		{
 			name: "empty group parameter",
@@ -340,10 +340,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.Group.GetKey(): "",
+					utils.VolumeParameters.GetSCKey("group"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", utils.VolumeProvisioningContext.Group.GetKey()),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("group")),
 		},
 		{
 			name: "invalid uperm parameter",
@@ -354,10 +354,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.UPerm.GetKey(): "invalid",
+					utils.VolumeParameters.GetSCKey("uperm"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.UPerm.GetKey(), permList),
+			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("uperm"), permList),
 		},
 		{
 			name: "invalid gperm parameter",
@@ -368,10 +368,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.GPerm.GetKey(): "invalid",
+					utils.VolumeParameters.GetSCKey("gperm"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.GPerm.GetKey(), permList),
+			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("gperm"), permList),
 		},
 		{
 			name: "invalid operm parameter",
@@ -382,10 +382,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.OPerm.GetKey(): "invalid",
+					utils.VolumeParameters.GetSCKey("operm"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be one of: %v", utils.VolumeProvisioningContext.OPerm.GetKey(), permList),
+			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("operm"), permList),
 		},
 		{
 			name: "invalid encryption parameter",
@@ -396,10 +396,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeProvisioningContext.Encryption.GetKey(): "invalid",
+					utils.VolumeParameters.GetSCKey("encryption"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be 'on' or 'off'", utils.VolumeProvisioningContext.Encryption.GetKey()),
+			err: fmt.Errorf("%s must be 'on' or 'off'", utils.VolumeParameters.GetSCKey("encryption")),
 		},
 		{
 			name: "volume content source not supported",
@@ -453,18 +453,18 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			},
 			VolumeCapabilities: []*csi.VolumeCapability{{}},
 			Parameters: map[string]string{
-				utils.VolumeProvisioningContext.BladeSet.GetKey():   "Set 1",
-				utils.VolumeProvisioningContext.VolService.GetKey(): "vol_service_id",
-				utils.VolumeProvisioningContext.Layout.GetKey():     "raid10+",
-				utils.VolumeProvisioningContext.MaxWidth.GetKey():   "3",
-				utils.VolumeProvisioningContext.StripeUnit.GetKey(): "16K",
-				utils.VolumeProvisioningContext.RgWidth.GetKey():    "9",
-				utils.VolumeProvisioningContext.RgDepth.GetKey():    "7",
-				utils.VolumeProvisioningContext.User.GetKey():       "user_name",
-				utils.VolumeProvisioningContext.Group.GetKey():      "group_name",
-				utils.VolumeProvisioningContext.UPerm.GetKey():      "read-only",
-				utils.VolumeProvisioningContext.GPerm.GetKey():      "write-only",
-				utils.VolumeProvisioningContext.OPerm.GetKey():      "none",
+				utils.VolumeParameters.GetSCKey("bladeset"):   "Set 1",
+				utils.VolumeParameters.GetSCKey("volservice"): "vol_service_id",
+				utils.VolumeParameters.GetSCKey("layout"):     "raid10+",
+				utils.VolumeParameters.GetSCKey("maxwidth"):   "3",
+				utils.VolumeParameters.GetSCKey("stripeunit"): "16K",
+				utils.VolumeParameters.GetSCKey("rgwidth"):    "9",
+				utils.VolumeParameters.GetSCKey("rgdepth"):    "7",
+				utils.VolumeParameters.GetSCKey("user"):       "user_name",
+				utils.VolumeParameters.GetSCKey("group"):      "group_name",
+				utils.VolumeParameters.GetSCKey("uperm"):      "read-only",
+				utils.VolumeParameters.GetSCKey("gperm"):      "write-only",
+				utils.VolumeParameters.GetSCKey("operm"):      "none",
 			},
 			Secrets: map[string]string{
 				utils.RealmConnectionContext.RealmAddress: "10.11.12.13",

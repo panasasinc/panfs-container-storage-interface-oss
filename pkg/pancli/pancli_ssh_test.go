@@ -70,7 +70,7 @@ func TestCreateVolume(t *testing.T) {
 			"VolumeCreated",
 			validVolumeName,
 			VolumeCreateParams{
-				utils.VolumeProvisioningContext.BladeSet.GetKey(): "Set 1",
+				utils.VolumeParameters.GetSCKey("bladeset"): "Set 1",
 			},
 			nil,
 			validVolumeResponse,
@@ -81,7 +81,9 @@ func TestCreateVolume(t *testing.T) {
 					"volume", "create", validVolumeName, `bladeset "Set 1"`,
 				).Times(1).Return([]byte{}, nil)
 
+				// generate expected pasxml output for the volume
 				genPasXML, _ := validVolumeResponse.MarshalVolumeToPasXML()
+
 				// then get volume details
 				runnerMock.EXPECT().RunCommand(
 					gomock.Any(),
@@ -131,7 +133,7 @@ func TestCreateVolume(t *testing.T) {
 			"CreatedButFailedToGetDetails",
 			validVolumeName,
 			VolumeCreateParams{
-				utils.VolumeProvisioningContext.BladeSet.GetKey(): "Set 1",
+				utils.VolumeParameters.GetSCKey("bladeset"): "Set 1",
 			},
 			fmt.Errorf("xml syntax error"),
 			nil,
@@ -141,6 +143,7 @@ func TestCreateVolume(t *testing.T) {
 					gomock.Any(),
 					"volume", "create", validVolumeName, `bladeset "Set 1"`,
 				).Times(1).Return([]byte{}, nil)
+
 				// then get volume details
 				runnerMock.EXPECT().RunCommand(
 					gomock.Any(),
@@ -152,7 +155,7 @@ func TestCreateVolume(t *testing.T) {
 			"CreatedEncryptedVolume",
 			validVolumeName,
 			VolumeCreateParams{
-				utils.VolumeProvisioningContext.Encryption.GetKey(): "on",
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
 			},
 			nil,
 			&utils.Volume{
@@ -190,7 +193,7 @@ func TestCreateVolume(t *testing.T) {
 			"CreatedEncryptedVolumeButFailedToGetDetails",
 			validVolumeName,
 			VolumeCreateParams{
-				utils.VolumeProvisioningContext.Encryption.GetKey(): "on",
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
 			},
 			fmt.Errorf("xml syntax error"),
 			nil,
@@ -295,83 +298,84 @@ func TestGetOptionalParameters(t *testing.T) {
 		{
 			name: "BladeSetOnly",
 			params: VolumeCreateParams{
-				utils.VolumeProvisioningContext.BladeSet.GetKey(): "Set 1",
+				utils.VolumeParameters.GetSCKey("bladeset"): "Set 1",
 			},
 			want: []string{`bladeset "Set 1"`},
 		},
 		{
 			name: "VolServiceAndEfsa",
 			params: VolumeCreateParams{
-				utils.VolumeProvisioningContext.VolService.GetKey(): "0x01",
-				utils.VolumeProvisioningContext.Efsa.GetKey():       "retry",
+				utils.VolumeParameters.GetSCKey("volservice"): "0x01",
+				utils.VolumeParameters.GetSCKey("efsa"):       "retry",
 			},
 			want: []string{"volservice 0x01", "efsa retry"},
 		},
 		{
 			name: "SoftAndHard",
 			params: VolumeCreateParams{
-				utils.VolumeProvisioningContext.Soft.GetKey(): "1073741824", // 1GB
-				utils.VolumeProvisioningContext.Hard.GetKey(): "2147483648", // 2GB
+				utils.VolumeParameters.GetSCKey("soft"): "1073741824", // 1GB
+				utils.VolumeParameters.GetSCKey("hard"): "2147483648", // 2GB
 			},
 			want: []string{"soft 1.00", "hard 2.00"},
 		},
 		{
 			name: "AllRAIDParams",
 			params: VolumeCreateParams{
-				utils.VolumeProvisioningContext.Layout.GetKey():     "RAID6",
-				utils.VolumeProvisioningContext.MaxWidth.GetKey():   "10",
-				utils.VolumeProvisioningContext.StripeUnit.GetKey(): "64K",
-				utils.VolumeProvisioningContext.RgWidth.GetKey():    "8",
-				utils.VolumeProvisioningContext.RgDepth.GetKey():    "2",
+				utils.VolumeParameters.GetSCKey("layout"):     "RAID6",
+				utils.VolumeParameters.GetSCKey("maxwidth"):   "10",
+				utils.VolumeParameters.GetSCKey("stripeunit"): "64K",
+				utils.VolumeParameters.GetSCKey("rgwidth"):    "8",
+				utils.VolumeParameters.GetSCKey("rgdepth"):    "2",
 			},
 			want: []string{"layout RAID6", "maxwidth 10", "stripeunit 64K", "rgwidth 8", "rgdepth 2"},
 		},
 		{
 			name: "OwnerGroupPerms",
 			params: VolumeCreateParams{
-				utils.VolumeProvisioningContext.User.GetKey():  "alice",
-				utils.VolumeProvisioningContext.Group.GetKey(): "staff",
-				utils.VolumeProvisioningContext.UPerm.GetKey(): "rwx",
-				utils.VolumeProvisioningContext.GPerm.GetKey(): "r-x",
-				utils.VolumeProvisioningContext.OPerm.GetKey(): "r--",
+				utils.VolumeParameters.GetSCKey("user"):  "alice",
+				utils.VolumeParameters.GetSCKey("group"): "staff",
+				utils.VolumeParameters.GetSCKey("uperm"): "rwx",
+				utils.VolumeParameters.GetSCKey("gperm"): "r-x",
+				utils.VolumeParameters.GetSCKey("operm"): "r--",
 			},
 			want: []string{`user "alice"`, `group "staff"`, "uperm rwx", "gperm r-x", "operm r--"},
 		},
 		{
 			name: "DescriptionAndRecoveryPriority",
 			params: VolumeCreateParams{
-				utils.VolumeProvisioningContext.Description.GetKey():      "test volume",
-				utils.VolumeProvisioningContext.RecoveryPriority.GetKey(): "42",
+				utils.VolumeParameters.GetSCKey("description"): "test volume",
+				utils.VolumeParameters.GetSCKey("recovery"):    "42",
 			},
 			want: []string{`description "test volume"`, "recoverypriority 42"},
 		},
 		{
 			name: "EncryptionRequested",
 			params: VolumeCreateParams{
-				utils.VolumeProvisioningContext.Encryption.GetKey(): "on",
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
 			},
 			want: []string{"encryption on"},
 		},
 		{
 			name: "AllFields",
 			params: VolumeCreateParams{
-				utils.VolumeProvisioningContext.BladeSet.GetKey():         "Set 2",
-				utils.VolumeProvisioningContext.RecoveryPriority.GetKey(): "99",
-				utils.VolumeProvisioningContext.Efsa.GetKey():             "file-unavailable",
-				utils.VolumeProvisioningContext.Soft.GetKey():             "3221225472", // 3GB
-				utils.VolumeProvisioningContext.Hard.GetKey():             "4294967296", // 4GB
-				utils.VolumeProvisioningContext.VolService.GetKey():       "0x02",
-				utils.VolumeProvisioningContext.Layout.GetKey():           "RAID5",
-				utils.VolumeProvisioningContext.MaxWidth.GetKey():         "12",
-				utils.VolumeProvisioningContext.StripeUnit.GetKey():       "128K",
-				utils.VolumeProvisioningContext.RgWidth.GetKey():          "6",
-				utils.VolumeProvisioningContext.RgDepth.GetKey():          "3",
-				utils.VolumeProvisioningContext.User.GetKey():             "bob",
-				utils.VolumeProvisioningContext.Group.GetKey():            "users",
-				utils.VolumeProvisioningContext.UPerm.GetKey():            "rw-",
-				utils.VolumeProvisioningContext.GPerm.GetKey():            "r--",
-				utils.VolumeProvisioningContext.OPerm.GetKey():            "---",
-				utils.VolumeProvisioningContext.Description.GetKey():      "full test",
+				utils.VolumeParameters.GetSCKey("bladeset"):    "Set 2",
+				utils.VolumeParameters.GetSCKey("recovery"):    "99",
+				utils.VolumeParameters.GetSCKey("efsa"):        "file-unavailable",
+				utils.VolumeParameters.GetSCKey("soft"):        "3221225472", // 3GB
+				utils.VolumeParameters.GetSCKey("hard"):        "4294967296", // 4GB
+				utils.VolumeParameters.GetSCKey("volservice"):  "0x02",
+				utils.VolumeParameters.GetSCKey("layout"):      "RAID5",
+				utils.VolumeParameters.GetSCKey("maxwidth"):    "12",
+				utils.VolumeParameters.GetSCKey("stripeunit"):  "128K",
+				utils.VolumeParameters.GetSCKey("rgwidth"):     "6",
+				utils.VolumeParameters.GetSCKey("rgdepth"):     "3",
+				utils.VolumeParameters.GetSCKey("user"):        "bob",
+				utils.VolumeParameters.GetSCKey("group"):       "users",
+				utils.VolumeParameters.GetSCKey("uperm"):       "rw-",
+				utils.VolumeParameters.GetSCKey("gperm"):       "r--",
+				utils.VolumeParameters.GetSCKey("operm"):       "---",
+				utils.VolumeParameters.GetSCKey("description"): "full test",
+				utils.VolumeParameters.GetSCKey("encryption"):  "on",
 			},
 			want: []string{
 				`bladeset "Set 2"`,
@@ -391,6 +395,7 @@ func TestGetOptionalParameters(t *testing.T) {
 				"uperm rw-",
 				"gperm r--",
 				"operm ---",
+				"encryption on",
 			},
 		},
 	}

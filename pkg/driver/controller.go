@@ -116,8 +116,8 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 		hard = cr.GetLimitBytes()
 	}
 
-	parameters[utils.VolumeProvisioningContext.Soft.GetKey()] = fmt.Sprintf("%d", soft)
-	parameters[utils.VolumeProvisioningContext.Hard.GetKey()] = fmt.Sprintf("%d", hard)
+	parameters[utils.VolumeParameters.GetSCKey("soft")] = fmt.Sprintf("%d", soft)
+	parameters[utils.VolumeParameters.GetSCKey("hard")] = fmt.Sprintf("%d", hard)
 
 	vol, err := d.panfs.CreateVolume(volumeName, parameters, secrets)
 	if err != nil {
@@ -153,14 +153,14 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 
 	llog.Info("volume created", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
 
-	requestedEncMode := parameters[utils.VolumeProvisioningContext.Encryption.GetKey()]
-	if requestedEncMode == "" {
-		requestedEncMode = "off"
-	}
+	// requestedEncMode := parameters[utils.VolumeParameters.GetSCKey("encryption")]
+	// if requestedEncMode == "" {
+	// 	requestedEncMode = "off"
+	// }
 
-	if requestedEncMode != vol.GetEncryptionMode() {
-		llog.Error(fmt.Errorf("volume encryption mode does not match the requested one"), "Volume creation error", "volume_name", volumeName, "requested_encryption", requestedEncMode, "actual_encryption", vol.GetEncryptionMode())
-	}
+	// if requestedEncMode != vol.GetEncryptionMode() {
+	// 	llog.Error(fmt.Errorf("volume encryption mode does not match the requested one"), "Volume creation error", "volume_name", volumeName, "requested_encryption", requestedEncMode, "actual_encryption", vol.GetEncryptionMode())
+	// }
 
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{

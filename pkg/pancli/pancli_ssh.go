@@ -18,7 +18,6 @@ package pancli
 
 import (
 	"fmt"
-	"reflect"
 	"strconv"
 	"strings"
 	"sync"
@@ -44,25 +43,26 @@ type VolumeCreateParams map[string]string
 //
 //	[]string - Slice of command-line arguments.
 func getOptionalParameters(params VolumeCreateParams) []string {
-	llog := klog.NewKlogr().WithName("getOptionalParameters")
-	llog.V(5).Info("Input params", "params", params)
 	opts := []string{}
 
-	volumeParams := map[string]string{}
-	val := reflect.ValueOf(utils.VolumeProvisioningContext)
-	for i := range val.NumField() {
-		field := val.Field(i)
-		key := field.Interface().(utils.ContextParameterData).GetKey()
-		value := field.Interface().(utils.ContextParameterData).Arg
-		volumeParams[key] = value
-	}
+	// volumeParams := map[string]string{}
+	// val := reflect.ValueOf(utils.VolumeParameters)
+	// for i := range val.NumField() {
+	// 	field := val.Field(i)
+	// 	key := string(field.Interface().(utils.ContextParameterData).GetKey())
+	// 	value := string(field.Interface().(utils.ContextParameterData))
+	// 	volumeParams[key] = value
+	// }
 
+	soft := utils.VolumeParameters.GetSCKey("soft")
+	hard := utils.VolumeParameters.GetSCKey("hard")
 	for key, value := range params {
 		if value == "" {
 			continue
 		}
 
-		if key == utils.VolumeProvisioningContext.Soft.GetKey() || key == utils.VolumeProvisioningContext.Hard.GetKey() {
+		keyParam := utils.VolumeParameters.GetSCKey(key)
+		if keyParam == soft || keyParam == hard {
 			// convert size from bytes to gigabytes for soft and hard quota parameters
 			sizeBytes, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
@@ -71,7 +71,7 @@ func getOptionalParameters(params VolumeCreateParams) []string {
 			value = fmt.Sprintf("%.2f", utils.BytesToGB(sizeBytes))
 		}
 
-		if fmtStr, ok := volumeParams[key]; ok {
+		if fmtStr := utils.VolumeParameters.GetFmt(keyParam); fmtStr != "" {
 			opts = append(opts, fmt.Sprintf(fmtStr, value))
 		}
 	}
@@ -300,8 +300,7 @@ func (p *PancliSSHClient) CreateVolume(volumeName string, params VolumeCreatePar
 		return nil, err
 	}
 
-	// Set encryption field based on provisioning context
-	volume.Encryption = params[utils.VolumeProvisioningContext.Encryption.GetKey()]
+	// volume.Encryption = params[utils.VolumeParameters.GetSCKey("encryption")]
 	return volume, nil
 }
 
