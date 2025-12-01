@@ -14,9 +14,64 @@ print() {
     printf "%b\n" "$1"
 }
 
+rollout_status() {
+    NAMESPACE=csi-panfs
+    resource_type="$1" # "deployment" or "daemonset"
+    resource_name="$2"  
+
+    FAIL_IMAGE='(ImagePullBackOff|ErrImagePull|InvalidImageName|RegistryUnavailable|Init:ImagePullBackOff|Init:ErrImagePull)'
+    FAIL_CRASH='(CrashLoopBackOff|Init:CrashLoopBackOff)'
+    FAIL_CONFIG='(CreateContainerConfigError|CreateContainerError|CreatePodSandboxError|Init:Error|Error|ContainerCannotRun|RunContainerError|StartError)'
+    FAIL_SCHEDULING='(FailedScheduling|Unschedulable)'
+    FAIL_VOLUME='(FailedMount|FailedAttachVolume)'
+    FAIL_CREATE='(FailedCreate|DeadlineExceeded)'
+
+    ALL_FAIL="(${FAIL_IMAGE}|${FAIL_CRASH}|${FAIL_CONFIG}|${FAIL_SCHEDULING}|${FAIL_VOLUME}|${FAIL_CREATE})"
+
+    while true; do
+        pods=$(kubectl -n "$NAMESPACE" get pods -l "app=${resource_name}" --no-headers 2>/dev/null)
+
+        if echo "$pods" | grep -Eq "$ALL_FAIL"; then
+            print ""
+            if echo "$pods" | grep -Eq "$FAIL_IMAGE"; then
+                print "${RED}ERROR: ${resource_type} ${resource_name} has pods with image pull errors. Please check the image name and registry access.${RESET}"
+            fi
+            if echo "$pods" | grep -Eq "$FAIL_CRASH"; then
+                print "${RED}ERROR: ${resource_type} ${resource_name} has pods in CrashLoopBackOff state. Please check the pod logs for more details.${RESET}"
+            fi
+            if echo "$pods" | grep -Eq "$FAIL_CONFIG"; then
+                print "${RED}ERROR: ${resource_type} ${resource_name} has pods with container configuration errors. Please check the pod logs for more details.${RESET}"
+            fi
+            if echo "$pods" | grep -Eq "$FAIL_SCHEDULING"; then
+                print "${RED}ERROR: ${resource_type} ${resource_name} has pods with scheduling issues. Please check node resources and taints.${RESET}"
+            fi
+            if echo "$pods" | grep -Eq "$FAIL_VOLUME"; then
+                print "${RED}ERROR: ${resource_type} ${resource_name} has pods with volume attachment/mount issues. Please check the volume status.${RESET}"
+            fi
+            if echo "$pods" | grep -Eq "$FAIL_CREATE"; then
+                print "${RED}ERROR: ${resource_type} ${resource_name} has pods with creation errors. Please check the pod logs for more details.${RESET}"
+            fi
+
+            print "Affected pods:"
+            kubectl -n "$NAMESPACE" get pods -l "app=${resource_name}"
+            exit 1
+        fi
+
+        # Check if rollout completed
+        if kubectl -n $NAMESPACE rollout status "${resource_type}/${resource_name}" --timeout=10s 2>/dev/null; then
+            print "\n${GREEN}✔ ${resource_type} ${resource_name} is successfully rolled out.${RESET}\n"
+            print "${resource_type} ${resource_name} status:"
+            kubectl -n $NAMESPACE get "${resource_type}" "${resource_name}" -o wide
+            echo
+            break
+        fi
+        sleep 5
+    done
+}
+
+
 print "${BOLD}Waiting for the PanFS CSI Controller deployment to be ready...${RESET}"
-kubectl -n csi-panfs rollout status deployment csi-panfs-controller
-kubectl -n csi-panfs get deploy csi-panfs-controller -o wide
+rollout_status "deployment" "csi-panfs-controller"
 
 if kubectl get module panfs -n csi-panfs >/dev/null 2>&1; then
     print "\n${BOLD}Waiting for PanFS module loader to converge...${RESET}"
@@ -59,5 +114,4 @@ else
 fi
 
 print "\n${BOLD}Waiting for the PanFS CSI Node daemonset to be ready...${RESET}"
-kubectl -n csi-panfs rollout status daemonset csi-panfs-node
-kubectl -n csi-panfs get ds csi-panfs-node -o wide
+rollout_status "daemonset" "csi-panfs-node"

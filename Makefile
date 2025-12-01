@@ -91,6 +91,7 @@ else
 SET_STORAGECLASS_DEFAULT := false
 endif
 
+CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi:latest
 TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
 
 ## Build Driver and DFC Images:
@@ -108,7 +109,7 @@ BUILD_DATE ?= $(shell date -u +'%Y-%m-%dT%H:%M:%SZ')
 .PHONY: build-driver-image
 build-driver-image: ## Build the PanFS CSI Driver Docker image
 	@if [ -z "$(CSI_IMAGE)" ]; then \
-		echo "$(RED)Error: CSI_IMAGE is not set$(RESET)"; \
+		echo "$(RED)CSI_IMAGE is not set$(RESET)"; \
 		exit 1; \
 	fi
 	docker build -t $(CSI_IMAGE) \
@@ -120,7 +121,7 @@ build-driver-image: ## Build the PanFS CSI Driver Docker image
 .PHONY: build-dfc-image
 build-dfc-image: ## Build the Kernel Module Management Docker image
 	@if [ -z "$(DFC_IMAGE)" ]; then \
-		echo "$(RED)Error: DFC_IMAGE is not set$(RESET)"; \
+		echo "$(RED)DFC_IMAGE is not set$(RESET)"; \
 		exit 1; \
 	fi
 	docker build -t $(DFC_IMAGE) -f dfc/Dockerfile.stub dfc/
@@ -148,13 +149,10 @@ coverage: ## Get code coverage report
 
 .PHONY: sanity-check
 sanity-check: ## Run smoke tests using csi-sanity
-	@if [ -z "$(TEST_IMAGE)" ]; then \
-		echo "$(RED)Error: TEST_IMAGE is not set$(RESET)"; \
-		exit 1; \
-	fi
-
-	@if [ -z "$(CSI_IMAGE)" ]; then \
-		echo "$(RED)Error: CSI_IMAGE is not set$(RESET)"; \
+	@if [ -n "$(CSI_IMAGE)" ]; then echo 'CSI_IMAGE:   "$(CSI_IMAGE)"'; else echo "$(RED)CSI_IMAGE:   unknown$(RESET)"; fi
+	@if [ -n "$(TEST_IMAGE)" ]; then echo 'TEST_IMAGE:  "$(TEST_IMAGE)"'; else echo "$(RED)TEST_IMAGE:  unknown$(RESET)"; fi
+	@if [ -z "$(CSI_IMAGE)" ] || [ -z "$(TEST_IMAGE)" ]; then \
+		printf '\nPlease set the above environment variables before deploying the driver.\n'; \
 		exit 1; \
 	fi
 
@@ -202,9 +200,28 @@ info: deploy-driver-info deploy-storageclass-info
 
 .PHONY: deploy-driver-info
 deploy-driver-info: ## Display information about the PanFS CSI Driver to be installed
-	@echo "CSI Image:    $(CSI_IMAGE)"
-	@echo "DFC Version:  $(DFC_VERSION)"
-	@echo "DFC Registry: $(DFC_REGISTRY)"
+	@printf '%-25s "%s"\n\n' "IMAGE_PULL_SECRET_NAME:" "$(IMAGE_PULL_SECRET_NAME)"
+
+	@if [ -n "$(CSI_IMAGE)" ]; \
+		then printf '%-25s "%s"\n' "CSI_IMAGE:" "$(CSI_IMAGE)"; \
+	else \
+		printf '$(RED)%-25s %s$(RESET)\n' "REALM_ADDRESS:" "unknown"; \
+	fi
+	@if [ -n "$(DFC_VERSION)" ]; \
+		then printf '%-25s "%s"\n' "DFC_VERSION:" "$(DFC_VERSION)"; \
+	else \
+		printf '$(RED)%-25s %s$(RESET)\n' "DFC_VERSION:" "unknown"; \
+	fi
+	@if [ -n "$(DFC_REGISTRY)" ]; \
+		then printf '%-25s "%s"\n' "DFC_REGISTRY:" "$(DFC_REGISTRY)"; \
+	else \
+		printf '$(RED)%-25s %s$(RESET)\n' "DFC_REGISTRY:" "unknown"; \
+	fi
+
+	@if [ -z "$(CSI_IMAGE)" ] || [ -z "$(DFC_VERSION)" ] || [ -z "$(DFC_REGISTRY)" ]; then \
+		printf '\nPlease set the above environment variables before deploying the storage class.\n'; \
+		exit 1; \
+	fi
 	@echo
 
 .PHONY: deploy-driver-with-helm
@@ -261,8 +278,21 @@ deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
 
 .PHONY: deploy-storageclass-info
 deploy-storageclass-info: ## Display information about the PanFS CSI Storage Class to be deployed
-	@echo "Storage Class Name: $(STORAGE_CLASS_NAME)"
-	@echo "Set as Default:     $(SET_STORAGECLASS_DEFAULT)"
+	@if [ -n "$(STORAGE_CLASS_NAME)" ]; then \
+		printf '%-25s "%s"\n' "STORAGE_CLASS_NAME:" "$(STORAGE_CLASS_NAME)"; \
+	else \
+		printf '$(RED)%-25s %s$(RESET)\n' "STORAGE_CLASS_NAME:" "unknown"; \
+	fi
+	@if [ -n "$(SET_STORAGECLASS_DEFAULT)" ]; then \
+		printf '%-25s "%s"\n' "SET_STORAGECLASS_DEFAULT:" "$(SET_STORAGECLASS_DEFAULT)"; \
+	else \
+		printf '$(RED)%-25s %s$(RESET)\n' "SET_STORAGECLASS_DEFAULT:" "unknown"; \
+	fi
+
+	@if [ -z "$(STORAGE_CLASS_NAME)" ] || [ -z "$(SET_STORAGECLASS_DEFAULT)" ]; then \
+		printf '\nPlease set the above environment variables before deploying the storage class.\n'; \
+		exit 1; \
+	fi
 	@echo
 
 .PHONY: sc
@@ -303,24 +333,27 @@ deploy-storageclass-with-manifest:
 
 .PHONY: deploy-storageclass
 deploy-storageclass: deploy-storageclass-info ## Deploy PanFS CSI Storage Class
-	@if [ -z "$(REALM_ADDRESS)" ]; then \
-		echo "$(RED)ERROR: REALM_ADDRESS is not set$(RESET)"; \
-		printf "USAGE:\n  export REALM_ADDRESS=...\n  export REALM_USER=...\n  export REALM_PASSWORD=... (or export REALM_PRIVATE_KEY=...)\n  make deploy-storageclass\n"; \
+	@if [ -n "$(REALM_ADDRESS)" ]; \
+		then printf '%-25s "%s"\n' "REALM_ADDRESS:" "$(REALM_ADDRESS)"; \
+	else \
+		printf '$(RED)%-25s %s$(RESET)\n' "REALM_ADDRESS:" "unknown"; \
+	fi
+	@if [ -n "$(REALM_USER)" ]; \
+		then printf '%-25s "%s"\n' "REALM_USER:" "$(REALM_USER)"; \
+	else \
+		printf '$(RED)%-25s %s$(RESET)\n' "REALM_USER:" "unknown"; \
+	fi
+	@if [ -n "$(REALM_PASSWORD)" ]; \
+		then printf '%-25s "%s"\n' "REALM_PASSWORD:" "*****"; \
+	else \
+		printf '$(RED)%-25s %s$(RESET)\n' "REALM_PASSWORD:" "unknown"; \
+	fi
+
+	@if [ -z "$(REALM_ADDRESS)" ] || [ -z "$(REALM_USER)" ] || [ -z "$(REALM_PASSWORD)" ]; then \
+		printf '\nPlease set the above environment variables before deploying the storage class.\n'; \
 		exit 1; \
 	fi
 
-	@if [ -z "$(REALM_USER)" ]; then \
-		echo "$(RED)ERROR: REALM_USER is not set$(RESET)"; \
-		printf "USAGE:\n  export REALM_ADDRESS=...\n  export REALM_USER=...\n  export REALM_PASSWORD=... (or export REALM_PRIVATE_KEY=...)\n  make deploy-storageclass\n"; \
-		exit 1; \
-	fi
-
-	@if [ -z "$(REALM_PASSWORD)" ] && [ -z "$(REALM_PRIVATE_KEY)" ]; then \
-		echo "$(RED)ERROR: Either REALM_PASSWORD or REALM_PRIVATE_KEY must be set$(RESET)"; \
-		printf "USAGE:\n  export REALM_ADDRESS=...\n  export REALM_USER=...\n  export REALM_PASSWORD=... (or export REALM_PRIVATE_KEY=...)\n  make deploy-storageclass\n"; \
-		exit 1; \
-	fi
-	
 	@if [ "$(USE_HELM)" = "true" ]; then \
 		make deploy-storageclass-with-helm; \
 	else \
