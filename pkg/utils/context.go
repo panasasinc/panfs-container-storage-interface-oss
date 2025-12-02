@@ -48,13 +48,9 @@ var VolumeParameters = VolumeParametersData{
 
 // GetSCKey retrieves the CSI Driver specific key for a given context parameter key
 func (c VolumeParametersData) GetSCKey(k string) string {
-	if _, ok := c[k]; ok {
-		return k
-	}
-
-	prefixed := VendorPrefix + k
-	if _, ok := c[prefixed]; ok {
-		return prefixed
+	short := strings.TrimPrefix(k, VendorPrefix)
+	if _, ok := c[short]; ok {
+		return VendorPrefix + short
 	}
 
 	return ""
@@ -62,13 +58,9 @@ func (c VolumeParametersData) GetSCKey(k string) string {
 
 // GetPanKey retrieves the PanFS CSI Driver specific key for a given context parameter key
 func (c VolumeParametersData) GetPanKey(k string) string {
-	if _, ok := c[k]; ok {
-		return strings.TrimPrefix(k, VendorPrefix)
-	}
-
-	prefixed := VendorPrefix + k
-	if _, ok := c[prefixed]; ok {
-		return k // `k` is already without prefix
+	short := strings.TrimPrefix(k, VendorPrefix)
+	if _, ok := c[short]; ok {
+		return short
 	}
 
 	return ""
@@ -76,7 +68,10 @@ func (c VolumeParametersData) GetPanKey(k string) string {
 
 // GetFmt retrieves the formatting string for a given context parameter key
 func (c VolumeParametersData) GetFmt(k string) string {
-	return c[c.GetSCKey(k)]
+	if value, ok := c[c.GetPanKey(k)]; ok {
+		return value
+	}
+	return ""
 }
 
 // Realm Connection Parameters Keys
