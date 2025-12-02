@@ -45,15 +45,6 @@ type VolumeCreateParams map[string]string
 func getOptionalParameters(params VolumeCreateParams) []string {
 	opts := []string{}
 
-	// volumeParams := map[string]string{}
-	// val := reflect.ValueOf(utils.VolumeParameters)
-	// for i := range val.NumField() {
-	// 	field := val.Field(i)
-	// 	key := string(field.Interface().(utils.ContextParameterData).GetKey())
-	// 	value := string(field.Interface().(utils.ContextParameterData))
-	// 	volumeParams[key] = value
-	// }
-
 	soft := utils.VolumeParameters.GetSCKey("soft")
 	hard := utils.VolumeParameters.GetSCKey("hard")
 	for key, value := range params {
