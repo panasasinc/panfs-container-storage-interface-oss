@@ -60,7 +60,7 @@ help:
 	@echo '    USE_HELM                                 Use Helm for deployment (true) or manifest (false) (default: $(USE_HELM)).'
 	@echo
 	@echo "  $(GREEN)Build/Deploy Settings:$(RESET)"
-	@echo '    TEST_IMAGE                               Full image name for the test image (for sanity/e2e tests).'
+	@echo '    TEST_IMAGE                               Full image name for the test image (for sanity tests).'
 	@echo '    CSI_IMAGE                                Full image name for the PanFS CSI Driver.'
 	@echo '    DFC_IMAGE                                Full image name for the Kernel Module Management image.'
 	@echo '    DFC_VERSION                              Version of the DFC to deploy.'
