@@ -430,7 +430,7 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				utils.RealmConnectionContext.KMIPConfigData: "some-kmip-data",
 			},
 			VolumeContext: map[string]string{
-				utils.VolumeParameters.GetPanKey("encryption"): "on",
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
 			},
 		}
 		resp, err := driver.NodePublishVolume(t.Context(), req)
@@ -475,7 +475,7 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				utils.RealmConnectionContext.KMIPConfigData: "some-kmip-data",
 			},
 			VolumeContext: map[string]string{
-				utils.VolumeParameters.GetPanKey("encryption"): "on",
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
 			},
 		}
 
@@ -528,7 +528,7 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				utils.RealmConnectionContext.KMIPConfigData: "",
 			},
 			VolumeContext: map[string]string{
-				utils.VolumeParameters.GetPanKey("encryption"): "on",
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
 			},
 		}
 
@@ -580,7 +580,7 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				utils.RealmConnectionContext.KMIPConfigData: "some data",
 			},
 			VolumeContext: map[string]string{
-				utils.VolumeParameters.GetPanKey("encryption"): "on",
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
 			},
 		}
 
@@ -635,7 +635,7 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				utils.RealmConnectionContext.KMIPConfigData: "some data",
 			},
 			VolumeContext: map[string]string{
-				utils.VolumeParameters.GetPanKey("encryption"): "on",
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
 			},
 		}
 

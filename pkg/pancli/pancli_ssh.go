@@ -48,13 +48,21 @@ func getOptionalParameters(params VolumeCreateParams) []string {
 	soft := utils.VolumeParameters.GetSCKey("soft")
 	hard := utils.VolumeParameters.GetSCKey("hard")
 	for key, value := range params {
+		// Skip parameters with empty values
 		if value == "" {
 			continue
 		}
 
+		// Normalize the key to the CSI Driver specific key
 		keyParam := utils.VolumeParameters.GetSCKey(key)
+
+		// Skip unsupported parameters
+		if keyParam != key {
+			continue
+		}
+
+		// Convert size from bytes to gigabytes for soft and hard quota parameters
 		if keyParam == soft || keyParam == hard {
-			// convert size from bytes to gigabytes for soft and hard quota parameters
 			sizeBytes, err := strconv.ParseInt(value, 10, 64)
 			if err != nil {
 				continue

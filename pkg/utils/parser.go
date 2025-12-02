@@ -109,7 +109,7 @@ func (v *Volume) MarshalVolumeToPasXML() ([]byte, error) {
 func (v *Volume) VolumeContext() map[string]string {
 	params := make(map[string]string)
 	if v.Encryption != "" {
-		params[VolumeParameters.GetPanKey("encryption")] = v.GetEncryptionMode()
+		params[VolumeParameters.GetSCKey("encryption")] = v.GetEncryptionMode()
 	}
 	return params
 }

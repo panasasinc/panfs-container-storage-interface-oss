@@ -242,7 +242,7 @@ func TestControllerCreateVolume(t *testing.T) {
 				Volume: &csi.Volume{
 					VolumeId: validVolumeName,
 					VolumeContext: map[string]string{
-						utils.VolumeParameters.GetPanKey("encryption"): "aes-xts-256",
+						utils.VolumeParameters.GetSCKey("encryption"): "aes-xts-256",
 					},
 				},
 			},

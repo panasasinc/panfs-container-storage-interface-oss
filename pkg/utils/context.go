@@ -56,19 +56,10 @@ func (c VolumeParametersData) GetSCKey(k string) string {
 	return ""
 }
 
-// GetPanKey retrieves the PanFS CSI Driver specific key for a given context parameter key
-func (c VolumeParametersData) GetPanKey(k string) string {
-	short := strings.TrimPrefix(k, VendorPrefix)
-	if _, ok := c[short]; ok {
-		return short
-	}
-
-	return ""
-}
-
 // GetFmt retrieves the formatting string for a given context parameter key
 func (c VolumeParametersData) GetFmt(k string) string {
-	if value, ok := c[c.GetPanKey(k)]; ok {
+	short := strings.TrimPrefix(c.GetSCKey(k), VendorPrefix)
+	if value, ok := c[short]; ok {
 		return value
 	}
 	return ""
