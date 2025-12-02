@@ -50,7 +50,7 @@ var (
 			ID:      "1",
 			Name:    "Set 1",
 		},
-		Encryption: "off",
+		Encryption: "none",
 	}
 )
 
@@ -166,7 +166,7 @@ func TestCreateVolume(t *testing.T) {
 				Bset: utils.Bladeset{
 					XMLName: xml.Name{Local: "bladesetName"},
 				},
-				Encryption: "on",
+				Encryption: "aes-xts-256",
 			},
 			func() {
 				// expect create volume command
@@ -179,7 +179,7 @@ func TestCreateVolume(t *testing.T) {
 					ID:         "371",
 					Name:       "validVolumeName",
 					State:      "Online",
-					Encryption: "on",
+					Encryption: "aes-xts-256",
 				}).MarshalVolumeToPasXML()
 
 				// then get volume details

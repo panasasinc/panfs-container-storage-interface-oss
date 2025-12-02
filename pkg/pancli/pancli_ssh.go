@@ -300,7 +300,6 @@ func (p *PancliSSHClient) CreateVolume(volumeName string, params VolumeCreatePar
 		return nil, err
 	}
 
-	// volume.Encryption = params[utils.VolumeParameters.GetSCKey("encryption")]
 	return volume, nil
 }
 

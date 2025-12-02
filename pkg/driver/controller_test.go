@@ -242,7 +242,7 @@ func TestControllerCreateVolume(t *testing.T) {
 				Volume: &csi.Volume{
 					VolumeId: validVolumeName,
 					VolumeContext: map[string]string{
-						utils.VolumeParameters.GetPanKey("encryption"): "on",
+						utils.VolumeParameters.GetPanKey("encryption"): "aes-xts-256",
 					},
 				},
 			},
@@ -251,7 +251,7 @@ func TestControllerCreateVolume(t *testing.T) {
 				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), defaultSecrets).Times(1).Return(
 					&utils.Volume{
 						Name:       utils.VolumeName(validVolumeName),
-						Encryption: "on",
+						Encryption: "aes-xts-256",
 					},
 					nil)
 			},

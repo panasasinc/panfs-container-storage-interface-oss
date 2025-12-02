@@ -89,7 +89,7 @@ func (c *FakePancliSSHClient) CreateVolume(volumeName string, params VolumeCreat
 		Soft:       utils.BytesStringToGB(soft),
 		Hard:       utils.BytesStringToGB(hard),
 		ID:         uuid.New().String(),
-		Encryption: "OFF",
+		Encryption: "none",
 	}
 
 	if val, ok := params[utils.VolumeParameters.GetSCKey("encryption")]; ok {

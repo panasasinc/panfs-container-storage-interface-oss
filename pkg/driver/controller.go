@@ -153,15 +153,6 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 
 	llog.Info("volume created", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
 
-	// requestedEncMode := parameters[utils.VolumeParameters.GetSCKey("encryption")]
-	// if requestedEncMode == "" {
-	// 	requestedEncMode = "off"
-	// }
-
-	// if requestedEncMode != vol.GetEncryptionMode() {
-	// 	llog.Error(fmt.Errorf("volume encryption mode does not match the requested one"), "Volume creation error", "volume_name", volumeName, "requested_encryption", requestedEncMode, "actual_encryption", vol.GetEncryptionMode())
-	// }
-
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			CapacityBytes: vol.GetSoftQuotaBytes(),

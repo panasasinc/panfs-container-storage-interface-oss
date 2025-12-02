@@ -306,5 +306,5 @@ func validateStripeUnit(input string) bool {
 //
 //	bool - True if valid, false otherwise.
 func validateEncryptionParameter(input string) bool {
-	return utils.In(input, "on", "off")
+	return utils.In(input, "on", "off", "aes-xts-256", "none")
 }

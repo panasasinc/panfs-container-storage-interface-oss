@@ -79,10 +79,6 @@ func (v *Volume) GetHardQuotaBytes() int64 {
 // GetEncryptionMode returns the encryption mode of the volume.
 func (v *Volume) GetEncryptionMode() string {
 	return v.Encryption
-	// if v.Encryption != "" {
-	// 	return v.Encryption
-	// }
-	// return "off"
 }
 
 // MarshalVolumeToPasXML marshals the Volume struct into XML format compatible with PanFS pasxml output.
