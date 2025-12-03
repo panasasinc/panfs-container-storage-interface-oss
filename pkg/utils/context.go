@@ -46,7 +46,7 @@ var VolumeParameters = VolumeParametersData{
 	"hard":        "hard %v", // hardQuotaGB
 }
 
-// GetSCKey retrieves the CSI Driver specific key for a given context parameter key
+// GetSCKey retrieves the storage class parameter key for a given context parameter key
 func (c VolumeParametersData) GetSCKey(k string) string {
 	short := strings.TrimPrefix(k, VendorPrefix)
 	if _, ok := c[short]; ok {
@@ -65,7 +65,7 @@ func (c VolumeParametersData) GetFmt(k string) string {
 	return ""
 }
 
-// RealmConnection Parameters Keys
+// RealmConnectionContext holds supported realm connection context parameters
 var RealmConnectionContext = struct {
 	RealmAddress         string
 	Username             string
