@@ -65,7 +65,7 @@ func (c VolumeParametersData) GetFmt(k string) string {
 	return ""
 }
 
-// Realm Connection Parameters Keys
+// RealmConnection Parameters Keys
 var RealmConnectionContext = struct {
 	RealmAddress         string
 	Username             string

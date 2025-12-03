@@ -101,11 +101,11 @@ func (v *Volume) MarshalVolumeToPasXML() ([]byte, error) {
 	return xml.MarshalIndent(list, "", "    ")
 }
 
-// ToParams converts the Volume struct into a map of string key-value pairs like volume creation parameters.
+// VolumeContext generates a map of volume context parameters based on the Volume struct.
 //
 // Returns:
 //
-//	map[string]string - The map of volume creation parameters.
+//	map[string]string - The volume context parameters.
 func (v *Volume) VolumeContext() map[string]string {
 	params := make(map[string]string)
 	if v.Encryption != "" {
