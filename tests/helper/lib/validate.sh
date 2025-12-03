@@ -31,10 +31,12 @@ export CYAN="\033[36m"
 export GRAY="\033[90m"
 export BOLD="\033[1m"
 
+# Output formatted message
 print() {
     printf "%b\n" "$1"
 }
 
+# Function to print names and images in a formatted list
 print_list() {
     if [ -z "${1}${2}" ]; then
         print "      No resources found in ${NS} namespace."
@@ -49,6 +51,8 @@ print_list() {
 
 errors=0
 NS="csi-panfs"
+
+print "${BOLD}\nCSI Driver Health Validation${RESET}\n"
 
 ## Controller
 print "${BOLD}CSI/Controller health...${RESET}"

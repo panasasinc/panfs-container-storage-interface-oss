@@ -272,7 +272,7 @@ deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
 		make deploy-driver-with-manifest; \
 	fi
 
-	@timeout 30m sh tests/helper/lib/wait.sh
+	@timeout 15m bash tests/helper/lib/wait.sh
 	@echo "$(GREEN)PanFS CSI Driver is successfully enrolled!$(RESET)"
 	@echo
 
@@ -370,7 +370,7 @@ deploy-storageclass: deploy-storageclass-info ## Deploy PanFS CSI Storage Class
 .PHONY: validate verify
 validate: verify
 verify: deploy-driver-info ## Verify the installation of the PanFS CSI Driver and its components
-	@CSI_IMAGE=$(CSI_IMAGE) DFC_VERSION=$(DFC_VERSION) exec tests/helper/lib/validate.sh
+	@CSI_IMAGE=$(CSI_IMAGE) DFC_VERSION=$(DFC_VERSION) exec bash tests/helper/lib/validate.sh
 
 ## Uninstall CSI Driver and Storage Class:
 .PHONY: uninstall-check
