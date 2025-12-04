@@ -29,10 +29,14 @@ on:
         description: CSI Driver Image URL
         type: string
         default: ""
-      kmm-image-url:
-        description: DFC KMM Image URL
+      dfc-image-registry:
+        description: DFC Image Registry
         type: string
-        default: ""
+        default: "ghcr.io/${{ github.repository }}"
+      dfc-version:
+        description: DFC version to use
+        type: string
+        default: "stub"
       realm_user:
         description: PanFS Realm user
         required: false
@@ -87,24 +91,24 @@ jobs:
           echo "::endgroup::"
 
       - name: Build Stub DFC Image
-        if: ${{ endsWith(inputs.kmm-image-url, ':stub') }}
+        if: ${{ inputs.dfc-version == 'stub' }}
         shell: bash
         run: |
           echo "::group::Build Stub DFC Image"
-          docker build -t ${{ inputs.kmm-image-url }} -f dfc/Dockerfile.stub ./dfc/
+          docker build -t ${{ inputs.dfc-image-registry }}/panfs-dfc:${{ inputs.dfc-version }} -f dfc/Dockerfile.stub ./dfc/
           echo "::endgroup::"
           echo "::group::Load Stub DFC Image into Kind cluster"
           echo "::endgroup::"
 
       - name: Load CSI Driver an Stub DFC Images into Kind Cluster
-        if: ${{ endsWith(inputs.kmm-image-url, ':stub') }}
+        if: ${{ inputs.dfc-version == 'stub' }}
         shell: bash
         run: |
           echo "::group::Load CSI Driver Image into Kind cluster"
           kind load docker-image ${{ inputs.driver-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
           echo "::endgroup::"
           echo "::group::Load Stub DFC Image into Kind cluster"
-          kind load docker-image ${{ inputs.kmm-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
+          kind load docker-image ${{ inputs.dfc-image-registry }}/panfs-dfc:${{ inputs.dfc-version }} --name=${{ steps.kind.outputs.cluster-name }}
           echo "::endgroup::"
 
       - name: Deploy CSI Driver
@@ -113,7 +117,8 @@ jobs:
           deployment-target: driver
           driver-installation-type: "${{ inputs.driver-installation-type }}"
           driver-image-url: "${{ inputs.driver-image-url }}"
-          kmm-image-url: "${{ inputs.kmm-image-url }}"
+          dfc-image-registry: "${{ inputs.dfc-image-registry }}"
+          dfc-version: "${{ inputs.dfc-version }}"
           ref: "${{ github.ref }}"
 
       - name: Deploy Storage Class

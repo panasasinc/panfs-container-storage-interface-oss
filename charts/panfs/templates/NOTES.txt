@@ -1,7 +1,7 @@
 PanFS CSI Driver ({{ .Chart.Version }}) has been successfully installed!
 
 Verification steps:
-{{- if .Values.panfsKmmModule.enabled }}
+{{- if .Values.kmm.enabled }}
 1. KMM status: 
    kubectl get module panfs -n {{ .Release.Namespace }} -o jsonpath='{.status}' | jq .
 2. CSI node/controller:
@@ -14,22 +14,3 @@ Verification steps:
 2. Check CSIDriver:
    kubectl get csidrivers.storage.k8s.io -l product=com.vdura.csi.panfs
 {{- end  }}
-
-To deploy Storage Class, please use "storageclass" chart:
-
-# Define Realm Credentials
-export REALM_ADDRESS=panfs-sample.com
-export REALM_USER=username
-export REALM_PASSWORD="password"
-
-# Deploy PanFS Storage Class with Helm
-helm upgrade --install csi-panfs-storage-class charts/storageclass \
-		--namespace csi-panfs-storage-class \
-		--create-namespace \
-		--set csiPanFSDriver.namespace="{{ .Release.Namespace }}" \
-		--set csiPanFSDriver.controllerServiceAccount="csi-panfs-controller" \
-		--set setAsDefaultStorageClass=true \
-		--set realm.address="${REALM_ADDRESS}" \
-		--set realm.username="${REALM_USER}" \
-		--set realm.password="${REALM_PASSWORD}" \
-		--wait

@@ -1,8 +1,10 @@
+## VDURA PanFS Container Storage Interface Driver
+
+The official CSI Driver for integrating **PanFS** storage with Container Orchestration Systems like Kubernetes.
+
 [![Driver deployment](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/main.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/main.yaml)
 [![Vulnerability Scan](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/panasasinc/panfs-container-storage-interface-oss)](https://goreportcard.com/report/github.com/panasasinc/panfs-container-storage-interface-oss)
-
-# VDURA PanFS Container Storage Interface Driver
 
 ## Contents
 
@@ -25,6 +27,7 @@
       * [2.2 Configure and Deploy](#22-configure-and-deploy)
     * [3. Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)
 * [Deploying Workloads](#deploying-workloads)
+* [CSI Driver Uninstallation](#csi-driver-uninstallation)
 * [API Documentation](#api-documentation)
   * [How to Use pkgsite](#how-to-use-pkgsite)
 * [Testing](#testing)
@@ -44,23 +47,28 @@ The PanFS CSI driver allows you to use PanFS volumes in a Kubernetes cluster. It
 
 For more details, please see the [Overview documentation](./docs/Overview.md)
 
-
 ## Capabilities
 
 ### CSI Services
 
-- **Identity Service**: Implements GetPluginInfo, GetPluginCapabilities, and Probe for plugin discovery and health checks.
-- **Controller Service**: Implements CreateVolume, DeleteVolume, ControllerExpandVolume, ValidateVolumeCapabilities, and ControllerGetCapabilities for full lifecycle management.
-- **Online Volume Expansion**: Supports resizing volumes while they are attached and in use.
+The driver implements the core CSI services for lifecycle management:
+
+  * **Identity Service**: Used for plugin discovery (`GetPluginInfo`) and health checks (`Probe`).
+  * **Controller Service**: Provides full lifecycle management, including:
+      * `CreateVolume`
+      * `DeleteVolume`
+      * `ControllerExpandVolume`
+  * **Node Service**: Handles volume attachment, mount, and unmount operations.
+  * **Online Volume Expansion**: Supports **resizing volumes** while they are attached and in use by a pod.
 
 ### Volume Features
 
-- **Volume Quota Management**: Supports soft and hard quotas for PanFS volumes.
-- **Multiple Volume Layouts**: Supports various layouts (raid6+, raid5+, raid10+, etc.) for flexible provisioning.
-- **Parameter Validation**: Validates StorageClass parameters, stripe units, and secrets for correctness and security.
-- **Error Handling**: Maps PanFS CLI errors to CSI-compliant error codes for robust operation.
-- **Unit Conversion**: Handles GB/bytes conversion for quotas and capacity.
-- **Testing and Mocking**: Extensive unit tests and mock implementations for controller, identity, pancli, and validators.
+The driver exposes advanced PanFS features through CSI:
+
+  * **Volume Quota Management**: Supports configurable **soft and hard quotas** for PanFS volumes.
+  * **Multiple Volume Layouts**: Provisioning support for various PanFS layouts (e.g., `raid6+`, `raid5+`, `raid10+`).
+  * **End-to-End Encryption**: Supports transparent volume encryption using an external **KMIP** provider (see [Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)).
+  * **Robust Operation**: Includes extensive parameter validation, unit conversion (e.g., GB/bytes), and mapping of PanFS CLI errors to CSI-compliant error codes.
 
 ### PanFS mount options
 The PanFS CSI driver supports custom mount options for PanFS volumes. You can specify mount options in the PersistentVolume manifest using the `mountOptions` field. This allows you to customize the mount behavior according to your requirements.
@@ -69,19 +77,18 @@ The PanFS CSI driver supports custom mount options for PanFS volumes. You can sp
 The PanFS CSI driver supports custom parameters for volume creation in the StorageClass manifest. You can specify parameters such as `bladeset`, `layout` etc to customize the behavior of the created volumes.
 For a full list of supported parameters, refer to the official PanFS documentation for volume creation corresponding to your PanFS version and CSI PanFS driver version.
 
-<a name="compatibility"></a>
 ## Compatibility
 
-Compatibility matrix between PanFS CSI Driver, Kubernetes, CSI Spec and PanFS versions:
+This matrix defines the supported versions for the PanFS CSI Driver, Kubernetes, CSI Specification, and PanFS:
 
 | PanFS CSI Version | Kubernetes Version | CSI Spec Version |
 |:------------------|:-------------------|:-----------------|
-| 1.0.0             | 1.30.1+            | 1.7.0            |
-| 1.0.1+            | 1.30.1+            | 1.11.0           |
-| 1.1.0             | 1.30.1+            | 1.11.0           |
-| 1.2.0             | 1.30.1+            | 1.11.0           |
-| 1.2.1             | 1.30.1+            | 1.11.0           |
-| 1.2.2             | 1.30.1+            | 1.11.0           |
+| **1.0.0** | 1.30.1+            | 1.7.0            |
+| **1.0.1+** | 1.30.1+            | 1.11.0           |
+| **1.1.0** | 1.30.1+            | 1.11.0           |
+| **1.2.0** | 1.30.1+            | 1.11.0           |
+| **1.2.1** | 1.30.1+            | 1.11.0           |
+| **1.2.2** | 1.30.1+            | 1.11.0           |
 
 
 ## Getting started
@@ -115,11 +122,14 @@ For experienced users who want to deploy quickly, here's the essential command s
 
 #### 1. Ensure dependencies are installed
 
-Please follow installation guides:
-- https://cert-manager.io/docs/installation/
-- https://kmm.sigs.k8s.io/documentation/install/
+Ensure the following Kubernetes ecosystem tools are installed in your cluster:
 
-#### 2. Deploy CSI driver with KMM module
+  * **cert-manager**: Follow the [installation guide](https://cert-manager.io/docs/installation/).
+  * **KMM (Kernel Module Manager)**: Follow the [installation guide](https://kmm.sigs.k8s.io/documentation/install/).
+
+---
+
+#### 2. Deploy CSI driver with KMM Module
 
 Create the namespace, configure registry credentials, and deploy the driver using the Kubernetes manifest file
 
@@ -129,7 +139,7 @@ Create the namespace, configure registry credentials, and deploy the driver usin
 kubectl create namespace csi-panfs
 
 # Configure secret for Private Registry with PanFS DFC KMM images
-# Example command (replace placeholders with your actual registry settings; do not commit real credentials):
+# REPLACE placeholders with your actual registry settings:
 kubectl create secret docker-registry <your-secret-name> \
   --docker-server=<your-registry-server> \
   --docker-username=<your-username> \
@@ -144,15 +154,19 @@ This will deploy CSI driver components and the KMM module.
 
 Please update the settings in [deploy/k8s/csi-driver/template-csi-panfs.yaml](deploy/k8s/csi-driver/template-csi-panfs.yaml) according to your cluster specification and available image tags in your private registry:
 
-- `<IMAGE_PULL_SECRET_NAME>`: The name of your image pull secret for accessing DFC KMM container images.
-- `<PANFS_DFC_IMAGE>`: The full image reference for the PanFS DFC container.
-- `<KERNEL_VERSION>`: The kernel version required for your environment.
+Edit the deployment manifest at [deploy/k8s/csi-driver/template-csi-panfs.yaml](deploy/k8s/csi-driver/template-csi-panfs.yaml) to configure essential settings:
 
-Review other settings relevant to your Kubernetes infrastructure, such as:
-- `replicas`
-- `tolerations`
-- `nodeSelector`
-- etc
+  * `<IMAGE_PULL_SECRET_NAME>`: The name of the secret created above.
+  * `<PANFS_DFC_KMM_PRIVATE_REGISTRY>`: The URL of your private registry hosting the DFC/KMM images.
+  * `<DFC_RELEASE_VERSION>`: The specific version tag of the DFC release you are deploying.
+
+> **Note:** Review other settings relevant to your Kubernetes infrastructure, such as:
+> - `replicas`
+> - `tolerations`
+> - `nodeSelector`
+> - etc
+
+Once configured, deploy the driver and KMM module:
 
 ```bash
 kubectl apply -f deploy/k8s/csi-driver/template-csi-panfs.yaml
@@ -183,74 +197,81 @@ module.kmm.sigs.x-k8s.io/panfs created
 
 **Validate Deployment**:
 
-- Check CSI driver registration:
-  ```bash
-  kubectl get csidrivers | grep panfs
-  ```
-  Expected output:
-  ```
-  com.vdura.csi.panfs   false   false   false   <unset>   false   Persistent   1m
-  ```
+Check the status of the deployed components:
 
-- Check controller deployment:
-  ```bash
-  kubectl get deployment csi-panfs-controller -n csi-panfs
-  ```
-  Expected output:
-  ```
-  NAME                   READY   UP-TO-DATE   AVAILABLE   AGE
-  csi-panfs-controller   3/3     3            3           1m
-  ```
+  * **CSI Driver Registration**:
+    ```bash
+    kubectl get csidrivers | grep panfs
+    ```
+  * **Controller Deployment**: (Should show **`READY`** equal to **`UP-TO-DATE`**)
+    ```bash
+    kubectl get deployment csi-panfs-controller -n csi-panfs
+    ```
+  * **Node DaemonSet**: (Should show **`READY`** equal to **`DESIRED`**)
+    ```bash
+    kubectl get daemonset csi-panfs-node -n csi-panfs
+    ```
+  * **KMM Module Status**:
+    ```bash
+    kubectl get module panfs -n csi-panfs -o yaml | sed -n '/status:$/,/^$/p'
+    ```
 
-- Check node daemonset:
-  ```bash
-  kubectl get daemonset csi-panfs-node -n csi-panfs
-  ```
-  Expected output:
-  ```
-  NAME             DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR                     AGE
-  csi-panfs-node   6         6         6       6            6           node-role.kubernetes.io/worker=   1m
-  ```
-
-- Check KMM module status:
-  ```bash
-  kubectl get module panfs -n csi-panfs
-  ```
-  Expected output:
-  ```
-  NAME    AGE
-  panfs   1m
-  ```
-  ```bash
-  kubectl get module panfs -n csi-panfs -o yaml | sed -n '/status:$/,/^$/p'
-  ```
-  Expected output:
-  ```
-  status:
-    devicePlugin: {}
-    moduleLoader:
-      availableNumber: 10
-      desiredNumber: 10
-      nodesMatchingSelectorNumber: 10
-  ```
+---
 
 #### 3. Configure and deploy StorageClass
 
-The StorageClass defines how Kubernetes provisions PanFS-backed volumes.
+The StorageClass defines the provisioned volume properties and provides PanFS Realm access credentials.
 
-Configure authentication based on your PanFS Realm setup by editing the following placeholders in [deploy/k8s/storage-class/template-secret-in-driver-ns.yaml](deploy/k8s/storage-class/template-secret-in-driver-ns.yaml):
+##### 3.1 Configure PanFS Realm Access Secret
 
-- `<STORAGE_CLASS_NAME>` - Storage Class name, e.g., `csi-panfs-storage-class`
-- `<REALM_ADDRESS>` - PanFS backend address, e.g., `panfs.example.com`
-- `<REALM_USERNAME>` - PanFS Realm service username, e.g., `admin`
-- `<REALM_PASSWORD>` - Password for user/password authentication with the Realm
-- `<REALM_PRIVATE_KEY>` - Private key for key-based authentication; leave empty if private key access is not configured
-- `<REALM_PRIVATE_KEY_PASSPHRASE>` - Passphrase for encrypted key; leave empty if there's no key encryption passphrase
+Edit [deploy/k8s/storage-class/template-secret-in-driver-ns.yaml](deploy/k8s/storage-class/template-secret-in-driver-ns.yaml) to replace the following placeholders with your PanFS Realm details.
 
-To make this StorageClass the default for your Kubernetes cluster, set the annotation `storageclass.kubernetes.io/is-default-class: "true"` in this StorageClass manifest.
+  * `<STORAGE_CLASS_NAME>`: The desired name for your StorageClass (e.g., `csi-panfs-storage-class`).
+  * `<REALM_ADDRESS>`: The PanFS backend address (e.g., `panfs.example.com`).
+  * **Credentials**: Provide one of the following sets of authentication data:
+      * `<REALM_USERNAME>` and `<REALM_PASSWORD>` (for user/password authentication)
+      * `<REALM_PRIVATE_KEY>` and `<REALM_PRIVATE_KEY_PASSPHRASE>` (for key-based authentication)
+  * `<KMIP_CONFIG_DATA>`: KMIP server connection details for volume encryption (if used).
+
+##### 3.2 Setting the Default StorageClass
+
+To designate this StorageClass as the default option for volume provisioning in your Kubernetes cluster, add the following annotation to the metadata section of its manifest:
+
+```yaml
+metadata:
+  annotations:
+    storageclass.kubernetes.io/is-default-class: "true"
+```
+
+##### 3.3. Optional: Enabling End-to-End Volume Encryption
+
+To enable transparent, end-to-end volume encryption using a KMIP provider:
+
+1.  **Enable Encryption in StorageClass**: Set the parameter below to `"true"` in the StorageClass manifest:
+    ```yaml
+    kind: StorageClass
+    parameters:
+      panfs.csi.vdura.com/encryption: "true" # Enables encryption for volumes
+    ```
+2.  **Configure KMIP Client**: The KMIP client configuration file content must be placed in the Secret under the `kmip_config_data` key as a YAML multi-line string:
+    ```yaml
+    kind: Secret
+    stringData:
+      kmip_config_data: |-
+        # Insert the full KMIP client configuration file content here.
+        # This typically includes server addresses, port, and client TLS/PKI settings.
+    ```
+3. Make sure KMM module is configured to load `wolfssl` kermel module. Check this:
+    ```bash
+    kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
+    ["panfs","wolfssl"]
+    ```
+
+##### 3.4 Deployment and Validation
+
+**Deploy PanFS Storage Class:**
 
 ```bash
-# Deploy PanFS Storage Class
 kubectl apply -f deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
 ```
 
@@ -260,7 +281,6 @@ namespace/csi-panfs-storage-class unchanged
 secret/csi-panfs-storage-class configured
 storageclass.storage.k8s.io/csi-panfs-storage-class configured
 ```
-
 
 **Validate StorageClass**:
 
@@ -280,6 +300,92 @@ If the StorageClass is missing or misconfigured, verify the configuration variab
 ## Deploying Workloads
 
 Refer to [usage-guide.md](./docs/usage-guide.md) for YAML manifests and examples of deploying workloads with the PanFS CSI Driver.
+
+---
+
+## CSI Driver Uninstallation
+
+A complete uninstallation ensures that all associated resources—workloads, PersistentVolumes, the StorageClass, driver components, and kernel modules—are cleanly removed from the Kubernetes cluster.
+
+### Identify and Terminate Dependent Workloads
+
+Before deleting the driver, you must ensure no running applications are actively using PanFS volumes.
+
+1.  **Identify all PanFS PersistentVolumes (PVs):**
+    This command lists the names of all PVs provisioned by the PanFS CSI driver.
+
+    ```bash
+    kubectl get pv -o jsonpath='{.items[?(@.spec.csi.driver=="com.vdura.csi.panfs")].metadata.name}'
+    ```
+
+2.  **Delete PVCs and Workloads:**
+    **Manually delete** all **PersistentVolumeClaims (PVCs)** and the **workloads** (Pods, Deployments, StatefulSets) that rely on the identified PVs.
+
+    > ⚠️ **Important:** Deleting the PVCs will trigger the deletion of the associated **PersistentVolumes (PVs)**, which in turn will cause the CSI Controller to delete the corresponding volume data on the backend PanFS storage, based on the `reclaimPolicy` defined in your StorageClass (typically **`Delete`**).
+
+### Remove StorageClass and Credentials
+
+Delete the StorageClass(es) and the associated Secret containing the PanFS Realm credentials.
+
+```bash
+# Delete the StorageClass and the Secret containing the Realm credentials.
+# Replace 'panfs-storage-class.yaml' with the actual file name you used.
+kubectl delete -f panfs-storage-class.yaml
+```
+
+### Uninstall CSI Driver Components and KMM Module
+
+Use the original deployment manifest to remove the Controller, Node DaemonSet, KMM Module, and all associated RBAC and custom resources.
+
+```bash
+# Delete the CSI driver Deployment, DaemonSet, CSIDriver object, and KMM Module.
+# Replace 'panfs-csi-driver.yaml' with the actual file name you used.
+kubectl delete -f panfs-csi-driver.yaml
+```
+
+**Remove Node Labels:**
+
+The KMM deployment sets labels on worker nodes. These labels must be removed to signal a complete cleanup.
+
+```bash
+# Removes the panfs readiness label from all nodes.
+kubectl label node -l node-role.kubernetes.io/worker= node.kubernetes.io/csi-driver.panfs.ready- --overwrite
+```
+
+**Verify Label Removal:**
+
+Ensure no nodes still have the `node.kubernetes.io/csi-driver.panfs.ready` label set. The count should be **0**.
+
+```bash
+kubectl get nodes --show-labels | grep node.kubernetes.io/csi-driver.panfs.ready | wc -l
+0
+```
+
+### Clean Up Cluster Resources
+
+Remove the namespace and any labels or secrets created during the prerequisite steps.
+
+1.  **Remove the CSI Driver Namespace:**
+
+    ```bash
+    kubectl delete namespace csi-panfs
+    ```
+
+2.  **Remove Registry Secret (if it was created in a separate namespace):**
+    If you created the private registry secret in a different namespace, delete it now.
+
+    ```bash
+    kubectl delete secret <your-secret-name> --namespace=<your-namespace>
+    ```
+
+### Remove Dependencies (Optional)
+
+If the cluster was solely dedicated to running the PanFS CSI driver, you may optionally uninstall the dependencies that were installed as prerequisites.
+
+  * **Uninstall KMM (Kernel Module Manager)**: Refer to the [KMM documentation](https://kmm.sigs.k8s.io/documentation/install/).
+  * **Uninstall cert-manager**: Refer to the [cert-manager documentation](https://cert-manager.io/docs/installation/).
+
+---
 
 ## API Documentation
 
@@ -365,5 +471,3 @@ End-to-end (E2E) tests validate the PanFS CSI driver in a real Kubernetes cluste
 - E2E tests require a working Kubernetes cluster and sufficient permissions.
 - The CronJob uses a prebuilt test image and runs tests with the configuration from the ConfigMap.
 - For more details, see `tests/e2e/Readme.md` in this repository.
-
-

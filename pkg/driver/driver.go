@@ -43,7 +43,7 @@ import (
 
 // StorageProviderClient defines an interface for managing volumes with a storage provider.
 type StorageProviderClient interface {
-	CreateVolume(volumeName string, params *pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error)
+	CreateVolume(volumeName string, params pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error)
 	DeleteVolume(volID string, secret map[string]string) error
 	ExpandVolume(volumeName string, targetSize int64, secret map[string]string) error
 	ListVolumes(secret map[string]string) (*utils.VolumeList, error)
@@ -68,6 +68,9 @@ type Driver struct {
 	mounterV2  PanMounter
 	panfs      StorageProviderClient
 	kubeClient *kubernetes.Clientset
+
+	tempFileFactory TempFileFactory
+
 	csi.UnimplementedIdentityServer
 	csi.UnimplementedControllerServer
 	csi.UnimplementedNodeServer
@@ -78,33 +81,44 @@ const (
 	// EphemeralK8SVolumeContext is a volume context key which indicating that k8s requests ephemeral volume. CSI PanFS
 	// plugin does not support ephemeral volumes for now
 	EphemeralK8SVolumeContext = "csi.storage.k8s.io/ephemeral"
-	PanFSFilesystemType       = "panfs"
-	VendorPrefix              = "panfs.csi.vdura.com"
 )
 
 // Volume parameters constants
 const (
 	DefaultDriverName string = "com.vdura.csi.panfs"
-	bladeSet                 = VendorPrefix + "bladeset"
-	recoveryPriority         = VendorPrefix + "recoverypriority"
-	efsa                     = VendorPrefix + "efsa"
-	volService               = VendorPrefix + "volservice"
-	layout                   = VendorPrefix + "layout"
-	maxWidth                 = VendorPrefix + "maxwidth"
-	stripeUnit               = VendorPrefix + "stripeunit"
-	rgWidth                  = VendorPrefix + "rgwidth"
-	rgDepth                  = VendorPrefix + "rgdepth"
-	user                     = VendorPrefix + "user"
-	group                    = VendorPrefix + "group"
-	uPerm                    = VendorPrefix + "uperm"
-	gPerm                    = VendorPrefix + "gperm"
-	oPerm                    = VendorPrefix + "operm"
-
-	realmIP    = "realm_ip"
-	sshUser    = "user"
-	password   = "password"
-	privateKey = "private_key"
 )
+
+// FileWriter defines an interface for writing to files.
+type FileWriter interface {
+	Write([]byte) (int, error)
+	Close() error
+	Name() string
+}
+
+// TempFileFactory defines an interface for creating temporary files.
+type TempFileFactory interface {
+	CreateTemp(dir, pattern string) (FileWriter, error)
+}
+
+// osTempFileFactory is an implementation of TempFileFactory using the os package.
+type osTempFileFactory struct{}
+
+// CreateTemp creates a temporary file in the specified directory with the given pattern.
+func (f *osTempFileFactory) CreateTemp(dir, pattern string) (FileWriter, error) {
+	file, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return nil, err
+	}
+	return &osFileWrapper{file}, nil
+}
+
+// osFileWrapper wraps an *os.File to implement the FileWriter interface.
+type osFileWrapper struct {
+	*os.File
+}
+
+// Name returns the name of the file.
+func (w *osFileWrapper) Name() string { return w.File.Name() }
 
 // CreateDriver initializes a new Driver instance with the provided configuration and dependencies.
 //
@@ -155,14 +169,15 @@ func CreateDriver(
 	}
 
 	return &Driver{
-		Version:    version,
-		Name:       driverName,
-		endpoint:   endpoint,
-		mounterV2:  mounterV2,
-		log:        log,
-		host:       host,
-		panfs:      panfs,
-		kubeClient: kubeClient,
+		Version:         version,
+		Name:            driverName,
+		endpoint:        endpoint,
+		mounterV2:       mounterV2,
+		log:             log,
+		host:            host,
+		panfs:           panfs,
+		kubeClient:      kubeClient,
+		tempFileFactory: &osTempFileFactory{},
 	}
 }
 

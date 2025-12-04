@@ -42,7 +42,7 @@ func (m *MockStorageProviderClient) EXPECT() *MockStorageProviderClientMockRecor
 }
 
 // CreateVolume mocks base method.
-func (m *MockStorageProviderClient) CreateVolume(volumeName string, params *pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error) {
+func (m *MockStorageProviderClient) CreateVolume(volumeName string, params pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CreateVolume", volumeName, params, secret)
 	ret0, _ := ret[0].(*utils.Volume)

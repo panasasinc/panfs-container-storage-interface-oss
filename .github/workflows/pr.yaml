@@ -71,7 +71,6 @@ jobs:
     with:
       driver-installation-type: "helm"
       driver-image-url: "${{ needs.csi-driver-image.outputs.image-url }}:pr${{ github.event.pull_request.number }}"
-      kmm-image-url: "ghcr.io/${{ github.repository }}/panfs-dfc-kmm:stub"
       runner-label: "ubuntu-latest"
       ref: ${{ github.ref }}
     secrets: inherit

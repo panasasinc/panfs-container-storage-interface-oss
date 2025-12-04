@@ -25,44 +25,13 @@ import (
 
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"golang.org/x/crypto/ssh"
+	"k8s.io/klog/v2"
 )
 
 //go:generate mockgen -source=pancli_ssh.go -destination=mock/mock_runner.go -package=mock PancliRunner
 
-// Auth secret keys used for SSH authentication.
-const (
-	AuthSecretRealmKey                   = "realm_ip"               // Key for realm IP
-	AuthSecretSSHUserKey                 = "user"                   // Key for SSH username
-	AuthSecretSSHPasswordKey             = "password"               // Key for SSH password
-	AuthSecretSSHPrivateKeyKey           = "private_key"            // Key for SSH private key
-	AuthSecretSSHPrivateKeyPassphraseKey = "private_key_passphrase" // Key for SSH private key passphrase
-)
-
-// VolumeCreateParams defines the parameters for creating a volume.
-type VolumeCreateParams struct {
-	BladeSet         string
-	Recoverypriority string // [1-100]|default
-	Efsa             string // retry|file-unavailable|default
-	Soft             int64  // Bytes
-	Hard             int64  // Bytes
-	VolService       string
-
-	// RAID parameters:
-	Layout     string
-	MaxWidth   string
-	StripeUnit string // 16K..4M divisible by 16K
-	RgWidth    string // [3-20]
-	RgDepth    string // [1-]
-
-	// Owner/group settings for volume root:
-	User  string
-	Group string
-	UPerm string
-	GPerm string
-	OPerm string
-
-	Description string
-}
+// VolumeCreateParams represents the parameters for creating a volume.
+type VolumeCreateParams map[string]string
 
 // getOptionalParameters constructs a list of optional parameters for the volume creation command.
 //
@@ -73,75 +42,39 @@ type VolumeCreateParams struct {
 // Returns:
 //
 //	[]string - Slice of command-line arguments.
-func getOptionalParameters(params *VolumeCreateParams) []string {
+func getOptionalParameters(params VolumeCreateParams) []string {
 	opts := []string{}
-	if params.BladeSet != "" {
-		opts = append(opts, fmt.Sprintf("bladeset \"%s\"", params.BladeSet))
+
+	soft := utils.VolumeParameters.GetSCKey("soft")
+	hard := utils.VolumeParameters.GetSCKey("hard")
+	for key, value := range params {
+		// Skip parameters with empty values
+		if value == "" {
+			continue
+		}
+
+		// Normalize the key to the CSI Driver specific key
+		keyParam := utils.VolumeParameters.GetSCKey(key)
+
+		// Skip unsupported parameters
+		if keyParam != key {
+			continue
+		}
+
+		// Convert size from bytes to gigabytes for soft and hard quota parameters
+		if keyParam == soft || keyParam == hard {
+			sizeBytes, err := strconv.ParseInt(value, 10, 64)
+			if err != nil {
+				continue
+			}
+			value = fmt.Sprintf("%.2f", utils.BytesToGB(sizeBytes))
+		}
+
+		if fmtStr := utils.VolumeParameters.GetFmt(keyParam); fmtStr != "" {
+			opts = append(opts, fmt.Sprintf(fmtStr, value))
+		}
 	}
 
-	if params.VolService != "" {
-		opts = append(opts, fmt.Sprintf("volservice %s", params.VolService))
-	}
-
-	if params.Soft != 0 {
-		opts = append(opts, "soft", strconv.FormatFloat(utils.BytesToGB(params.Soft), 'f', 2, 64))
-	}
-
-	if params.Hard != 0 {
-		opts = append(opts, "hard", strconv.FormatFloat(utils.BytesToGB(params.Hard), 'f', 2, 64))
-	}
-
-	if params.Efsa != "" {
-		opts = append(opts, "efsa", params.Efsa)
-	}
-
-	if params.Description != "" {
-		opts = append(opts, "description", params.Description)
-	}
-
-	if params.Recoverypriority != "" {
-		opts = append(opts, "recoverypriority", params.Recoverypriority)
-	}
-
-	if params.Layout != "" {
-		opts = append(opts, fmt.Sprintf("layout %s", params.Layout))
-	}
-
-	if params.MaxWidth != "" {
-		opts = append(opts, fmt.Sprintf("maxwidth %s", params.MaxWidth))
-	}
-
-	if params.StripeUnit != "" {
-		opts = append(opts, fmt.Sprintf("stripeunit %s", params.StripeUnit))
-	}
-
-	if params.RgWidth != "" {
-		opts = append(opts, fmt.Sprintf("rgwidth %s", params.RgWidth))
-	}
-
-	if params.RgDepth != "" {
-		opts = append(opts, fmt.Sprintf("rgdepth %s", params.RgDepth))
-	}
-
-	if params.User != "" {
-		opts = append(opts, fmt.Sprintf("user %s", params.User))
-	}
-
-	if params.Group != "" {
-		opts = append(opts, fmt.Sprintf("group %s", params.Group))
-	}
-
-	if params.UPerm != "" {
-		opts = append(opts, fmt.Sprintf("uperm %s", params.UPerm))
-	}
-
-	if params.GPerm != "" {
-		opts = append(opts, fmt.Sprintf("gperm %s", params.GPerm))
-	}
-
-	if params.OPerm != "" {
-		opts = append(opts, fmt.Sprintf("operm %s", params.OPerm))
-	}
 	return opts
 }
 
@@ -219,9 +152,9 @@ func (s *SSHClient) RunCommand(secrets map[string]string, args ...string) ([]byt
 //	*ssh.Client - The SSH client connection.
 //	error       - Error if connection fails.
 func (s *SSHClient) getSSHConnection(secrets map[string]string) (*ssh.Client, error) {
-	realm, ok := secrets[AuthSecretRealmKey]
+	realm, ok := secrets[utils.RealmConnectionContext.RealmAddress]
 	if !ok {
-		return nil, fmt.Errorf("missing realm_ip in secrets")
+		return nil, fmt.Errorf("missing %s in secrets", utils.RealmConnectionContext.RealmAddress)
 	}
 
 	// acquire a lock to ensure thread safety when accessing the clients map
@@ -240,22 +173,22 @@ func (s *SSHClient) getSSHConnection(secrets map[string]string) (*ssh.Client, er
 	}
 
 	// If no cached connection or the cached connection is dead, create a new one
-	user, ok := secrets[AuthSecretSSHUserKey]
+	user, ok := secrets[utils.RealmConnectionContext.Username]
 	if !ok {
 		return nil, fmt.Errorf("missing user in secrets")
 	}
 
-	password, ok := secrets[AuthSecretSSHPasswordKey]
+	password, ok := secrets[utils.RealmConnectionContext.Password]
 	if !ok {
 		password = "" // Default to empty if not provided
 	}
 
-	privateKey, ok := secrets[AuthSecretSSHPrivateKeyKey]
+	privateKey, ok := secrets[utils.RealmConnectionContext.PrivateKey]
 	if !ok {
 		privateKey = "" // Default to empty if not provided
 	}
 
-	privateKeyPassphrase, ok := secrets[AuthSecretSSHPrivateKeyPassphraseKey]
+	privateKeyPassphrase, ok := secrets[utils.RealmConnectionContext.PrivateKeyPassphrase]
 	if !ok {
 		privateKeyPassphrase = "" // Default to empty if not provided
 	}
@@ -318,6 +251,8 @@ type PancliSSHClient struct {
 	pancli SSHRunner
 }
 
+var llog klog.Logger = klog.NewKlogr()
+
 // NewPancliSSHClient creates a new instance of PancliSSHClient with the provided SSHRunner.
 //
 // Parameters:
@@ -346,7 +281,7 @@ func NewPancliSSHClient(runner SSHRunner) *PancliSSHClient {
 //
 //	*utils.Volume - The created volume object.
 //	error         - Error if creation or retrieval fails.
-func (p *PancliSSHClient) CreateVolume(volumeName string, params *VolumeCreateParams, secrets map[string]string) (*utils.Volume, error) {
+func (p *PancliSSHClient) CreateVolume(volumeName string, params VolumeCreateParams, secrets map[string]string) (*utils.Volume, error) {
 	cmd := []string{"volume", "create", volumeName}
 
 	optionalParams := getOptionalParameters(params)
@@ -354,6 +289,7 @@ func (p *PancliSSHClient) CreateVolume(volumeName string, params *VolumeCreatePa
 		cmd = append(cmd, optionalParams...)
 	}
 
+	llog.V(5).Info("CreateVolume executes:", "command", strings.Join(cmd, " "))
 	if _, err := p.pancli.RunCommand(secrets, cmd...); err != nil {
 		return nil, err
 	}
@@ -377,6 +313,7 @@ func (p *PancliSSHClient) CreateVolume(volumeName string, params *VolumeCreatePa
 //
 //	error - Error if deletion fails.
 func (p *PancliSSHClient) DeleteVolume(volumeName string, secrets map[string]string) error {
+	llog.V(5).Info("DeleteVolume executes:", "command", strings.Join([]string{"volume", "delete", "-f", volumeName}, " "))
 	_, err := p.pancli.RunCommand(secrets, "volume", "delete", "-f", volumeName)
 	return err
 }
@@ -396,6 +333,8 @@ func (p *PancliSSHClient) DeleteVolume(volumeName string, secrets map[string]str
 func (p *PancliSSHClient) ExpandVolume(volumeName string, sizeBytes int64, secrets map[string]string) error {
 	// convert size from bytes to gigabytes
 	sizeGBStr := strconv.FormatFloat(utils.BytesToGB(sizeBytes), 'f', 2, 64)
+
+	llog.V(5).Info("ExpandVolume executes:", "command", strings.Join([]string{"volume", "set", "soft-quota", volumeName, sizeGBStr}, " "))
 	_, err := p.pancli.RunCommand(secrets, "volume", "set", "soft-quota", volumeName, sizeGBStr)
 	if err != nil {
 		return err
@@ -416,6 +355,7 @@ func (p *PancliSSHClient) ExpandVolume(volumeName string, sizeBytes int64, secre
 //	*utils.VolumeList - The parsed volume list.
 //	error             - Error if retrieval or parsing fails.
 func (p *PancliSSHClient) ListVolumes(secrets map[string]string) (*utils.VolumeList, error) {
+	llog.V(5).Info("ListVolumes executes:", "command", strings.Join([]string{"pasxml", "volumes"}, " "))
 	out, err := p.pancli.RunCommand(secrets, "pasxml", "volumes")
 	if err != nil {
 		return nil, err
@@ -446,6 +386,7 @@ func (p *PancliSSHClient) ListVolumes(secrets map[string]string) (*utils.VolumeL
 //	*utils.Volume - The parsed volume object.
 //	error         - Error if retrieval or parsing fails.
 func (p *PancliSSHClient) GetVolume(volumeName string, secrets map[string]string) (*utils.Volume, error) {
+	llog.V(5).Info("GetVolume executes:", "command", strings.Join([]string{"pasxml", "volumes", "volume", volumeName}, " "))
 	out, err := p.pancli.RunCommand(secrets, "pasxml", "volumes", "volume", volumeName)
 	if err != nil {
 		return nil, err

@@ -39,25 +39,31 @@ func (v *VolumeName) UnmarshalXML(d *xml.Decoder, start xml.StartElement) error 
 
 // VolumeList represents the XML structure returned by the `pancli` command for listing volumes.
 type VolumeList struct {
-	XMLName       xml.Name      `xml:"pasxml"`
-	Volumes       []Volume      `xml:"volumes>volume"`
-	SupportedUrls SupportedUrls `xml:"supportedUrls"`
+	XMLName       xml.Name `xml:"pasxml"`
+	Version       string   `xml:"version,attr"`
+	Volumes       []Volume `xml:"volumes>volume"`
+	SupportedUrls struct {
+		Urls []string `xml:"url"`
+	} `xml:"supportedUrls"`
+}
+
+// Bladeset represents a bladeset in the PanFS system.
+type Bladeset struct {
+	XMLName xml.Name `xml:"bladesetName"`
+	ID      string   `xml:"id,attr"`
+	Name    string   `xml:",chardata"`
 }
 
 // Volume represents a single volume in the PanFS system.
 type Volume struct {
-	XMLName xml.Name   `xml:"volume"`
-	ID      string     `xml:"id,attr"`
-	Name    VolumeName `xml:"name"`
-	State   string     `xml:"state"`
-	Soft    float64    `xml:"softQuotaGB"`
-	Hard    float64    `xml:"hardQuotaGB"`
-	Bset    Bladeset   `xml:"bladesetName"`
-}
-
-// SupportedUrls represents the supported URLs in the PanFS system.
-type SupportedUrls struct {
-	Urls []string `xml:"url"`
+	XMLName    xml.Name   `xml:"volume"`
+	ID         string     `xml:"id,attr"`
+	Name       VolumeName `xml:"name"`
+	State      string     `xml:"state"`
+	Soft       float64    `xml:"softQuotaGB"`
+	Hard       float64    `xml:"hardQuotaGB"`
+	Bset       Bladeset   `xml:"bladesetName"`
+	Encryption string     `xml:"encryption"`
 }
 
 // GetSoftQuotaBytes returns the soft quota in bytes.
@@ -70,11 +76,42 @@ func (v *Volume) GetHardQuotaBytes() int64 {
 	return GBToBytes(v.Hard)
 }
 
-// Bladeset represents a bladeset in the PanFS system.
-type Bladeset struct {
-	XMLName xml.Name `xml:"bladesetName"`
-	ID      string   `xml:"id,attr"`
-	Name    string   `xml:",chardata"`
+// GetEncryptionMode returns the encryption mode of the volume.
+func (v *Volume) GetEncryptionMode() string {
+	return v.Encryption
+}
+
+// MarshalVolumeToPasXML marshals the Volume struct into XML format compatible with PanFS pasxml output.
+//
+// Returns:
+//
+//	[]byte - The marshaled XML byte slice.
+//	error  - Error if marshaling fails.
+func (v *Volume) MarshalVolumeToPasXML() ([]byte, error) {
+	list := VolumeList{
+		Version: "6.0.0",
+		Volumes: []Volume{*v},
+		SupportedUrls: struct {
+			Urls []string `xml:"url"`
+		}{
+			Urls: []string{},
+		},
+	}
+
+	return xml.MarshalIndent(list, "", "    ")
+}
+
+// VolumeContext generates a map of volume context parameters based on the Volume struct.
+//
+// Returns:
+//
+//	map[string]string - The volume context parameters.
+func (v *Volume) VolumeContext() map[string]string {
+	params := make(map[string]string)
+	if v.Encryption != "" {
+		params[VolumeParameters.GetSCKey("encryption")] = v.GetEncryptionMode()
+	}
+	return params
 }
 
 // ParseListVolumes parses the XML output from the `pancli` command for listing volumes.

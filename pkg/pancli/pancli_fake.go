@@ -58,23 +58,44 @@ type FakePancliSSHClient struct {
 //
 //	*utils.Volume - The created volume object.
 //	error         - Error if volume exists.
-func (c *FakePancliSSHClient) CreateVolume(volumeName string, params *VolumeCreateParams, _ map[string]string) (*utils.Volume, error) {
+func (c *FakePancliSSHClient) CreateVolume(volumeName string, params VolumeCreateParams, _ map[string]string) (*utils.Volume, error) {
 	if _, err := c.getVolume(volumeName); err == nil {
 		// no error means volume already exists
 		return nil, ErrorAlreadyExist
+	}
+
+	bsetName := params[utils.VolumeParameters.GetSCKey("bladeset")]
+	if bsetName == "" {
+		bsetName = "Set 1"
+	}
+
+	soft := params[utils.VolumeParameters.GetSCKey("soft")]
+	if soft == "" {
+		soft = "0"
+	}
+
+	hard := params[utils.VolumeParameters.GetSCKey("hard")]
+	if hard == "" {
+		hard = "0"
 	}
 
 	vol := &utils.Volume{
 		Name: utils.VolumeName(volumeName),
 		Bset: utils.Bladeset{
 			ID:   "1",
-			Name: params.BladeSet,
+			Name: bsetName,
 		},
-		State: "Online",
-		Soft:  utils.BytesToGB(params.Soft),
-		Hard:  utils.BytesToGB(params.Hard),
-		ID:    uuid.New().String(),
+		State:      "Online",
+		Soft:       utils.BytesStringToGB(soft),
+		Hard:       utils.BytesStringToGB(hard),
+		ID:         uuid.New().String(),
+		Encryption: "none",
 	}
+
+	if val, ok := params[utils.VolumeParameters.GetSCKey("encryption")]; ok {
+		vol.Encryption = val
+	}
+
 	c.Volumes = append(c.Volumes, vol)
 	return vol, nil
 }

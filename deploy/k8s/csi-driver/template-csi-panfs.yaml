@@ -444,9 +444,15 @@ spec: # csi-panfs-node
       # ServiceAccount for node plugin
       serviceAccount: csi-panfs-node
 
-      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      # Please make sure you have created the image pull secret in the same namespace
+      # Check with: kubectl get secrets -n csi-panfs
+      # If not, create with:
+      # kubectl create secret docker-registry -n csi-panfs <IMAGE_PULL_SECRET_NAME> \
+      #   --docker-server=<REGISTRY_URL> \
+      #   --docker-username=<USERNAME> \
+      #   --docker-password=<PASSWORD_OR_TOKEN>
       imagePullSecrets:
-        # - name: <IMAGE_PULL_SECRET_NAME>
+        - name: <IMAGE_PULL_SECRET_NAME>
 
       # SELinux security context
       securityContext:
@@ -471,20 +477,21 @@ spec: # csi-panfs-node
 
       initContainers:
         # Init container to enable PanFS mount helper
-        - name: get-dfc-bin
-          image: <PANFS_DFC_IMAGE> # Change to relevant DFC/KMM image
-          imagePullPolicy: Always
-          command: ["cp", "/usr/sbin/mount.panfs", "/var/lib/panfs/"]
+        - name: get-plugin-bin
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.3
+          imagePullPolicy: IfNotPresent
+          command: ["cp", "/panfs-csi", "/var/panfs/"]
           volumeMounts:
-            - name: dfc-bin
-              mountPath: /var/lib/panfs
+            - name: csi-plugin-bin
+              mountPath: /var/panfs
 
       containers:
         # Main PanFS CSI node plugin container
         - name: csi-panfs-plugin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.2
+          image: <PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-dfc:<DFC_RELEASE_VERSION> # Update with the desired DFC release version
           imagePullPolicy: Always
           args:
+            - "/var/panfs/panfs-csi"
             - "--endpoint=$(CSI_ENDPOINT)"
             - "--v=5"
           env:
@@ -522,9 +529,8 @@ spec: # csi-panfs-node
               user: system_u
 
           volumeMounts:
-            - name: dfc-bin
-              mountPath: /usr/sbin/mount.panfs
-              subPath: mount.panfs
+            - name: csi-plugin-bin
+              mountPath: /var/panfs
 
             - name: socket-dir
               mountPath: /csi
@@ -585,7 +591,7 @@ spec: # csi-panfs-node
 
       volumes:
         # For DFC binary
-        - name: dfc-bin
+        - name: csi-plugin-bin
           emptyDir: {}
 
         # For kubelet plugin registration
@@ -674,14 +680,20 @@ spec: # csi-panfs-controller
       # ServiceAccount for the controller pods
       serviceAccount: csi-panfs-controller
 
-      # Uncomment the line below and set the secret name to enable pulling images from a private registry.
+      # Please make sure you have created the image pull secret in the same namespace
+      # Check with: kubectl get secrets -n csi-panfs
+      # If not, create with:
+      # kubectl create secret docker-registry -n csi-panfs <IMAGE_PULL_SECRET_NAME> \
+      #   --docker-server=<REGISTRY_URL> \
+      #   --docker-username=<USERNAME> \
+      #   --docker-password=<PASSWORD_OR_TOKEN>
       imagePullSecrets:
-        # - name: <IMAGE_PULL_SECRET_NAME>
+        - name: <IMAGE_PULL_SECRET_NAME>
 
       containers:
         # Main PanFS CSI plugin container
         - name: csi-panfs-plugin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.2
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.3
           imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -891,10 +903,15 @@ metadata:
     product: com.vdura.csi.panfs
 spec:
 
-  # If your cluster does not inherit image pull credentials from the default ServiceAccount,
-  # uncomment the line below and set the secret name to enable pulling images from a private registry.
+  # Please make sure you have created the image pull secret in the same namespace
+  # Check with: kubectl get secrets -n csi-panfs
+  # If not, create with:
+  #   kubectl create secret docker-registry -n csi-panfs <IMAGE_PULL_SECRET_NAME> \
+  #     --docker-server=<REGISTRY_URL> \
+  #     --docker-username=<USERNAME> \
+  #     --docker-password=<PASSWORD>
   imageRepoSecret:
-    # name: <IMAGE_PULL_SECRET_NAME>
+    name: <IMAGE_PULL_SECRET_NAME>
 
   # Node selector for scheduling the KMM Module pods (to load the PanFS kernel module)
   # Should match the nodes where the PanFS consumer workloads supposed to run
@@ -907,9 +924,19 @@ spec:
     container:
       modprobe:
         moduleName: panfs
+
+        # Encryption support requires loading the wolfssl module.
+        # If encryption is not needed or, comment out the modulesLoadingOrder below.
+        modulesLoadingOrder: 
+          - panfs
+          - wolfssl
+
       imagePullPolicy: Always
 
       # PanFS DFC/KMM image containing the PanFS kernel module
       kernelMappings:
-        - literal: "<KERNEL_VERSION>"         # Replace with your Worker node kernel version
-          containerImage: "<PANFS_DFC_IMAGE>" # Change to Kernel-related corresponding DFC/KMM image
+        # For each node running a kernel matching the regexp below,
+        # KMM will create a DaemonSet running the image specified in containerImage
+        # with ${KERNEL_FULL_VERSION} replaced with the kernel version.
+        - regexp: '^.*.x86_64$'
+          containerImage: <PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-kmm:${KERNEL_FULL_VERSION}-<DFC_RELEASE_VERSION> # Update with the desired DFC release version

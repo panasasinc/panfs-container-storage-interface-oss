@@ -80,7 +80,7 @@ runs:
     - name: Build ${{ inputs.image-name }} Image
       env:
         APP_VERSION: "${{ inputs.app-version }}"
-        CSIDRIVER_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
+        CSI_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
         TEST_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
         REGISTRY: "${{ inputs.repo-url }}"
       shell: bash

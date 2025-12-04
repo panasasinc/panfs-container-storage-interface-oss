@@ -29,7 +29,7 @@
 
 ```bash
 git clone <repository-url>
-cd panfs-container-storage-interface
+cd panfs-container-storage-interface-oss
 ```
 
 ### Helm Commands
@@ -41,7 +41,6 @@ Render the chart templates locally to inspect the generated Kubernetes manifests
 
 ```bash
 helm template charts/panfs --namespace csi-panfs
-helm template charts/panfs --namespace csi-panfs --output-dir ./output
 ```
 
 This command generates the manifests in terminal or in the `./output` directory for review.
@@ -55,15 +54,25 @@ helm upgrade --install csi-panfs charts/panfs --namespace csi-panfs --create-nam
 
 This installs or updates the deployment while preserving the existing release.
 
-#### 3. Upgrade with Overriding Parameters
-Override specific values during an upgrade, for example, changing the replica count or image tag:
+#### 3. Install / Upgrade with Custom Values
+To customize the installation, create a `custom-values.yaml` file with your desired configurations and use it during installation or upgrade:
 
 ```bash
-helm upgrade csi-panfs charts/panfs --namespace csi-panfs \
-  --set images.panfsPlugin.image=us-central1-docker.pkg.dev/labvirtualization/vdura-csi/csi-plugin@sha256:c3e9fe6257975a1ff984b7f43ea8cd3ef2d2bdfef19341d99af5c0bc6c798c6b
+helm upgrade --install csi-panfs charts/panfs --namespace csi-panfs --create-namespace -f custom-values.yaml
 ```
 
-This updates the release with a specific image tag for the PanFS plugin.
+Or, to override specific values directly via the command line:
+```bash
+helm upgrade --install csi-panfs charts/panfs \
+			--namespace csi-panfs \
+			--set csi.image="$CSI_IMAGE" \
+			--set dfc.version="$DFC_VERSION" \
+			--set dfc.privateRegistry="$DFC_REGISTRY" \
+			--set imagePullSecrets[0]="$IMAGE_PULL_SECRET_NAME" \
+			--wait \
+```
+
+This applies your custom configurations during the installation or upgrade process.
 
 #### 4. Check Release Status
 View the status of the deployed release:

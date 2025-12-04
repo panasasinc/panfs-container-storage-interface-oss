@@ -15,6 +15,8 @@
 // Package utils provides utility functions for unit conversions.
 package utils
 
+import "strconv"
+
 const bytesPerGB float64 = 1073741824
 
 // GBToBytes converts gigabytes to bytes.
@@ -41,4 +43,21 @@ func GBToBytes(in float64) int64 {
 //	float64 - The size in gigabytes.
 func BytesToGB(in int64) float64 {
 	return float64(in) / bytesPerGB
+}
+
+// BytesStringToGB converts a string representation of bytes to gigabytes.
+//
+// Parameters:
+//
+//	in - The size in bytes as a string.
+//
+// Returns:
+//
+//	float64 - The size in gigabytes.
+func BytesStringToGB(in string) float64 {
+	size, err := strconv.ParseInt(in, 10, 64)
+	if err == nil {
+		return BytesToGB(size)
+	}
+	return 0
 }

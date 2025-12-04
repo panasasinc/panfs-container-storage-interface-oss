@@ -18,7 +18,7 @@
 
 PanFS Realm Storage Class Chart
 
-![Version: 1.2.2](https://img.shields.io/badge/Version-1.2.2-informational?style=flat-square) ![AppVersion: 1.2.2](https://img.shields.io/badge/AppVersion-1.2.2-informational?style=flat-square)
+![Version: 1.2.3](https://img.shields.io/badge/Version-1.2.3-informational?style=flat-square) ![AppVersion: 1.2.3](https://img.shields.io/badge/AppVersion-1.2.3-informational?style=flat-square)
 
 ## What PanFS CSI StorageClass is
 
@@ -228,6 +228,7 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | mountOptions | list | `[]` |  |
 | parameters | object | `{...}` | Optional storage class parameters |
 | realm.address | string | `""` | Endpoint address for the backend PanFS realm |
+| realm.kmipConfigData | string | `""` | KMIP configuration data for volume encryption key management |
 | realm.password | string | `""` | Password for the PanFS backend realm |
 | realm.privateKey | string | `""` | Private key for the PanFS backend realm |
 | realm.privateKeyPassphrase | string | `""` | Private Key Passphrase |

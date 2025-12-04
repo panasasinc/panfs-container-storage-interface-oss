@@ -33,7 +33,7 @@ spec:
   attachRequired: false
   podInfoOnMount: false
   fsGroupPolicy: File
-  requiresRepublish: {{ .Values.csiDriver.requiresRepublish }}
-  seLinuxMount: {{ .Values.csiDriver.seLinuxMount }}
+  requiresRepublish: {{ .Values.csi.requiresRepublish }}
+  seLinuxMount: {{ .Values.csi.seLinuxMount }}
   volumeLifecycleModes:
     - Persistent

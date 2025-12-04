@@ -463,12 +463,11 @@ spec: # csi-panfs-node
       tolerations:
         - operator: Exists
 
-      # Node selector for scheduling the DaemonSet pods
-      # Should match the nodes where the PanFS consumer workloads supposed to run
-      # Double-check that the nodes labels are correct:
-      # kubectl get nodes --show-labels
+      # Ensure the DaemonSet pods are scheduled only on nodes with the PanFS kernel module loaded
+      # This label is applied by the KMM operator when the PanFS module is successfully loaded
       nodeSelector:
-        node-role.kubernetes.io/worker: ""
+        # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
+        kmm.node.kubernetes.io/csi-panfs.panfs.ready: ""
 
       initContainers:
         # Init container to enable PanFS mount helper
@@ -877,3 +876,50 @@ spec:
   seLinuxMount: true
   volumeLifecycleModes:
     - Persistent
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Kernel Module Manager (KMM) Module for PanFS
+apiVersion: kmm.sigs.x-k8s.io/v1beta1
+kind: Module
+metadata:
+  name: panfs
+  namespace: csi-panfs
+  labels:
+    app: panfs-kmm-module
+    product: com.vdura.csi.panfs
+spec:
+
+  # If your cluster does not inherit image pull credentials from the default ServiceAccount,
+  # uncomment the line below and set the secret name to enable pulling images from a private registry.
+  imageRepoSecret:
+    # name: <IMAGE_PULL_SECRET_NAME>
+
+  # Node selector for scheduling the KMM Module pods (to load the PanFS kernel module)
+  # Should match the nodes where the PanFS consumer workloads supposed to run
+  # Ensure that the nodes have the appropriate labels
+  # kubectl get nodes --show-labels
+  selector:
+    node-role.kubernetes.io/worker: ""
+
+  moduleLoader:
+    container:
+      modprobe:
+        moduleName: panfs
+
+        # Encryption support requires loading the wolfssl module.
+        # If encryption is not needed or, comment out the modulesLoadingOrder below.
+        modulesLoadingOrder: 
+          - panfs
+          - wolfssl
+
+      imagePullPolicy: Always
+
+      # PanFS DFC/KMM image containing the PanFS kernel module
+      kernelMappings:
+        # For each node running a kernel matching the regexp below,
+        # KMM will create a DaemonSet running the image specified in containerImage
+        # with ${KERNEL_FULL_VERSION} replaced with the kernel version.
+        - regexp: '^.*.x86_64$'
+          containerImage: <PANFS_DFC_KMM_PRIVATE_REGISTRY>/panfs-kmm:${KERNEL_FULL_VERSION}-<DFC_RELEASE_VERSION> # Update with the desired DFC release version

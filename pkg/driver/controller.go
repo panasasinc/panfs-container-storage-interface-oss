@@ -21,6 +21,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -102,39 +103,37 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 
 	volumeName := in.GetName()
 	parameters := in.GetParameters()
-	volParams := &pancli.VolumeCreateParams{
-		BladeSet:   parameters[bladeSet],
-		VolService: parameters[volService],
-
-		Soft: in.GetCapacityRange().GetRequiredBytes(), // csc flag for soft [--req-bytes]
-		Hard: in.GetCapacityRange().GetLimitBytes(),    // csc flag for hard [--lim-bytes],
-
-		Layout:     parameters[layout],
-		MaxWidth:   parameters[maxWidth],
-		StripeUnit: parameters[stripeUnit],
-		RgWidth:    parameters[rgWidth],
-		RgDepth:    parameters[rgDepth],
-
-		User:  parameters[user],
-		Group: parameters[group],
-		UPerm: parameters[uPerm],
-		GPerm: parameters[gPerm],
-		OPerm: parameters[oPerm],
+	if parameters == nil {
+		parameters = make(map[string]string)
 	}
 
-	vol, err := d.panfs.CreateVolume(volumeName, volParams, secrets)
+	// handle capacity range
+	cr := in.GetCapacityRange()
+	soft, hard := int64(0), int64(0)
+
+	if cr != nil {
+		soft = cr.GetRequiredBytes()
+		hard = cr.GetLimitBytes()
+	}
+
+	parameters[utils.VolumeParameters.GetSCKey("soft")] = fmt.Sprintf("%d", soft)
+	parameters[utils.VolumeParameters.GetSCKey("hard")] = fmt.Sprintf("%d", hard)
+
+	vol, err := d.panfs.CreateVolume(volumeName, parameters, secrets)
 	if err != nil {
 		// if error happens and it is not ErrorAlreadyExist, we return error
 		if !errors.Is(err, pancli.ErrorAlreadyExist) {
 			d.log.Error(err, "failed to create volume", "volume_id", volumeName)
 			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
 		}
+
 		// this is ErrorAlreadyExist error - need to check volume matches capabilities
 		vol, err := d.panfs.GetVolume(volumeName, secrets)
 		if err != nil || vol == nil {
 			llog.Error(err, "volume already exists but failed to verify capabilities", "volume_id", volumeName)
 			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
 		}
+
 		// if volume is not match requested capabilities
 		if err := validateVolumeCapacity(in.GetCapacityRange(), vol); err != nil {
 			llog.Error(err, "volume already exists, but the capacity does not match", "volume_id", volumeName)
@@ -142,20 +141,23 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 		}
 
 		// existing volume matches requested capabilities - return OK with existing volume info
+		llog.Info("volume already exists", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
 		return &csi.CreateVolumeResponse{
 			Volume: &csi.Volume{
 				CapacityBytes: vol.GetSoftQuotaBytes(),
 				VolumeId:      volumeName,
+				VolumeContext: vol.VolumeContext(),
 			},
 		}, nil
 	}
 
-	llog.Info("volume created", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes())
+	llog.Info("volume created", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
 
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			CapacityBytes: vol.GetSoftQuotaBytes(),
 			VolumeId:      volumeName,
+			VolumeContext: vol.VolumeContext(),
 		},
 	}, nil
 }

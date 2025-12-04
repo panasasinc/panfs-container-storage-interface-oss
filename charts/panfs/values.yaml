@@ -67,6 +67,7 @@ controllerServer:
     retryIntervalStart: 5s
 
     # -- Resource requests and limits for provisioner
+    # @default -- `{...}`
     resources:
       requests:
         cpu: 100m
@@ -86,6 +87,7 @@ controllerServer:
     # -- Timeout for attacher operations
     timeout: 60s
     # -- Resource requests and limits for attacher
+    # @default -- `{...}`
     resources:
       requests:
         cpu: 100m
@@ -105,6 +107,7 @@ controllerServer:
     # -- Timeout for resizer operations
     timeout: 60s
     # -- Resource requests and limits for resizer
+    # @default -- `{...}`
     resources:
       requests:
         cpu: 100m
@@ -141,6 +144,7 @@ nodeServer:
     # -- Timeout for driver registrar operations
     timeout: 60s
     # -- Resource requests and limits for driver registrar
+    # @default -- `{...}`
     resources:
       requests:
         cpu: 100m
@@ -165,8 +169,51 @@ nodeServer:
 
 seLinux: true
 
-# PanFS CSI plugin image and pull policy
-panfsPlugin:
+dfc:
+  # -- DFC release version
+  # @default -- `<DFC_RELEASE_VERSION>`
+  version: "<DFC_RELEASE_VERSION> # Update with the desired DFC release version"
+
+  # -- Private registry for DFC images
+  privateRegistry: "<PANFS_DFC_KMM_PRIVATE_REGISTRY>"
+
+  # -- Image pull policy for the DFC binary
+  pullPolicy: Always
+
+kmm:
+  # -- Enable or disable KMM module for PanFS
+  enabled: true
+
+  # -- Image pull policy for the KMM module
+  pullPolicy: Always
+
+  # -- Label applied to nodes when the PanFS kernel module is successfully loaded
+  # @default -- `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}`
+  nodeReadyLabel:
+    # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
+    name: kmm.node.kubernetes.io/{{ .Release.Namespace }}.panfs.ready 
+    value: ""
+
+  # -- Node selector for node pods
+  selector:
+    node-role.kubernetes.io/worker: ""
+
+  # -- Enable encryption support in DFC
+  encryptionSupport: true
+
+  # -- **PanFS DFC images** for different kernel versions
+  # @default -- `[...]`
+  kernelMappings: 
+    - regexp: '^.*.x86_64$'
+      containerImage: "{{ .Values.dfc.privateRegistry }}/panfs-kmm:${KERNEL_FULL_VERSION}-{{ .Values.dfc.version }}"
+
+# labels -- Labels for the CSI driver workloads
+labels: {}
+
+# -- List of image pull secrets for private registries
+imagePullSecrets: []
+
+csi:
   # -- Image for the PanFS CSI plugin
   # @default -- `...`
   image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:{{ .Chart.AppVersion }}
@@ -185,6 +232,7 @@ panfsPlugin:
     level: s0
 
   # -- Resource requests and limits for the PanFS CSI plugin
+  # @default -- `{...}`
   resources:
     requests:
       cpu: 100m
@@ -193,42 +241,6 @@ panfsPlugin:
       cpu: 300m
       memory: 600Mi
 
-dfcRelease:
-  # -- Image pull policy for the DFC binary
-  pullPolicy: Always
-
-  # -- **PanFS DFC images** for different kernel versions
-  # @default -- `[]`
-  kernelMappings: []
-    # - literal: worker-node-kernel-version-1
-    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-1>-<dfc-release-version>
-    # - literal: worker-node-kernel-version-2
-    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-2>-<dfc-release-version>
-    # - literal: worker-node-kernel-version-3
-    #   containerImage: panfs-dfc-kmm-image:<worker-node-kernel-version-3>-<dfc-release-version>
-
-panfsKmmModule:
-  # -- Enable or disable KMM module for PanFS
-  enabled: true
-  # -- Image pull policy for the KMM module
-  pullPolicy: Always
-  # -- Label applied to nodes when the PanFS kernel module is successfully loaded
-  # @default -- `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}`
-  kmmNodeReadyLabel:
-    # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
-    name: kmm.node.kubernetes.io/{{ .Release.Namespace }}.panfs.ready 
-    value: ""
-  # -- Node selector for node pods
-  selector:
-    node-role.kubernetes.io/worker: ""
-
-# labels -- Labels for the CSI driver workloads
-labels: {}
-
-# -- List of image pull secrets for private registries
-imagePullSecrets: []
-
-csiDriver:
   # -- Indicates if the driver requires NodePublishVolume to be periodically called for already published volumes
   requiresRepublish: false
 

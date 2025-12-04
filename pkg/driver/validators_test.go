@@ -163,7 +163,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			err: fmt.Errorf("required_bytes (10) should not be greater than limit_bytes (1)"),
 		},
 		{
-			name: "missing bladeset parameter",
+			name: "empty bladeset parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -171,13 +171,13 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					bladeSet: "",
+					utils.VolumeParameters.GetSCKey("bladeset"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", bladeSet),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("bladeset")),
 		},
 		{
-			name: "missing volservice parameter",
+			name: "empty volservice parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -185,13 +185,13 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					volService: "",
+					utils.VolumeParameters.GetSCKey("volservice"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", volService),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("volservice")),
 		},
 		{
-			name: "missing layout parameter",
+			name: "invalid layout parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -199,10 +199,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					layout: "",
+					utils.VolumeParameters.GetSCKey("layout"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be one of: %v", layout, layoutList),
+			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("layout"), layoutList),
 		},
 		{
 			name: "invalid maxwidth parameter (alphanumeric)",
@@ -213,24 +213,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					maxWidth: "q1",
+					utils.VolumeParameters.GetSCKey("maxwidth"): "q1",
 				},
 			},
-			err: fmt.Errorf("%s is not integer", maxWidth),
-		},
-		{
-			name: "missing maxwidth parameter",
-			request: &csi.CreateVolumeRequest{
-				Name: "test",
-				CapacityRange: &csi.CapacityRange{
-					RequiredBytes: 10,
-				},
-				VolumeCapabilities: []*csi.VolumeCapability{{}},
-				Parameters: map[string]string{
-					maxWidth: "",
-				},
-			},
-			err: fmt.Errorf("%s is not integer", maxWidth),
+			err: fmt.Errorf("%s is not integer", utils.VolumeParameters.GetSCKey("maxwidth")),
 		},
 		{
 			name: "invalid maxwidth parameter",
@@ -241,14 +227,13 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					maxWidth: "0",
+					utils.VolumeParameters.GetSCKey("maxwidth"): "abc",
 				},
 			},
-			err: fmt.Errorf("%s must be greater then 0", maxWidth),
+			err: fmt.Errorf("%s is not integer", utils.VolumeParameters.GetSCKey("maxwidth")),
 		},
 		{
-			// todo: add more cases
-			name: "missing stripeunit parameter",
+			name: "invalid maxwidth parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -256,10 +241,25 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					stripeUnit: "",
+					utils.VolumeParameters.GetSCKey("maxwidth"): "0",
 				},
 			},
-			err: fmt.Errorf("%s is not valid", stripeUnit),
+			err: fmt.Errorf("%s must be greater then 0", utils.VolumeParameters.GetSCKey("maxwidth")),
+		},
+		{
+			// todo: add more cases
+			name: "invalid stripeunit parameter",
+			request: &csi.CreateVolumeRequest{
+				Name: "test",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10,
+				},
+				VolumeCapabilities: []*csi.VolumeCapability{{}},
+				Parameters: map[string]string{
+					utils.VolumeParameters.GetSCKey("stripeunit"): "abc",
+				},
+			},
+			err: fmt.Errorf("%s is not valid", utils.VolumeParameters.GetSCKey("stripeunit")),
 		},
 		{
 			name: "invalid rgwidth parameter",
@@ -270,10 +270,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					rgWidth: "",
+					utils.VolumeParameters.GetSCKey("rgwidth"): "",
 				},
 			},
-			err: fmt.Errorf("%s is not integer", rgWidth),
+			err: fmt.Errorf("%s is not integer", utils.VolumeParameters.GetSCKey("rgwidth")),
 		},
 		{
 			name: "rgwidth parameter is not in range",
@@ -284,10 +284,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					rgWidth: "2",
+					utils.VolumeParameters.GetSCKey("rgwidth"): "2",
 				},
 			},
-			err: fmt.Errorf("%s must be between 3 and 20 (inclusive)", rgWidth),
+			err: fmt.Errorf("%s must be between 3 and 20 (inclusive)", utils.VolumeParameters.GetSCKey("rgwidth")),
 		},
 		{
 			name: "invalid rgdepth parameter",
@@ -298,10 +298,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					rgDepth: "q",
+					utils.VolumeParameters.GetSCKey("rgdepth"): "q",
 				},
 			},
-			err: fmt.Errorf("%s is not integer", rgDepth),
+			err: fmt.Errorf("%s is not integer", utils.VolumeParameters.GetSCKey("rgdepth")),
 		},
 		{
 			name: "rgdepth parameter is less then minimum",
@@ -312,13 +312,13 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					rgDepth: "0",
+					utils.VolumeParameters.GetSCKey("rgdepth"): "0",
 				},
 			},
-			err: fmt.Errorf("%s must be greater then 0", rgDepth),
+			err: fmt.Errorf("%s must be greater then 0", utils.VolumeParameters.GetSCKey("rgdepth")),
 		},
 		{
-			name: "missing user parameter",
+			name: "empty user parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -326,13 +326,13 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					user: "",
+					utils.VolumeParameters.GetSCKey("user"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", user),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("user")),
 		},
 		{
-			name: "missing group parameter",
+			name: "empty group parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -340,13 +340,13 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					group: "",
+					utils.VolumeParameters.GetSCKey("group"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", group),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("group")),
 		},
 		{
-			name: "missing uperm parameter",
+			name: "invalid uperm parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -354,13 +354,13 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					uPerm: "",
+					utils.VolumeParameters.GetSCKey("uperm"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be one of: %v", uPerm, permList),
+			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("uperm"), permList),
 		},
 		{
-			name: "missing gperm parameter",
+			name: "invalid gperm parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -368,13 +368,13 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					gPerm: "",
+					utils.VolumeParameters.GetSCKey("gperm"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be one of: %v", gPerm, permList),
+			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("gperm"), permList),
 		},
 		{
-			name: "missing operm parameter",
+			name: "invalid operm parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -382,10 +382,24 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					oPerm: "",
+					utils.VolumeParameters.GetSCKey("operm"): "invalid",
 				},
 			},
-			err: fmt.Errorf("%s must be one of: %v", oPerm, permList),
+			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("operm"), permList),
+		},
+		{
+			name: "invalid encryption parameter",
+			request: &csi.CreateVolumeRequest{
+				Name: "test",
+				CapacityRange: &csi.CapacityRange{
+					RequiredBytes: 10,
+				},
+				VolumeCapabilities: []*csi.VolumeCapability{{}},
+				Parameters: map[string]string{
+					utils.VolumeParameters.GetSCKey("encryption"): "invalid",
+				},
+			},
+			err: fmt.Errorf("%s must be 'on' or 'off'", utils.VolumeParameters.GetSCKey("encryption")),
 		},
 		{
 			name: "volume content source not supported",
@@ -439,23 +453,23 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			},
 			VolumeCapabilities: []*csi.VolumeCapability{{}},
 			Parameters: map[string]string{
-				bladeSet:   "Set-1",
-				volService: "vol_service_id",
-				layout:     "raid10+",
-				maxWidth:   "3",
-				stripeUnit: "16K",
-				rgWidth:    "9",
-				rgDepth:    "7",
-				user:       "user_name",
-				group:      "group_name",
-				uPerm:      "read-only",
-				gPerm:      "write-only",
-				oPerm:      "none",
+				utils.VolumeParameters.GetSCKey("bladeset"):   "Set 1",
+				utils.VolumeParameters.GetSCKey("volservice"): "vol_service_id",
+				utils.VolumeParameters.GetSCKey("layout"):     "raid10+",
+				utils.VolumeParameters.GetSCKey("maxwidth"):   "3",
+				utils.VolumeParameters.GetSCKey("stripeunit"): "16K",
+				utils.VolumeParameters.GetSCKey("rgwidth"):    "9",
+				utils.VolumeParameters.GetSCKey("rgdepth"):    "7",
+				utils.VolumeParameters.GetSCKey("user"):       "user_name",
+				utils.VolumeParameters.GetSCKey("group"):      "group_name",
+				utils.VolumeParameters.GetSCKey("uperm"):      "read-only",
+				utils.VolumeParameters.GetSCKey("gperm"):      "write-only",
+				utils.VolumeParameters.GetSCKey("operm"):      "none",
 			},
 			Secrets: map[string]string{
-				realmIP:  "10.10.10.10",
-				sshUser:  "user",
-				password: "password",
+				utils.RealmConnectionContext.RealmAddress: "10.11.12.13",
+				utils.RealmConnectionContext.Username:     "dummy",
+				utils.RealmConnectionContext.Password:     "dummy",
 			},
 		}
 

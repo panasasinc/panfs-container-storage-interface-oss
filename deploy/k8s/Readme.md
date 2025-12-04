@@ -12,17 +12,23 @@ This guide describes how to deploy the PanFS CSI Driver and StorageClass using t
 - **If SELinux is disabled in your cluster:**
   - Use: `csi-driver/template-csi-panfs-without-selinux.yaml`
 
-**Important:**
-Before applying the driver manifest, update the following parameters to match your infrastructure:
-- `<IMAGE_PULL_SECRET_NAME>`: The name of your image pull secret for accessing container images.
-- `<PANFS_DFC_IMAGE>`: The full image reference for the PanFS DFC container.
-- `<KERNEL_VERSION>`: The kernel version required for your environment.
+**Key Place Holders:**
 
-Apply the chosen manifest:
+  * `<IMAGE_PULL_SECRET_NAME>`: The name of the secret created above.
+  * `<PANFS_DFC_KMM_PRIVATE_REGISTRY>`: The URL of your private registry hosting the DFC/KMM images.
+  * `<DFC_RELEASE_VERSION>`: The specific version tag of the DFC release you are deploying.
+
+> **Note:** Review other settings relevant to your Kubernetes infrastructure, such as:
+> - `replicas`
+> - `tolerations`
+> - `nodeSelector`
+> - etc
+
+Once configured, deploy the driver and KMM module:
+
 ```bash
 kubectl apply -f <selected-driver-manifest>.yaml
 ```
-
 
 ## 2. Deploying the StorageClass and Secret
 
@@ -64,7 +70,31 @@ Apply the selected manifest:
 kubectl apply -f <selected-storageclass-manifest>.yaml
 ```
 
-## 3. Example: Creating a PersistentVolumeClaim (PVC)
+## 3. Optional: Enabling End-to-End Volume Encryption
+
+To enable transparent, end-to-end volume encryption using a KMIP provider:
+
+1.  **Enable Encryption in StorageClass**: Set the parameter below to `"true"` in the StorageClass manifest:
+    ```yaml
+    kind: StorageClass
+    parameters:
+      panfs.csi.vdura.com/encryption: "true" # Enables encryption for volumes
+    ```
+2.  **Configure KMIP Client**: The KMIP client configuration file content must be placed in the Secret under the `kmip_config_data` key as a YAML multi-line string:
+    ```yaml
+    kind: Secret
+    stringData:
+      kmip_config_data: |-
+        # Insert the full KMIP client configuration file content here.
+        # This typically includes server addresses, port, and client TLS/PKI settings.
+    ```
+3. Make sure KMM module is configured to load `wolfssl` kermel module. Check this:
+    ```bash
+    kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
+    ["panfs","wolfssl"]
+    ```
+
+## 4. Example: Creating a PersistentVolumeClaim (PVC)
 
 After deploying the StorageClass, you can create PVCs referencing your StorageClass. Example:
 
@@ -87,7 +117,7 @@ Apply with:
 kubectl apply -f <your-pvc-manifest>.yaml
 ```
 
-## 4. Additional Notes
+## 5. Additional Notes
 
 - Review all comments in the manifests for guidance on configuration and permissions.
 - Ensure that any referenced ServiceAccounts, Roles, and RoleBindings are created and configured as described.

@@ -57,7 +57,15 @@ parameters:
 
   # Specific parameters for volumes (to be) created in the PanFS Realm
   {{- range $k, $v := .Values.parameters }}
+  {{- if eq $k "panfs.csi.vdura.com/encryption" }}
+  
+  # Enable/Disable E2EE for volumes created with this StorageClass
+  # Set to "on" to enable encryption, "off" to disable encryption
+  # If enabled, please ensure that KMIP server connection details are provided in the Secret used by this StorageClass
   {{ $k }}: {{ $v | quote }}
+  {{else }}
+  {{ $k }}: {{ $v | quote }}
+  {{- end }}
   {{- end }}
 
 {{- if .Values.mountOptions }}

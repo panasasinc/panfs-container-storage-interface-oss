@@ -16,10 +16,15 @@ package driver
 
 import (
 	"fmt"
+	"os"
+	"regexp"
 	"testing"
+
+	"slices"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/driver/mock"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
@@ -118,7 +123,7 @@ func TestNodePublishVolume(t *testing.T) {
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[realmIP], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
 					validPublishTargetPath,
 					[]string{}).Times(1)
 			},
@@ -161,7 +166,7 @@ func TestNodePublishVolume(t *testing.T) {
 			status.Error(codes.Internal, "Failed to publish volume: mounter error"),
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[realmIP], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
 					validPublishTargetPath,
 					[]string{"noatime"}).Return(fmt.Errorf("mounter error")).Times(1)
 			},
@@ -185,7 +190,7 @@ func TestNodePublishVolume(t *testing.T) {
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[realmIP], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
 					validPublishTargetPath,
 					[]string{}).Times(1)
 			},
@@ -281,7 +286,7 @@ func TestNodePublishVolume(t *testing.T) {
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[realmIP], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
 					validPublishTargetPath,
 					[]string{"noatime", "ro"}).Times(1)
 			},
@@ -296,6 +301,353 @@ func TestNodePublishVolume(t *testing.T) {
 			assert.Equal(t, tc.expectedError, err, "Unexpected error got from NodePublishVolume: %v, expected: %v", err, tc.expectedError)
 		})
 	}
+}
+
+// fakeFileWriter is a mock implementation of utils.FileWriter for testing
+type fakeFileWriter struct {
+	writeCalled bool
+	writeData   []byte
+	writeErr    error
+	closeCalled bool
+	closeErr    error
+	name        string
+}
+
+// Write simulates writing data to the file
+func (f *fakeFileWriter) Write(b []byte) (int, error) {
+	f.writeCalled = true
+	f.writeData = b
+	return len(b), f.writeErr
+}
+
+// Close simulates closing the file
+func (f *fakeFileWriter) Close() error {
+	f.closeCalled = true
+	return f.closeErr
+}
+
+// Name returns the name of the file
+func (f *fakeFileWriter) Name() string {
+	return f.name
+}
+
+// fakeTempFileFactory is a mock implementation of a temp file factory for testing
+type fakeTempFileFactory struct {
+	file FileWriter
+}
+
+// CreateTemp simulates creating a temporary file
+func (f *fakeTempFileFactory) CreateTemp(dir, pattern string) (FileWriter, error) {
+	return f.file, nil
+}
+
+// osCreateTemp is a wrapper around os.CreateTemp to match the utils.FileWriter interface
+var osCreateTemp = func(dir, pattern string) (FileWriter, error) {
+	f, err := os.CreateTemp(dir, pattern)
+	if err != nil {
+		return nil, err
+	}
+	return &osFileWrapper{f}, nil
+}
+
+// mountOptsRegexpMatcher is a custom matcher for mount options using regular expressions
+type mountOptsRegexpMatcher struct {
+	pattern *regexp.Regexp
+}
+
+// Matches checks if the provided mount options match the regular expression
+func (m mountOptsRegexpMatcher) Matches(x interface{}) bool {
+	opts, ok := x.([]string)
+	if !ok || len(opts) == 0 {
+		return false
+	}
+	return slices.ContainsFunc(opts, m.pattern.MatchString)
+}
+
+// String returns a description of the matcher
+func (m mountOptsRegexpMatcher) String() string {
+	return "matches mount options regexp"
+}
+
+// errorTempFileFactory simulates an error during temp file creation
+type errorTempFileFactory struct{}
+
+// CreateTemp always returns an error
+func (f *errorTempFileFactory) CreateTemp(dir, pattern string) (FileWriter, error) {
+	return nil, fmt.Errorf("create temp error")
+}
+
+// TestNodePublishVolume_EncryptedVolume tests the NodePublishVolume method for encrypted volumes,
+// specifically focusing on KMIP configuration file handling and error scenarios.
+func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
+	t.Run("KMIP config file creation fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockMounter := mock.NewMockPanMounter(ctrl)
+
+		driver := &Driver{
+			Version:         "testing",
+			Name:            DefaultDriverName,
+			endpoint:        "unix:///tmp/csi.sock",
+			host:            "localhost",
+			mounterV2:       mockMounter, // will be set in sub-tests
+			panfs:           nil,
+			tempFileFactory: &errorTempFileFactory{},
+		}
+
+		mockMounter.EXPECT().Mount(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+		// Save original functions to restore after test
+		origMkdirAll := osMkdirAll
+		origCreateTemp := osCreateTemp
+		origChmod := osChmod
+		origRemove := osRemove
+
+		defer func() {
+			osMkdirAll = origMkdirAll
+			osCreateTemp = origCreateTemp
+			osChmod = origChmod
+			osRemove = origRemove
+		}()
+
+		osMkdirAll = func(path string, perm os.FileMode) error { return nil }
+		osCreateTemp = func(dir, pattern string) (FileWriter, error) { return nil, fmt.Errorf("create temp error") }
+		osChmod = func(name string, mode os.FileMode) error { return nil }
+		osRemove = func(name string) error { return nil }
+
+		req := &csi.NodePublishVolumeRequest{
+			VolumeId:   validVolumeName,
+			TargetPath: validPublishTargetPath,
+			VolumeCapability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+			},
+			Secrets: map[string]string{
+				utils.RealmConnectionContext.RealmAddress:   "realm",
+				utils.RealmConnectionContext.Username:       "user",
+				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.KMIPConfigData: "some-kmip-data",
+			},
+			VolumeContext: map[string]string{
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
+			},
+		}
+		resp, err := driver.NodePublishVolume(t.Context(), req)
+		assert.Nil(t, resp)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = Failed to create KMIP config file: create temp error")
+	})
+
+	t.Run("KMIP config file chmod fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockMounter := mock.NewMockPanMounter(ctrl)
+
+		driver := &Driver{
+			Version:   "testing",
+			Name:      DefaultDriverName,
+			endpoint:  "unix:///tmp/csi.sock",
+			host:      "localhost",
+			mounterV2: mockMounter, // will be set in sub-tests
+			panfs:     nil,
+			tempFileFactory: &fakeTempFileFactory{
+				file: &fakeFileWriter{
+					name: "/var/tmp/kmip/config_test.conf",
+				},
+			},
+		}
+
+		// Mount should NOT be called if chmod fails
+		mockMounter.EXPECT().Mount(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+		req := &csi.NodePublishVolumeRequest{
+			VolumeId:   validVolumeName,
+			TargetPath: validPublishTargetPath,
+			VolumeCapability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+			},
+			Secrets: map[string]string{
+				utils.RealmConnectionContext.RealmAddress:   "realm",
+				utils.RealmConnectionContext.Username:       "user",
+				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.KMIPConfigData: "some-kmip-data",
+			},
+			VolumeContext: map[string]string{
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
+			},
+		}
+
+		// Save and restore original osChmod
+		origChmod := osChmod
+		defer func() { osChmod = origChmod }()
+		osChmod = func(name string, mode os.FileMode) error {
+			return fmt.Errorf("chmod error")
+		}
+
+		resp, err := driver.NodePublishVolume(t.Context(), req)
+		assert.Nil(t, resp)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = Failed to set '0700' permissions on KMIP config file: chmod error")
+	})
+
+	t.Run("Missing/Empty KMIP secret", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockMounter := mock.NewMockPanMounter(ctrl)
+
+		driver := &Driver{
+			Version:   "testing",
+			Name:      DefaultDriverName,
+			endpoint:  "unix:///tmp/csi.sock",
+			host:      "localhost",
+			mounterV2: mockMounter, // will be set in sub-tests
+			panfs:     nil,
+			tempFileFactory: &fakeTempFileFactory{
+				file: &fakeFileWriter{
+					name: "/var/tmp/kmip/config_test.conf",
+				},
+			},
+		}
+
+		// Mount should NOT be called if KMIP secret is missing
+		mockMounter.EXPECT().Mount(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+		req := &csi.NodePublishVolumeRequest{
+			VolumeId:   validVolumeName,
+			TargetPath: validPublishTargetPath,
+			VolumeCapability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+			},
+			Secrets: map[string]string{
+				utils.RealmConnectionContext.RealmAddress:   "realm",
+				utils.RealmConnectionContext.Username:       "user",
+				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.KMIPConfigData: "",
+			},
+			VolumeContext: map[string]string{
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
+			},
+		}
+
+		// Save and restore original osChmod
+		origChmod := osChmod
+		defer func() { osChmod = origChmod }()
+		osChmod = func(name string, mode os.FileMode) error { return nil }
+
+		resp, err := driver.NodePublishVolume(t.Context(), req)
+		assert.Nil(t, resp)
+		assert.EqualError(t, err, "rpc error: code = InvalidArgument desc = KMIP secret must be provided for encrypted volumes")
+	})
+
+	t.Run("KMIP config file write fails", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockMounter := mock.NewMockPanMounter(ctrl)
+
+		driver := &Driver{
+			Version:   "testing",
+			Name:      DefaultDriverName,
+			endpoint:  "unix:///tmp/csi.sock",
+			host:      "localhost",
+			mounterV2: mockMounter,
+			panfs:     nil,
+			tempFileFactory: &fakeTempFileFactory{
+				file: &fakeFileWriter{
+					name:     "/var/tmp/kmip/config_test.conf",
+					writeErr: fmt.Errorf("write error"),
+				},
+			},
+		}
+
+		// Mount should NOT be called if write fails
+		mockMounter.EXPECT().Mount(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+
+		req := &csi.NodePublishVolumeRequest{
+			VolumeId:   validVolumeName,
+			TargetPath: validPublishTargetPath,
+			VolumeCapability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+			},
+			Secrets: map[string]string{
+				utils.RealmConnectionContext.RealmAddress:   "realm",
+				utils.RealmConnectionContext.Username:       "user",
+				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.KMIPConfigData: "some data",
+			},
+			VolumeContext: map[string]string{
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
+			},
+		}
+
+		// Save and restore original osChmod
+		origChmod := osChmod
+		defer func() { osChmod = origChmod }()
+		osChmod = func(name string, mode os.FileMode) error { return nil }
+
+		resp, err := driver.NodePublishVolume(t.Context(), req)
+		assert.Nil(t, resp)
+		assert.EqualError(t, err, "rpc error: code = Internal desc = Failed to write KMIP config data to temporary file: write error")
+	})
+
+	t.Run("Mount called with KMIP config file option", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+		mockMounter := mock.NewMockPanMounter(ctrl)
+
+		driver := &Driver{
+			Version:   "testing",
+			Name:      DefaultDriverName,
+			endpoint:  "unix:///tmp/csi.sock",
+			host:      "localhost",
+			mounterV2: mockMounter,
+			panfs:     nil,
+			tempFileFactory: &fakeTempFileFactory{
+				file: &fakeFileWriter{
+					name: "/var/tmp/kmip/config_test.conf",
+				},
+			},
+		}
+
+		// Expect Mount to be called with the KMIP config file option
+		mockMounter.EXPECT().Mount(
+			"panfs://realm/validVolumeName",
+			validPublishTargetPath,
+			mountOptsRegexpMatcher{pattern: regexp.MustCompile(`kmip-config-file=/var/tmp/kmip/config_test.conf`)},
+		).Return(nil).Times(1)
+
+		req := &csi.NodePublishVolumeRequest{
+			VolumeId:   validVolumeName,
+			TargetPath: validPublishTargetPath,
+			VolumeCapability: &csi.VolumeCapability{
+				AccessType: &csi.VolumeCapability_Mount{
+					Mount: &csi.VolumeCapability_MountVolume{},
+				},
+			},
+			Secrets: map[string]string{
+				utils.RealmConnectionContext.RealmAddress:   "realm",
+				utils.RealmConnectionContext.Username:       "user",
+				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.KMIPConfigData: "some data",
+			},
+			VolumeContext: map[string]string{
+				utils.VolumeParameters.GetSCKey("encryption"): "on",
+			},
+		}
+
+		// Save and restore original osChmod
+		origChmod := osChmod
+		defer func() { osChmod = origChmod }()
+		osChmod = func(name string, mode os.FileMode) error { return nil }
+
+		resp, err := driver.NodePublishVolume(t.Context(), req)
+		assert.NoError(t, err)
+		assert.NotNil(t, resp)
+	})
 }
 
 // TODO: move to the mounter
