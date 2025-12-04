@@ -42,12 +42,6 @@ jobs:
       - name: Run go vet
         run: go vet ./...
 
-      - name: Install golint
-        run: go install golang.org/x/lint/golint@latest
-
-      - name: Run golint
-        run: golint ./...
-
   golangci:
     name: golangci-lint
     runs-on: ubuntu-latest
