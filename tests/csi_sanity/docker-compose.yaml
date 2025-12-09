@@ -15,14 +15,13 @@
 services:
   plugin_controller:
     image: ${CSI_IMAGE}
-    platform: linux/amd64
     command:
       - -endpoint
       - /tmp/vdura-csi/controller.sock
     volumes:
       - shared-volume:/tmp/vdura-csi
     environment:
-      CSI_SANITY_MODE: true
+      CSI_SANITY_MODE: "true"
     privileged: true
     network_mode: host
     healthcheck:
@@ -36,14 +35,13 @@ services:
     image: ${CSI_IMAGE}
     depends_on:
       - plugin_controller
-    platform: linux/amd64
     command:
       - -endpoint
       - /tmp/vdura-csi/node.sock
     volumes:
       - shared-volume:/tmp/vdura-csi
     environment:
-      CSI_SANITY_MODE: true
+      CSI_SANITY_MODE: "true"
     privileged: true
     network_mode: host
     healthcheck:
@@ -55,11 +53,10 @@ services:
 
   sanity_tests:
     image: ${CSI_TEST_IMAGE}
-    platform: linux/amd64
     environment:
       CSI_ENDPOINT: /tmp/vdura-csi/controller.sock
       CSI_NODE_ENDPOINT: /tmp/vdura-csi/node.sock
-      CSI_SANITY_MODE: true
+      CSI_SANITY_MODE: "true"
     command: 
       - sh
       - -c
