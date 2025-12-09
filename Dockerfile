@@ -16,7 +16,7 @@
 ARG GOLANG_VERSION=1.24
 
 # MARK: Stage 1: Download Go modules for caching
-FROM golang:${GOLANG_VERSION}-alpine AS modules
+FROM golang:${GOLANG_VERSION} AS modules
 
 # Copy go.mod and go.sum to leverage Docker cache for dependencies
 COPY go.mod go.sum /modules/
@@ -24,21 +24,25 @@ WORKDIR /modules
 RUN go mod download
 
 # MARK: Stage 2: Build the Go binary
-FROM golang:${GOLANG_VERSION}-alpine AS builder
+FROM golang:${GOLANG_VERSION} AS builder
 ARG APP_VERSION="0.2.0"
 
 # Copy downloaded Go modules from previous stage
 COPY --from=modules /go/pkg /go/pkg
 
-# Copy the application source code
-COPY . /app
+# Set the working directory
 WORKDIR /app
+
+# Copy the application source code
+COPY pkg/ pkg/
+COPY cmd/ cmd/
+COPY go.mod go.sum ./
 
 # Build the binary for Linux amd64, statically linked
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${APP_VERSION}" -o /bin/panfs-csi ./cmd/csi-plugin/main.go
 
 # MARK: Stage 3: Create the final image
-FROM ubuntu:latest AS plugin
+FROM alpine:3.22 AS plugin
 
 ARG BUILD_DATE
 ARG VERSION
@@ -52,8 +56,7 @@ LABEL org.opencontainers.image.title="PanFS CSI Driver" \
       org.opencontainers.image.revision="${GIT_COMMIT}" \
       org.opencontainers.image.vendor="PanFS CSI Team"
 
-RUN apt-get update && \
-    rm -rf /var/lib/apt/lists/*
+RUN apk update && apk upgrade && rm -rf /var/cache/apk/*
 
 # Copy the built panfs-csi binary from builder stage
 COPY --from=builder /bin/panfs-csi /panfs-csi
