@@ -56,6 +56,13 @@ func getOptionalParameters(params VolumeCreateParams) []string {
 		// Normalize the key to the CSI Driver specific key
 		keyParam := utils.VolumeParameters.GetSCKey(key)
 
+		// Backward compatibility: skip encryption parameter if it is not requested explicitly as "on"
+		if strings.Contains(key, "encryption") && keyParam == utils.VolumeParameters.GetSCKey("encryption") {
+			if value != "on" {
+				continue
+			}
+		}
+
 		// Skip unsupported parameters
 		if keyParam != key {
 			continue
