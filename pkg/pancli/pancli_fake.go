@@ -81,7 +81,7 @@ func (c *FakePancliSSHClient) CreateVolume(volumeName string, params VolumeCreat
 
 	vol := &utils.Volume{
 		Name: utils.VolumeName(volumeName),
-		Sset: utils.Storageset{
+		StorageSet: utils.Storageset{
 			ID:   "1",
 			Name: ssetName,
 		},

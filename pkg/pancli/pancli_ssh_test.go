@@ -45,7 +45,7 @@ var (
 		State:   "Online",
 		Soft:    0.00,
 		Hard:    0.00,
-		Sset: utils.Storageset{
+		StorageSet: utils.Storageset{
 			XMLName: xml.Name{Local: "storagesetName"},
 			ID:      "1",
 			Name:    "Set 1",
@@ -163,7 +163,7 @@ func TestCreateVolume(t *testing.T) {
 				Name:    validVolumeName,
 				ID:      "371",
 				State:   "Online",
-				Sset: utils.Storageset{
+				StorageSet: utils.Storageset{
 					XMLName: xml.Name{Local: "storagesetName"},
 				},
 				Encryption: "aes-xts-256",
