@@ -64,9 +64,9 @@ func (c *FakePancliSSHClient) CreateVolume(volumeName string, params VolumeCreat
 		return nil, ErrorAlreadyExist
 	}
 
-	bsetName := params[utils.VolumeParameters.GetSCKey("bladeset")]
-	if bsetName == "" {
-		bsetName = "Set 1"
+	ssetName := params[utils.VolumeParameters.GetSCKey("storageset")]
+	if ssetName == "" {
+		ssetName = "Set 1"
 	}
 
 	soft := params[utils.VolumeParameters.GetSCKey("soft")]
@@ -81,9 +81,9 @@ func (c *FakePancliSSHClient) CreateVolume(volumeName string, params VolumeCreat
 
 	vol := &utils.Volume{
 		Name: utils.VolumeName(volumeName),
-		Bset: utils.Bladeset{
+		StorageSet: utils.Storageset{
 			ID:   "1",
-			Name: bsetName,
+			Name: ssetName,
 		},
 		State:      "Online",
 		Soft:       utils.BytesStringToGB(soft),

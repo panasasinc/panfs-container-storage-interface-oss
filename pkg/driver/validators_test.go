@@ -163,7 +163,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			err: fmt.Errorf("required_bytes (10) should not be greater than limit_bytes (1)"),
 		},
 		{
-			name: "empty bladeset parameter",
+			name: "empty storageset parameter",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -171,10 +171,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeParameters.GetSCKey("bladeset"): "",
+					utils.VolumeParameters.GetSCKey("storageset"): "",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("bladeset")),
+			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("storageset")),
 		},
 		{
 			name: "empty volservice parameter",
@@ -453,7 +453,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			},
 			VolumeCapabilities: []*csi.VolumeCapability{{}},
 			Parameters: map[string]string{
-				utils.VolumeParameters.GetSCKey("bladeset"):   "Set 1",
+				utils.VolumeParameters.GetSCKey("storageset"): "Set 1",
 				utils.VolumeParameters.GetSCKey("volservice"): "vol_service_id",
 				utils.VolumeParameters.GetSCKey("layout"):     "raid10+",
 				utils.VolumeParameters.GetSCKey("maxwidth"):   "3",

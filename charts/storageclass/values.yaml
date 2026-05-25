@@ -59,7 +59,7 @@ volumeBindingMode: WaitForFirstConsumer # Options: Immediate, WaitForFirstConsum
 # -- Optional storage class parameters
 # @default -- `{...}`
 parameters:
-  panfs.csi.vdura.com/bladeset: "Set 1"
+  panfs.csi.vdura.com/storageset: "Set 1"
   panfs.csi.vdura.com/recoverypriority: "50"
   panfs.csi.vdura.com/efsa: "retry"
   panfs.csi.vdura.com/layout: "raid6+"

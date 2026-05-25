@@ -45,8 +45,8 @@ var (
 		State:   "Online",
 		Soft:    0.00,
 		Hard:    0.00,
-		Bset: utils.Bladeset{
-			XMLName: xml.Name{Local: "bladesetName"},
+		StorageSet: utils.Storageset{
+			XMLName: xml.Name{Local: "storagesetName"},
 			ID:      "1",
 			Name:    "Set 1",
 		},
@@ -70,7 +70,7 @@ func TestCreateVolume(t *testing.T) {
 			"VolumeCreated",
 			validVolumeName,
 			VolumeCreateParams{
-				utils.VolumeParameters.GetSCKey("bladeset"): "Set 1",
+				utils.VolumeParameters.GetSCKey("storageset"): "Set 1",
 			},
 			nil,
 			validVolumeResponse,
@@ -78,7 +78,7 @@ func TestCreateVolume(t *testing.T) {
 				// expect create volume command
 				runnerMock.EXPECT().RunCommand(
 					gomock.Any(),
-					"volume", "create", validVolumeName, `bladeset "Set 1"`,
+					"volume", "create", validVolumeName, `storageset "Set 1"`,
 				).Times(1).Return([]byte{}, nil)
 
 				// generate expected pasxml output for the volume
@@ -133,7 +133,7 @@ func TestCreateVolume(t *testing.T) {
 			"CreatedButFailedToGetDetails",
 			validVolumeName,
 			VolumeCreateParams{
-				utils.VolumeParameters.GetSCKey("bladeset"): "Set 1",
+				utils.VolumeParameters.GetSCKey("storageset"): "Set 1",
 			},
 			fmt.Errorf("xml syntax error"),
 			nil,
@@ -141,7 +141,7 @@ func TestCreateVolume(t *testing.T) {
 				// expect create volume command
 				runnerMock.EXPECT().RunCommand(
 					gomock.Any(),
-					"volume", "create", validVolumeName, `bladeset "Set 1"`,
+					"volume", "create", validVolumeName, `storageset "Set 1"`,
 				).Times(1).Return([]byte{}, nil)
 
 				// then get volume details
@@ -163,8 +163,8 @@ func TestCreateVolume(t *testing.T) {
 				Name:    validVolumeName,
 				ID:      "371",
 				State:   "Online",
-				Bset: utils.Bladeset{
-					XMLName: xml.Name{Local: "bladesetName"},
+				StorageSet: utils.Storageset{
+					XMLName: xml.Name{Local: "storagesetName"},
 				},
 				Encryption: "aes-xts-256",
 			},
@@ -296,11 +296,11 @@ func TestGetOptionalParameters(t *testing.T) {
 			want:   []string{},
 		},
 		{
-			name: "BladeSetOnly",
+			name: "StorageSetOnly",
 			params: VolumeCreateParams{
-				utils.VolumeParameters.GetSCKey("bladeset"): "Set 1",
+				utils.VolumeParameters.GetSCKey("storageset"): "Set 1",
 			},
-			want: []string{`bladeset "Set 1"`},
+			want: []string{`storageset "Set 1"`},
 		},
 		{
 			name: "VolServiceAndEfsa",
@@ -358,7 +358,7 @@ func TestGetOptionalParameters(t *testing.T) {
 		{
 			name: "AllFields",
 			params: VolumeCreateParams{
-				utils.VolumeParameters.GetSCKey("bladeset"):    "Set 2",
+				utils.VolumeParameters.GetSCKey("storageset"):  "Set 2",
 				utils.VolumeParameters.GetSCKey("recovery"):    "99",
 				utils.VolumeParameters.GetSCKey("efsa"):        "file-unavailable",
 				utils.VolumeParameters.GetSCKey("soft"):        "3221225472", // 3GB
@@ -378,7 +378,7 @@ func TestGetOptionalParameters(t *testing.T) {
 				utils.VolumeParameters.GetSCKey("encryption"):  "on",
 			},
 			want: []string{
-				`bladeset "Set 2"`,
+				`storageset "Set 2"`,
 				"volservice 0x02",
 				"soft 3.00",
 				"hard 4.00",

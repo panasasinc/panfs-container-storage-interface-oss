@@ -243,7 +243,7 @@ Refer to the PanCLI User Guide for details on the following parameters:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| parameters."panfs.csi.vdura.com/bladeset" | string | `"Set 1"` | Name of the bladeset to use for realm volumes |
+| parameters."panfs.csi.vdura.com/storageset" | string | `"Set 1"` | Name of the storageset to use for realm volumes |
 | parameters."panfs.csi.vdura.com/recoverypriority" | string | `"50"` | Recovery priority for the realm volumes |
 | parameters."panfs.csi.vdura.com/efsa" | string | `"retry"` | EFSA volume mode |
 | parameters."panfs.csi.vdura.com/layout" | string | `"raid10+"` | Default layout for the realm volumes |

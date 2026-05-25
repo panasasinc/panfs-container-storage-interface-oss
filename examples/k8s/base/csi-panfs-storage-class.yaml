@@ -92,7 +92,7 @@ parameters:
   csi.storage.k8s.io/controller-expand-secret-namespace: *secretNamespace
 
   # Specific parameters for volumes (to be) created in the PanFS Realm
-  panfs.csi.vdura.com/bladeset: "Set 1"
+  panfs.csi.vdura.com/storageset: "Set 1"
   panfs.csi.vdura.com/description: "PanFS CSI Storage Class"
   panfs.csi.vdura.com/efsa: "retry"
   panfs.csi.vdura.com/layout: "raid6+"
