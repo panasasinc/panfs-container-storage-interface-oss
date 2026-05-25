@@ -47,9 +47,9 @@ type VolumeList struct {
 	} `xml:"supportedUrls"`
 }
 
-// Bladeset represents a bladeset in the PanFS system.
-type Bladeset struct {
-	XMLName xml.Name `xml:"bladesetName"`
+// Storageset represents a storageset in the PanFS system.
+type Storageset struct {
+	XMLName xml.Name `xml:"storagesetName"`
 	ID      string   `xml:"id,attr"`
 	Name    string   `xml:",chardata"`
 }
@@ -62,7 +62,7 @@ type Volume struct {
 	State      string     `xml:"state"`
 	Soft       float64    `xml:"softQuotaGB"`
 	Hard       float64    `xml:"hardQuotaGB"`
-	Bset       Bladeset   `xml:"bladesetName"`
+	Sset       Storageset `xml:"storagesetName"`
 	Encryption string     `xml:"encryption"`
 }
 

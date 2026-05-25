@@ -74,7 +74,7 @@ The driver exposes advanced PanFS features through CSI:
 The PanFS CSI driver supports custom mount options for PanFS volumes. You can specify mount options in the PersistentVolume manifest using the `mountOptions` field. This allows you to customize the mount behavior according to your requirements.
 
 #### Storage class customisation (e.g. volume create parameters)
-The PanFS CSI driver supports custom parameters for volume creation in the StorageClass manifest. You can specify parameters such as `bladeset`, `layout` etc to customize the behavior of the created volumes.
+The PanFS CSI driver supports custom parameters for volume creation in the StorageClass manifest. You can specify parameters such as `storageset`, `layout` etc to customize the behavior of the created volumes.
 For a full list of supported parameters, refer to the official PanFS documentation for volume creation corresponding to your PanFS version and CSI PanFS driver version.
 
 ## Compatibility

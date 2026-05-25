@@ -27,7 +27,7 @@ type VolumeParametersData map[string]string
 // VolumeParameters holds supported volume provisioning context parameters
 var VolumeParameters = VolumeParametersData{
 	"description": `description "%s"`,
-	"bladeset":    `bladeset "%s"`,
+	"storageset":  `storageset "%s"`,
 	"recovery":    "recoverypriority %s",
 	"efsa":        "efsa %s",
 	"volservice":  "volservice %s",

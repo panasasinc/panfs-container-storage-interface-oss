@@ -115,8 +115,8 @@ func validateCreateVolumeRequest(req *csi.CreateVolumeRequest) error {
 //	error - Returns an error if any parameter is invalid.
 func validateVolumeParameters(parameters map[string]string) error {
 	// Validate optional parameters if they are present
-	if val, exist := parameters[utils.VolumeParameters.GetSCKey("bladeset")]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("bladeset"))
+	if val, exist := parameters[utils.VolumeParameters.GetSCKey("storageset")]; exist && val == "" {
+		return fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("storageset"))
 	}
 
 	if val, exist := parameters[utils.VolumeParameters.GetSCKey("volservice")]; exist && val == "" {
