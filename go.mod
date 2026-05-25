@@ -1,6 +1,6 @@
 module github.com/panasasinc/panfs-container-storage-interface-oss
 
-go 1.24.3
+go 1.25.10
 
 require (
 	github.com/container-storage-interface/spec v1.11.0
