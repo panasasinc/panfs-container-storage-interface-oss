@@ -62,7 +62,7 @@ type Volume struct {
 	State      string     `xml:"state"`
 	Soft       float64    `xml:"softQuotaGB"`
 	Hard       float64    `xml:"hardQuotaGB"`
-	Sset       Storageset `xml:"storagesetName"`
+	StorageSet Storageset `xml:"storagesetName"`
 	Encryption string     `xml:"encryption"`
 }
 
