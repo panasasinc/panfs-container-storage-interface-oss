@@ -11,7 +11,7 @@ To use volume encryption, you must meet the following requirements:
 
 ## 1. Enable Encryption in CSI Driver
 
-When installing or upgrading the PanFS CSI driver via Helm, encryption support should be enabled. This allows the driver to load necessary encryption modules (e.g. `wolfssl`) on the worker nodes.
+When installing or upgrading the PanFS CSI driver via Helm, encryption support should be enabled. This allows the driver to load necessary encryption modules (e.g. `libwolfssl`) on the worker nodes.
 
 Encryption support is enabled by default via the `kmm.encryptionSupport` parameter. To explicitly ensure it is enabled during installation:
 

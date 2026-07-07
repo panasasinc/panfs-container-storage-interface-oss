@@ -925,11 +925,11 @@ spec:
       modprobe:
         moduleName: panfs
 
-        # Encryption support requires loading the wolfssl module.
-        # If encryption is not needed or, comment out the modulesLoadingOrder below.
+        # Encryption support requires loading the libwolfssl module.
+        # If encryption is not needed, comment out the modulesLoadingOrder below.
         modulesLoadingOrder: 
           - panfs
-          - wolfssl
+          - libwolfssl
 
       imagePullPolicy: Always
 

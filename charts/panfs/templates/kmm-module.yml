@@ -67,18 +67,18 @@ spec:
 
         {{- if .Values.kmm.encryptionSupport }}
 
-        # Encryption support requires loading the wolfssl module.
-        # If encryption is not needed or, comment out the modulesLoadingOrder below.
+        # Encryption support requires loading the libwolfssl module.
+        # If encryption is not needed, comment out the modulesLoadingOrder below.
         modulesLoadingOrder: 
           - panfs
-          - wolfssl
+          - libwolfssl
         {{- else }}
 
-        # If encryption support is required, load the wolfssl module before panfs.
+        # If encryption support is required, load the libwolfssl module before panfs.
         # To enable encryption, uncomment and set modulesLoadingOrder as shown below.
         # modulesLoadingOrder: 
         #  - panfs
-        #  - wolfssl
+        #  - libwolfssl
         {{- end }}
 
       imagePullPolicy: {{ .Values.kmm.pullPolicy | default "Always" }}
