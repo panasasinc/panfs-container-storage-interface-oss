@@ -1,0 +1,120 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+name: Create Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (X.Y.Z, e.g. 1.2.6)'
+        required: true
+        type: string
+      draft:
+        description: 'Create the GitHub Release as a draft'
+        required: false
+        type: boolean
+        default: false
+
+jobs:
+  create-release:
+    name: Tag and GitHub Release
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+    steps:
+      # Releases must be cut from the main branch only
+      - name: Validate branch
+        if: github.ref != 'refs/heads/main'
+        run: |
+          echo "::error::Releases must be created from the main branch (got '${{ github.ref }}')"
+          exit 1
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history is required to check existing tags and generate release notes
+          fetch-depth: 0
+
+      - name: Validate version
+        id: version
+        env:
+          VERSION: ${{ inputs.version }}
+        run: |
+          if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
+            echo "::error::Version '$VERSION' must match X.Y.Z (e.g. 1.2.6)"
+            exit 1
+          fi
+          if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
+            echo "::error::Tag '$VERSION' already exists"
+            exit 1
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      # Keep Helm chart versions in sync with the release tag
+      - name: Bump Helm chart versions
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          for chart in charts/panfs/Chart.yaml charts/storageclass/Chart.yaml; do
+            sed -i -E "s/^version: \"[^\"]*\"/version: \"$VERSION\"/" "$chart"
+            sed -i -E "s/^appVersion: \"[^\"]*\"/appVersion: \"$VERSION\"/" "$chart"
+          done
+          git diff --stat
+
+      - name: Commit version bump and push tag
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          if ! git diff --quiet; then
+            git add charts/panfs/Chart.yaml charts/storageclass/Chart.yaml
+            git commit -m "chore(release): $VERSION"
+            git push origin main
+          fi
+          git tag "$VERSION"
+          git push origin "refs/tags/$VERSION"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          gh release create "$VERSION" \
+            --title "$VERSION" \
+            --generate-notes \
+            ${{ inputs.draft && '--draft' || '' }}
+
+  # Tags pushed with GITHUB_TOKEN do not trigger the tag-based
+  # "Release builds" workflow, so build and push the image directly.
+  csi-driver-image-ghcr:
+    needs: create-release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/build-reusable.yaml
+    with:
+      runner-label: "ubuntu-latest"
+      app-version: "${{ needs.create-release.outputs.version }}"
+      image-name: "panfs-csi-driver"
+      image-tags: "${{ needs.create-release.outputs.version }}"
+      repo-url: "ghcr.io/${{ github.repository }}"
+      ref: "refs/tags/${{ needs.create-release.outputs.version }}"
+      trivy-scan: false
+      push: true
+    secrets: inherit
