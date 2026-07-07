@@ -261,10 +261,10 @@ To enable transparent, end-to-end volume encryption using a KMIP provider:
         # Insert the full KMIP client configuration file content here.
         # This typically includes server addresses, port, and client TLS/PKI settings.
     ```
-3. Make sure KMM module is configured to load `wolfssl` kermel module. Check this:
+3. Make sure KMM module is configured to load `libwolfssl` kernel module. Check this:
     ```bash
     kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
-    ["panfs","wolfssl"]
+    ["panfs","libwolfssl"]
     ```
 
 ##### 3.4 Deployment and Validation
