@@ -159,14 +159,17 @@ nodeServer:
 
   # -- Tolerations for node pods
   # @default -- `[...]`
-  tolerations: 
+  tolerations:
   - operator: "Exists"
 
   updateStrategy:
+    # -- Update strategy type for the node DaemonSet
     type: RollingUpdate
     rollingUpdate:
+      # -- Maximum number of unavailable node pods during update
       maxUnavailable: 100%
 
+# -- Enable SELinux integration for the node driver (mounts /sys/fs/selinux and /etc/selinux into the plugin)
 seLinux: true
 
 dfc:
@@ -191,10 +194,10 @@ kmm:
   # @default -- `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}`
   nodeReadyLabel:
     # Naming convention: kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready
-    name: kmm.node.kubernetes.io/{{ .Release.Namespace }}.panfs.ready 
+    name: kmm.node.kubernetes.io/{{ .Release.Namespace }}.panfs.ready
     value: ""
 
-  # -- Node selector for node pods
+  # -- Node selector for the KMM module (nodes where the PanFS kernel module should be loaded)
   selector:
     node-role.kubernetes.io/worker: ""
 
@@ -203,7 +206,7 @@ kmm:
 
   # -- **PanFS DFC images** for different kernel versions
   # @default -- `[...]`
-  kernelMappings: 
+  kernelMappings:
     - regexp: '^.*.x86_64$'
       containerImage: "{{ .Values.dfc.privateRegistry }}/panfs-kmm:${KERNEL_FULL_VERSION}-{{ .Values.dfc.version }}"
 

@@ -43,10 +43,10 @@ realm:
   # -- KMIP configuration data for volume encryption key management
   kmipConfigData: ""
 
-# -- Whether to set current storage class default for the cluster or not
+# -- Whether to set this storage class as the default for the cluster
 setAsDefaultStorageClass: false
 
-# -- Allow volume expansion for realms
+# -- Allow expansion of provisioned volumes
 allowVolumeExpansion: true
 
 # -- Default reclaim policy for volumes

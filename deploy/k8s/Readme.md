@@ -12,9 +12,9 @@ This guide describes how to deploy the PanFS CSI Driver and StorageClass using t
 - **If SELinux is disabled in your cluster:**
   - Use: `csi-driver/template-csi-panfs-without-selinux.yaml`
 
-**Key Place Holders:**
+**Key Placeholders:**
 
-  * `<IMAGE_PULL_SECRET_NAME>`: The name of the secret created above.
+  * `<IMAGE_PULL_SECRET_NAME>`: The name of the image pull secret for the private registry hosting the DFC/KMM images.
   * `<PANFS_DFC_KMM_PRIVATE_REGISTRY>`: The URL of your private registry hosting the DFC/KMM images.
   * `<DFC_RELEASE_VERSION>`: The specific version tag of the DFC release you are deploying.
 
@@ -22,7 +22,7 @@ This guide describes how to deploy the PanFS CSI Driver and StorageClass using t
 > - `replicas`
 > - `tolerations`
 > - `nodeSelector`
-> - etc
+> - etc.
 
 Once configured, deploy the driver and KMM module:
 
@@ -35,9 +35,7 @@ kubectl apply -f <selected-driver-manifest>.yaml
 Choose the manifest that matches your namespace and topology requirements:
 
 ### 1. Dedicated Namespace
-- **Manifests:** 
-  - `storage-class/template-secret-in-driver-ns.yaml`
-  - `storage-class/template-secret-in-dedicated-ns.yaml` (more placeholders to change)
+- **Manifest:** `storage-class/template-secret-in-dedicated-ns.yaml` (more placeholders to change)
 - **Configuration:**
   - Creates a StorageClass
     - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class`)
@@ -74,11 +72,11 @@ kubectl apply -f <selected-storageclass-manifest>.yaml
 
 To enable transparent, end-to-end volume encryption using a KMIP provider:
 
-1.  **Enable Encryption in StorageClass**: Set the parameter below to `"true"` in the StorageClass manifest:
+1.  **Enable Encryption in StorageClass**: Set the parameter below to `"on"` in the StorageClass manifest:
     ```yaml
     kind: StorageClass
     parameters:
-      panfs.csi.vdura.com/encryption: "true" # Enables encryption for volumes
+      panfs.csi.vdura.com/encryption: "on" # Enables encryption for volumes
     ```
 2.  **Configure KMIP Client**: The KMIP client configuration file content must be placed in the Secret under the `kmip_config_data` key as a YAML multi-line string:
     ```yaml
@@ -88,7 +86,7 @@ To enable transparent, end-to-end volume encryption using a KMIP provider:
         # Insert the full KMIP client configuration file content here.
         # This typically includes server addresses, port, and client TLS/PKI settings.
     ```
-3. Make sure KMM module is configured to load `libwolfssl` kernel module. Check this:
+3. Make sure the KMM module is configured to load the `libwolfssl` kernel module. Verify with:
     ```bash
     kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
     ["panfs","libwolfssl"]

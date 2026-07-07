@@ -53,7 +53,7 @@ spec:
   {{- if .Values.kmm.selector }}
 
   # Node selector for scheduling the KMM Module pods (to load the PanFS kernel module)
-  # Should match the nodes where the PanFS consumer workloads supposed to run
+  # Should match the nodes where the PanFS consumer workloads are supposed to run
   # Ensure that the nodes have the appropriate labels
   # kubectl get nodes --show-labels
   selector:
@@ -69,14 +69,14 @@ spec:
 
         # Encryption support requires loading the libwolfssl module.
         # If encryption is not needed, comment out the modulesLoadingOrder below.
-        modulesLoadingOrder: 
+        modulesLoadingOrder:
           - panfs
           - libwolfssl
         {{- else }}
 
         # If encryption support is required, load the libwolfssl module before panfs.
         # To enable encryption, uncomment and set modulesLoadingOrder as shown below.
-        # modulesLoadingOrder: 
+        # modulesLoadingOrder:
         #  - panfs
         #  - libwolfssl
         {{- end }}

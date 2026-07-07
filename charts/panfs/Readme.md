@@ -7,7 +7,7 @@ A Helm chart for deploying VDURA PanFS CSI controller, node components, and KMM 
 
 ## Prerequisites
 
-- Kubernetes 1.20+
+- Kubernetes 1.30.1+
 - Helm 3.8+
 - Access to the container images specified in the `values.yaml` file
 - RBAC enabled in the Kubernetes cluster
@@ -17,11 +17,11 @@ A Helm chart for deploying VDURA PanFS CSI controller, node components, and KMM 
 | Compatible with CSI Version  | Container Image | [Min K8s Version](https://kubernetes-csi.github.io/docs/kubernetes-compatibility.html#minimum-version) | [Recommended K8s Version](https://kubernetes-csi.github.io/docs/kubernetes-compatibility.html#recommended-version) |
 |---|---|---|---|
 | [CSI Spec v1.9.0](https://github.com/container-storage-interface/spec/releases/tag/v1.9.0) | [registry.k8s.io/sig-storage/csi-provisioner:v5.3.0](https://github.com/kubernetes-csi/external-provisioner) | 1.20 | 1.31 |
-| [CSI Spec v1.10.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [k8s.gcr.io/sig-storage/csi-resizer:v1.13.2](https://github.com/kubernetes-csi/external-resizer) | 1.16 | 1.32 |
+| [CSI Spec v1.10.0](https://github.com/container-storage-interface/spec/releases/tag/v1.10.0) | [gcr.io/k8s-staging-sig-storage/csi-resizer:v1.13.2](https://github.com/kubernetes-csi/external-resizer) | 1.16 | 1.32 |
 | [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [registry.k8s.io/sig-storage/csi-attacher:v4.9.0](https://github.com/kubernetes-csi/external-attacher) | 1.17 | 1.22 |
-| [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.14.0](https://github.com/kubernetes-csi/node-driver-registrar) | 1.13 | 1.23.10 |
+| [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0](https://github.com/kubernetes-csi/node-driver-registrar) | 1.13 | 1.23.10 |
 
-> **NOTE**: According to upstream documentation
+> **NOTE**: Version compatibility information is based on the upstream [Kubernetes CSI documentation](https://kubernetes-csi.github.io/docs/kubernetes-compatibility.html).
 
 ## Installation
 
@@ -43,7 +43,7 @@ Render the chart templates locally to inspect the generated Kubernetes manifests
 helm template charts/panfs --namespace csi-panfs
 ```
 
-This command generates the manifests in terminal or in the `./output` directory for review.
+This command prints the generated manifests to the terminal for review.
 
 #### 2. Install / Upgrade the Chart
 Install / Upgrade the chart into the `csi-panfs` namespace:
@@ -69,7 +69,7 @@ helm upgrade --install csi-panfs charts/panfs \
 			--set dfc.version="$DFC_VERSION" \
 			--set dfc.privateRegistry="$DFC_REGISTRY" \
 			--set imagePullSecrets[0]="$IMAGE_PULL_SECRET_NAME" \
-			--wait \
+			--wait
 ```
 
 This applies your custom configurations during the installation or upgrade process.
@@ -142,7 +142,7 @@ The `values.yaml` file contains configurable parameters.
 | kmm.kernelMappings | list | `[...]` | **PanFS DFC images** for different kernel versions |
 | kmm.nodeReadyLabel | object | `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}` | Label applied to nodes when the PanFS kernel module is successfully loaded |
 | kmm.pullPolicy | string | `"Always"` | Image pull policy for the KMM module |
-| kmm.selector | object | `{"node-role.kubernetes.io/worker":""}` | Node selector for node pods |
+| kmm.selector | object | `{"node-role.kubernetes.io/worker":""}` | Node selector for the KMM module (nodes where the PanFS kernel module should be loaded) |
 | labels | object | `{}` | Labels for the CSI driver workloads |
 | nodeServer.driverRegistrar.image | string | `"k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0"` | CSI node driver registrar image |
 | nodeServer.driverRegistrar.logLevel | int | `5` | Log level for driver registrar |
@@ -152,16 +152,16 @@ The `values.yaml` file contains configurable parameters.
 | nodeServer.priorityClassName | string | `"system-cluster-critical"` | Priority class for node pods |
 | nodeServer.selector | object | `{"node-role.kubernetes.io/worker":""}` | Node selector for node pods |
 | nodeServer.tolerations | list | `[...]` | Tolerations for node pods |
-| nodeServer.updateStrategy.rollingUpdate.maxUnavailable | string | `"100%"` |  |
-| nodeServer.updateStrategy.type | string | `"RollingUpdate"` |  |
-| seLinux | bool | `true` |  |
+| nodeServer.updateStrategy.rollingUpdate.maxUnavailable | string | `"100%"` | Maximum number of unavailable node pods during update |
+| nodeServer.updateStrategy.type | string | `"RollingUpdate"` | Update strategy type for the node DaemonSet |
+| seLinux | bool | `true` | Enable SELinux integration for the node driver (mounts /sys/fs/selinux and /etc/selinux into the plugin) |
 
 > **NOTE:** Please refer to the `values.yaml` file for a complete list of configurable parameters.
 
 To customize, create a `custom-values.yaml` file and apply it during install or upgrade:
 
 ```bash
-helm install csi-panfs csi-panfs --namespace csi-panfs -f custom-values.yaml
+helm upgrade --install csi-panfs charts/panfs --namespace csi-panfs -f custom-values.yaml
 ```
 
 ## Notes

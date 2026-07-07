@@ -191,7 +191,7 @@ rules:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Bind the namespace Role to the controller ServiceAccount
+# Bind the provisioner Role to the controller ServiceAccount
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:

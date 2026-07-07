@@ -57,7 +57,7 @@ rules:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Node Server ClusterRoleBinding
+# Bind the node ClusterRole to the node ServiceAccount
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:

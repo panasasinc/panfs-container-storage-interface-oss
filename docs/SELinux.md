@@ -22,11 +22,11 @@ This document is a technical reference for configuring SELinux in Kubernetes env
 
 1. [Overview](#1-overview)
 2. [SELinux Configuration Requirements](#2-selinux-configuration-requirements)
-  - [Operating System Configuration](#21-operating-system-configuration)
-  - [Container Runtime Configuration](#22-container-runtime-configuration)
-  - [Kubernetes Cluster Configuration](#23-kubernetes-cluster-configuration)
-  - [CSI Driver and Storage Configuration](#24-csi-driver-and-storage-configuration)
-  - [Application and Workload Configuration](#25-application-and-workload-configuration)
+   - [Operating System Configuration](#21-operating-system-configuration)
+   - [Container Runtime Configuration](#22-container-runtime-configuration)
+   - [Kubernetes Cluster Configuration](#23-kubernetes-cluster-configuration)
+   - [CSI Driver and Storage Configuration](#24-csi-driver-and-storage-configuration)
+   - [Application and Workload Configuration](#25-application-and-workload-configuration)
 
 ## 1. Overview
 
@@ -171,11 +171,11 @@ provisioner: com.vdura.csi.panfs
 parameters:
   # ... other configuration ...
 
-  # SELinux context configuration for mounted volumes
-  mountOptions:
-  # Set default SELinux context for new files created on the volume
-  # This ensures new files inherit container_file_t type for proper container access
-  - "defcontext=system_u:object_r:container_file_t:s0"
+# SELinux context configuration for mounted volumes
+mountOptions:
+# Set default SELinux context for new files created on the volume
+# This ensures new files inherit container_file_t type for proper container access
+- "defcontext=system_u:object_r:container_file_t:s0"
 ```
 
 > **Note:** The `container_file_t` SELinux type in the `defcontext` option above is provided as an example. Depending on your storage backend and security requirements, you may need to use a different SELinux type (e.g., `nfs_t`, `svirt_sandbox_file_t`, or a custom type). Always choose the SELinux type that is appropriate for your specific use case and storage configuration.
@@ -203,10 +203,6 @@ apiVersion: v1
 kind: Pod
 metadata:
   name: secure-application
-  annotations:
-    # Kubernetes Pod Security Standards policy annotation indicating restricted security controls
-    # This enforces the most restrictive security policy with enhanced isolation
-    security.policy: "restricted"
 spec:
   securityContext:
     # Pod-level SELinux context

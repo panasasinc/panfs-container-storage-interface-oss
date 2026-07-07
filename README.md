@@ -6,14 +6,30 @@ The official CSI Driver for integrating **PanFS** storage with Container Orchest
 [![Vulnerability Scan](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml)
 [![Go Report Card](https://goreportcard.com/badge/github.com/panasasinc/panfs-container-storage-interface-oss)](https://goreportcard.com/report/github.com/panasasinc/panfs-container-storage-interface-oss)
 
+## Documentation
+
+For more details on specific topics, refer to the following documents:
+
+| Document | Description |
+|:---------|:------------|
+| [Overview](./docs/Overview.md) | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow |
+| [Usage Guide](./docs/Usage-Guide.md) | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples |
+| [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
+| [Encryption](./docs/Encryption.md) | Enabling End-to-End Encryption (E2EE) for volumes with a KMIP key management server |
+| [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
+| [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
+| [Troubleshooting](./docs/Troubleshooting.md) | Diagnosing and resolving common issues: installation, volume mounting, KMM, authentication, and networking |
+| [Diagnostic](./docs/Diagnostic.md) | Collecting diagnostic data to submit to VDURA Technical Support |
+
 ## Contents
 
+* [Documentation](#documentation)
 * [Overview](#overview)
 * [Capabilities](#capabilities)
   * [CSI Services](#csi-services)
   * [Volume Features](#volume-features)
   * [PanFS mount options](#panfs-mount-options)
-  * [Storage class customisation](#storage-class-customisation-eg-volume-create-parameters)
+  * [Storage class customization](#storage-class-customization-eg-volume-create-parameters)
 * [Compatibility](#compatibility)
 * [Getting started](#getting-started)
   * [Prerequisites](#prerequisites)
@@ -22,7 +38,7 @@ The official CSI Driver for integrating **PanFS** storage with Container Orchest
     * [Access Requirements](#access-requirements)
   * [CSI Driver Installation - Quick Start](#csi-driver-installation---quick-start)
     * [1. Ensure dependencies are installed](#1-ensure-dependencies-are-installed)
-    * [2. Deploy CSI driver with KMM module](#2-deploy-csi-driver-with-kmm-module)
+    * [2. Deploy CSI driver with KMM Module](#2-deploy-csi-driver-with-kmm-module)
       * [2.1 Prerequisites](#21-prerequisites)
       * [2.2 Configure and Deploy](#22-configure-and-deploy)
     * [3. Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)
@@ -37,7 +53,7 @@ The official CSI Driver for integrating **PanFS** storage with Container Orchest
   * [Kubernetes CSI E2E tests](#kubernetes-csi-e2e-tests)
     * [Provided E2E Test Setup](#provided-e2e-test-setup)
     * [Running E2E Tests](#running-e2e-tests)
-    * [Notes](#notes)
+    * [Notes](#notes-1)
 
 ## Overview
 
@@ -45,7 +61,7 @@ The Container Storage Interface (CSI) is a standard for exposing arbitrary block
 
 The PanFS CSI driver allows you to use PanFS volumes in a Kubernetes cluster. It is possible to use volumes from multiple realms within a single CSI driver instance. See the [Deploying Workloads](#deploying-workloads) section for usage examples.
 
-For more details, please see the [Overview documentation](./docs/Overview.md)
+For more details, please see the [Overview documentation](./docs/Overview.md).
 
 ## Capabilities
 
@@ -73,23 +89,25 @@ The driver exposes advanced PanFS features through CSI:
 ### PanFS mount options
 The PanFS CSI driver supports custom mount options for PanFS volumes. You can specify mount options in the PersistentVolume manifest using the `mountOptions` field. This allows you to customize the mount behavior according to your requirements.
 
-#### Storage class customisation (e.g. volume create parameters)
-The PanFS CSI driver supports custom parameters for volume creation in the StorageClass manifest. You can specify parameters such as `storageset`, `layout` etc to customize the behavior of the created volumes.
+#### Storage class customization (e.g. volume create parameters)
+The PanFS CSI driver supports custom parameters for volume creation in the StorageClass manifest. You can specify parameters such as `storageset`, `layout`, etc., to customize the behavior of the created volumes.
 For a full list of supported parameters, refer to the official PanFS documentation for volume creation corresponding to your PanFS version and CSI PanFS driver version.
 
 ## Compatibility
 
-This matrix defines the supported versions for the PanFS CSI Driver, Kubernetes, CSI Specification, and PanFS:
+This matrix defines the supported versions of Kubernetes and the CSI Specification for each PanFS CSI Driver release:
 
 | PanFS CSI Version | Kubernetes Version | CSI Spec Version |
 |:------------------|:-------------------|:-----------------|
-| **1.0.0** | 1.30.1+            | 1.7.0            |
-| **1.0.1+** | 1.30.1+            | 1.11.0           |
-| **1.1.0** | 1.30.1+            | 1.11.0           |
-| **1.2.0** | 1.30.1+            | 1.11.0           |
-| **1.2.1** | 1.30.1+            | 1.11.0           |
-| **1.2.2** | 1.30.1+            | 1.11.0           |
-
+| **1.0.0**         | 1.30.1+            | 1.7.0            |
+| **1.0.1+**        | 1.30.1+            | 1.11.0           |
+| **1.1.0**         | 1.30.1+            | 1.11.0           |
+| **1.2.0**         | 1.30.1+            | 1.11.0           |
+| **1.2.1**         | 1.30.1+            | 1.11.0           |
+| **1.2.2**         | 1.30.1+            | 1.11.0           |
+| **1.2.3**         | 1.30.1+            | 1.11.0           |
+| **1.2.4**         | 1.30.1+            | 1.11.0           |
+| **1.2.5**         | 1.30.1+            | 1.11.0           |
 
 ## Getting started
 
@@ -131,7 +149,7 @@ Ensure the following Kubernetes ecosystem tools are installed in your cluster:
 
 #### 2. Deploy CSI driver with KMM Module
 
-Create the namespace, configure registry credentials, and deploy the driver using the Kubernetes manifest file
+Create the namespace, configure registry credentials, and deploy the driver using the Kubernetes manifest file.
 
 ##### 2.1 Prerequisites
 ```bash
@@ -164,7 +182,7 @@ Edit the deployment manifest at [deploy/k8s/csi-driver/template-csi-panfs.yaml](
 > - `replicas`
 > - `tolerations`
 > - `nodeSelector`
-> - etc
+> - etc.
 
 Once configured, deploy the driver and KMM module:
 
@@ -243,15 +261,15 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "true"
 ```
 
-##### 3.3. Optional: Enabling End-to-End Volume Encryption
+##### 3.3 Optional: Enabling End-to-End Volume Encryption
 
 To enable transparent, end-to-end volume encryption using a KMIP provider:
 
-1.  **Enable Encryption in StorageClass**: Set the parameter below to `"true"` in the StorageClass manifest:
+1.  **Enable Encryption in StorageClass**: Set the parameter below to `"on"` in the StorageClass manifest:
     ```yaml
     kind: StorageClass
     parameters:
-      panfs.csi.vdura.com/encryption: "true" # Enables encryption for volumes
+      panfs.csi.vdura.com/encryption: "on" # Enables encryption for volumes
     ```
 2.  **Configure KMIP Client**: The KMIP client configuration file content must be placed in the Secret under the `kmip_config_data` key as a YAML multi-line string:
     ```yaml
@@ -261,7 +279,7 @@ To enable transparent, end-to-end volume encryption using a KMIP provider:
         # Insert the full KMIP client configuration file content here.
         # This typically includes server addresses, port, and client TLS/PKI settings.
     ```
-3. Make sure KMM module is configured to load `libwolfssl` kernel module. Check this:
+3. Make sure the KMM module is configured to load the `libwolfssl` kernel module. Verify with:
     ```bash
     kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
     ["panfs","libwolfssl"]
@@ -277,9 +295,9 @@ kubectl apply -f deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
 
 The expected output will look like this:
 ```bash
-namespace/csi-panfs-storage-class unchanged
-secret/csi-panfs-storage-class configured
-storageclass.storage.k8s.io/csi-panfs-storage-class configured
+namespace/csi-panfs-storage-class created
+secret/csi-panfs-storage-class created
+storageclass.storage.k8s.io/csi-panfs-storage-class created
 ```
 
 **Validate StorageClass**:
@@ -299,7 +317,7 @@ If the StorageClass is missing or misconfigured, verify the configuration variab
 
 ## Deploying Workloads
 
-Refer to [usage-guide.md](./docs/usage-guide.md) for YAML manifests and examples of deploying workloads with the PanFS CSI Driver.
+Refer to [Usage-Guide.md](./docs/Usage-Guide.md) for YAML manifests and examples of deploying workloads with the PanFS CSI Driver.
 
 ---
 
@@ -403,7 +421,7 @@ You can generate and view Go API documentation for this project using the [pkgsi
   pkgsite -open .
   ```
 
-3. It opens your browser, or navigate to [http://localhost:8080](http://localhost:8080) to view the generated documentation for all Go packages in the repository.
+3. Your browser will open automatically; otherwise, navigate to [http://localhost:8080](http://localhost:8080) to view the generated documentation for all Go packages in the repository.
 
 This will provide a browsable interface for all exported types, functions, and documentation comments in your codebase.
 
@@ -416,7 +434,7 @@ The PanFS CSI driver includes a ready-to-use Docker Compose setup for running CS
 #### Running CSI Sanity Tests with Docker Compose
 
 1. Build the CSI driver and sanity test images:
-   - Set the environment variables `CSI_IMAGE` (your built PanFS CSI driver image) and `CSI_TEST_IMAGE` (the baked test image, see `tests/csi_sanity/Dockerfile`).
+   - Set the environment variables `CSI_IMAGE` (your built PanFS CSI driver image) and `CSI_TEST_IMAGE` (the prebuilt test image, see `tests/csi_sanity/Dockerfile`).
    - Example:
      ```bash
      export CSI_IMAGE=your-registry/panfs-csi-driver:latest

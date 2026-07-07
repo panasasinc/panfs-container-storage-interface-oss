@@ -41,7 +41,7 @@ stringData:
   # Leave empty if not using private key
   private_key: 
 
-  # Leave empty if not not using private key passphrase
+  # Leave empty if not using private key passphrase
   private_key_passphrase: 
 ---
 # Copyright 2025 VDURA Inc.
@@ -82,7 +82,7 @@ volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
 
 parameters:
-  # Relates to Secret object that contains credentials for the CSI driver
+  # References the Secret object that contains credentials for the CSI driver
   # This secret is used by the CSI driver to authenticate with the PanFS backend
   csi.storage.k8s.io/provisioner-secret-name: &secretName csi-panfs-storage-class
   csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace csi-panfs-storage-class
@@ -149,7 +149,6 @@ metadata:
   namespace: csi-panfs-storage-class
 subjects:
   # The service account used by the PanFS CSI driver controller
-  # Relates to PanFS Driver ServiceAccount (controller) 
   - kind: ServiceAccount
     name: csi-panfs-controller    # The name of the PanFS CSI Driver service account
     namespace: csi-panfs          # The namespace where the PanFS CSI Driver is deployed

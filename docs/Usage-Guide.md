@@ -35,7 +35,7 @@ Ensure the following are in place before proceeding:
 - **PanFS StorageClass**: Configured to connect to the PanFS Realm backend
 - **kubectl**: Installed for interacting with the Kubernetes cluster
 
-> **Tip**: Refer to the [Architecture Overview](./architecture-overview.md) for setup instructions.
+> **Tip**: Refer to the [README](../README.md) for setup instructions and the [Architecture Overview](./Overview.md) for design details.
 
 ---
 
@@ -308,4 +308,4 @@ persistentvolume/panfs-static-volume-pv created
 
 - **Additional Resources**:
   - [examples/k8s](../examples/k8s): Sample YAML manifests.
-  - [kmm.md](./kmm.md): KMM configuration and troubleshooting.
+  - [KMM.md](./KMM.md): KMM configuration and troubleshooting.
