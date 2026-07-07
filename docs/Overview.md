@@ -35,11 +35,10 @@ The PanFS CSI Driver consists of two primary components, orchestrated to handle 
 - **Controller Service** (Deployment):
   - Runs as a highly available deployment with multiple replicas for fault tolerance.
   - Manages cluster-wide operations: provisioning, attaching, detaching, and resizing PanFS volumes.
-  - Includes sidecar containers:
+  - Runs the **PanFS CSI Plugin**, which implements PanFS-specific logic, alongside sidecar containers:
     - **CSI Provisioner**: Handles volume creation.
     - **CSI Attacher**: Manages volume attachment to nodes.
     - **CSI Resizer**: Supports volume expansion.
-    - **PanFS CSI Plugin**: Implements PanFS-specific logic.
 
 - **Node Service** (DaemonSet):
   - Runs on every cluster node to handle local volume operations (mounting/unmounting).
@@ -102,7 +101,7 @@ graph LR
 1. **Provisioning**: A PersistentVolumeClaim (PVC) referencing a PanFS StorageClass triggers the controller to create a PanFS volume.
 2. **Attachment**: The controller and node services coordinate to attach the volume to the target node when a workload is scheduled.
 3. **Mounting**: The node service mounts the volume into the pod with appropriate permissions and security context.
-4. **Lifecycle Management**: Supports dynamic resizing, snapshotting, and volume deletion.
+4. **Lifecycle Management**: Supports dynamic resizing and volume deletion.
 5. **Kernel Module Handling**: If enabled, KMM ensures the PanFS kernel module is loaded on nodes before mounting.
 
 ## Key Features
@@ -119,5 +118,5 @@ graph LR
 ## References
 
 - [Makefile](../Makefile): Automation targets.
-- [usage-guide.md](./usage-guide.md): Workload deployment guides.
-- [kmm.md](./kmm.md): KMM setup and management.
+- [Usage-Guide.md](./Usage-Guide.md): Workload deployment guides.
+- [KMM.md](./KMM.md): KMM setup and management.

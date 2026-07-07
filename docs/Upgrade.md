@@ -59,7 +59,7 @@ The PanFS CSI driver consists of three primary components that may require updat
    - 5.1 [Common Issues](#51-common-issues)
         - 5.1.1 [Image Pull Failures](#511-image-pull-failures)
         - 5.1.2 [KMM Module Load Failures](#512-kmm-module-load-failures)
-        - 5.1.3 [Stage Sequencing Issues](#513-stage-sequencing-issues)
+        - 5.1.3 [Phase Sequencing Issues](#513-phase-sequencing-issues)
         - 5.1.4 [Pod Scheduling Issues](#514-pod-scheduling-issues)
         - 5.1.5 [Volume Mount Failures During Upgrade](#515-volume-mount-failures-during-upgrade)
         - 5.1.6 [Authentication Issues](#516-authentication-issues)
@@ -246,9 +246,9 @@ This phase ensures that both the CSI driver components and KMM module are update
 
 Update the settings in the deployment manifest according to your cluster specification and available image tags in your private registry:
 
-- `<KERNEL_VERSION>` - Worker Node kernel version, should correspond to PANFS_KMM_IMAGE, e.g: `4.18.0-553.el8_10.x86_64`
-- `<PANFS_KMM_IMAGE>` - PanFS KMM module image, e.g: `<your private registry>/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.0.a-1860775.2`
-- `<PANFS_CSI_DRIVER_IMAGE>` - PanFS CSI Driver image, e.g: `<your private registry>/panfs-csi-driver:1.0.3`
+- `<KERNEL_VERSION>` - Worker Node kernel version, should correspond to PANFS_KMM_IMAGE, e.g., `4.18.0-553.el8_10.x86_64`
+- `<PANFS_KMM_IMAGE>` - PanFS KMM module image, e.g., `<your private registry>/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.0.a-1860775.2`
+- `<PANFS_CSI_DRIVER_IMAGE>` - PanFS CSI Driver image, e.g., `<your private registry>/panfs-csi-driver:1.0.3`
 - `<IMAGE_PULL_SECRET_NAME>` - Image pull secret for fetching PanFS CSI Driver images from your private registry
 
 Review other settings relevant to your Kubernetes infrastructure, such as:
@@ -269,22 +269,21 @@ Review other settings relevant to your Kubernetes infrastructure, such as:
 #### 3.2.3 Pre-Deployment Validation
 ```bash
 # Validate deployment manifests (server-side dry run)
-kubectl apply --dry-run=server -f deploy/k8s/csi-panfs-driver.yaml
+kubectl apply --dry-run=server -f deploy/k8s/csi-driver/template-csi-panfs.yaml
 
 # Validate deployment manifests (client-side dry run)
-kubectl apply --dry-run=client -f deploy/k8s/csi-panfs-driver.yaml
+kubectl apply --dry-run=client -f deploy/k8s/csi-driver/template-csi-panfs.yaml
 
 # Check for any validation errors or warnings
-kubectl apply --validate=true --dry-run=client -f deploy/k8s/csi-panfs-driver.yaml
+kubectl apply --validate=true --dry-run=client -f deploy/k8s/csi-driver/template-csi-panfs.yaml
 ```
 
 #### 3.2.4 Execute CSI Driver and KMM Module Update
 
 ##### Deployment:
 ```bash
-# Apply updated configurations for CSI driver components only
-# (KMM module should already be updated in Stage 1 if applicable)
-kubectl apply -f deploy/k8s/csi-panfs-driver.yaml
+# Apply updated configurations for the CSI driver components and KMM module
+kubectl apply -f deploy/k8s/csi-driver/template-csi-panfs.yaml
 
 # Monitor rollout status for controller
 kubectl rollout status deployment/csi-panfs-controller -n csi-panfs --timeout=300s
@@ -310,8 +309,8 @@ kubectl logs -n csi-panfs deployment/csi-panfs-controller -c csi-attacher --tail
 kubectl logs -n csi-panfs deployment/csi-panfs-controller -c csi-resizer --tail=50
 
 # Node logs
-kubectl logs -n csi-panfs daemonset/csi-panfs-node -c csi-driver --tail=50
-kubectl logs -n csi-panfs daemonset/csi-panfs-node -c node-driver-registrar --tail=50
+kubectl logs -n csi-panfs daemonset/csi-panfs-node -c csi-panfs-plugin --tail=50
+kubectl logs -n csi-panfs daemonset/csi-panfs-node -c csi-driver-registrar --tail=50
 ```
 
 **KMM Module Validation:**
@@ -344,9 +343,9 @@ Update the following placeholders in your StorageClass manifest according to you
 |-----------|-------------|---------|
 | `<STORAGE_CLASS_NAME>` | Storage Class identifier | `csi-panfs-storage-class` |
 
-StorageClass is not a namespaced resource. But Namespace with the same name is used to keep secret with Realm access credentials.
+StorageClass is not a namespaced resource, but a Namespace with the same name is used to keep the Secret with Realm access credentials.
 
-#### Backed Realm Access Credentials
+#### Backend Realm Access Credentials
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
@@ -415,10 +414,10 @@ StorageClass is not a namespaced resource. But Namespace with the same name is u
 
 ```bash
 # Update the StorageClass manifest with your chosen parameters
-# Edit deploy/k8s/csi-panfs-storage-class.yaml with appropriate values
+# Edit deploy/k8s/storage-class/template-secret-in-driver-ns.yaml with appropriate values
 
 # Apply the updated configuration
-kubectl apply -f deploy/k8s/csi-panfs-storage-class.yaml
+kubectl apply -f deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
 ```
 
 #### 3.3.3 Validate StorageClass:
@@ -571,7 +570,7 @@ kubectl logs -n kmm-operator-system -l control-plane=controller --tail=100
 # sudo dmesg | grep panfs | tail -100
 ```
 
-#### 5.1.3 Stage Sequencing Issues
+#### 5.1.3 Phase Sequencing Issues
 ```bash
 # Verify completion of KMM module update before proceeding to CSI driver update
 kubectl wait --for=jsonpath='{.status.moduleLoader.availableNumber}'=$(kubectl get module panfs -n csi-panfs -o jsonpath='{.status.moduleLoader.desiredNumber}') module/panfs -n csi-panfs --timeout=600s
@@ -685,7 +684,7 @@ kubectl logs -n csi-panfs -l app=csi-panfs-controller --all-containers
 # Get CSI Driver Node logs
 kubectl logs -n csi-panfs -l app=csi-panfs-node --all-containers
 
-# Two-Stage Upgrade Diagnostics
+# Upgrade Sequencing Diagnostics
 # Check KMM module status
 kubectl get module panfs -n csi-panfs -o yaml
 
@@ -777,7 +776,7 @@ For issues during upgrade:
 
 2. **Review Documentation**
    - [PanFS CSI Driver Overview](./Overview.md) - Detailed information about PanFS CSI driver architecture
-   - [Usage Guide](./usage-guide.md) - Workload deployment examples and best practices
+   - [Usage Guide](./Usage-Guide.md) - Workload deployment examples and best practices
    - [Troubleshooting Guide](./Troubleshooting.md) - Comprehensive troubleshooting for common issues
    - [Diagnostics Guide](./Diagnostic.md) - Advanced diagnostic procedures and log analysis
    - Product release notes for breaking changes or known issues

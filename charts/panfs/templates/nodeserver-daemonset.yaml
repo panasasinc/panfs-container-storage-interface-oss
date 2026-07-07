@@ -105,7 +105,7 @@ spec: # csi-panfs-node
       {{- else if .Values.nodeServer.selector }}
 
       # Node selector for scheduling the DaemonSet pods
-      # Should match the nodes where the PanFS consumer workloads supposed to run
+      # Should match the nodes where the PanFS consumer workloads are supposed to run
       # Double-check that the nodes labels are correct:
       # kubectl get nodes --show-labels
       nodeSelector:
@@ -137,7 +137,7 @@ spec: # csi-panfs-node
 
           {{- if .Values.csi.resources }}
 
-          # Resource requests and limits for the driver registrar sidecar
+          # Resource requests and limits for the node plugin container
           # Limits should be set to prevent excessive resource consumption
           # Requests should be set to ensure the container gets scheduled
           resources:

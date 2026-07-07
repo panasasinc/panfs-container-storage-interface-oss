@@ -32,7 +32,7 @@ metadata:
 # The PanFS provisioner name
 provisioner: com.vdura.csi.panfs
 
-# Allow volume expansion for realms. Persistent volumes to be expanded (i.e., resized) after creation.
+# Allow volume expansion. Persistent volumes can be expanded (i.e., resized) after creation.
 allowVolumeExpansion: {{ .Values.allowVolumeExpansion }}
 
 # Possible values for volumeBindingMode:
@@ -46,7 +46,7 @@ volumeBindingMode: {{ .Values.volumeBindingMode }}
 reclaimPolicy: {{ .Values.volumeReclaimPolicy }}
 
 parameters:
-  # Relates to Secret object that contains credentials for the CSI driver
+  # References the Secret object that contains credentials for the CSI driver
   # This secret is used by the CSI driver to authenticate with the PanFS backend
   csi.storage.k8s.io/provisioner-secret-name: &secretName {{ .Release.Name }}
   csi.storage.k8s.io/provisioner-secret-namespace: &secretNamespace {{ .Release.Namespace }}

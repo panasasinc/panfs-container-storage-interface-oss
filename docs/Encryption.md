@@ -130,7 +130,7 @@ allowVolumeExpansion: true
 volumeBindingMode: WaitForFirstConsumer
 reclaimPolicy: Delete
 parameters:
-  csi.storage.k8s.io/provisioner-secret-name:            csi-panfs-storage-class  # secret name with KMIM configuration
+  csi.storage.k8s.io/provisioner-secret-name:            csi-panfs-storage-class  # secret name with KMIP configuration
   csi.storage.k8s.io/provisioner-secret-namespace:       csi-panfs-storage-class  # namespace with the secret, which contains "kmip_config_data"
   csi.storage.k8s.io/node-publish-secret-name:           csi-panfs-storage-class
   csi.storage.k8s.io/node-publish-secret-namespace:      csi-panfs-storage-class

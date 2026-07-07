@@ -250,7 +250,7 @@ roleRef:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Node Server ClusterRoleBinding
+# Bind the node ClusterRole to the node ServiceAccount
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -364,7 +364,7 @@ roleRef:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Bind the namespace Role to the controller ServiceAccount
+# Bind the provisioner Role to the controller ServiceAccount
 kind: RoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -484,7 +484,7 @@ spec: # csi-panfs-node
             - name: CSI_ENDPOINT
               value: /csi/csi.sock
 
-          # Resource requests and limits for the driver registrar sidecar
+          # Resource requests and limits for the node plugin container
           # Limits should be set to prevent excessive resource consumption
           # Requests should be set to ensure the container gets scheduled
           resources:
@@ -863,7 +863,7 @@ spec:
     # name: <IMAGE_PULL_SECRET_NAME>
 
   # Node selector for scheduling the KMM Module pods (to load the PanFS kernel module)
-  # Should match the nodes where the PanFS consumer workloads supposed to run
+  # Should match the nodes where the PanFS consumer workloads are supposed to run
   # Ensure that the nodes have the appropriate labels
   # kubectl get nodes --show-labels
   selector:
@@ -876,7 +876,7 @@ spec:
 
         # Encryption support requires loading the libwolfssl module.
         # If encryption is not needed, comment out the modulesLoadingOrder below.
-        modulesLoadingOrder: 
+        modulesLoadingOrder:
           - panfs
           - libwolfssl
 

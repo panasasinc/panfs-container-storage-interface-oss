@@ -20,10 +20,10 @@ This document contains all diagnostic commands extracted from the Troubleshootin
 
 ## Automated Collection Script
 
-For convenience, use the provided [cripts/collect-csi-diagnostics.sh](collect-csi-diagnostics.sh) script:
+For convenience, use the provided [scripts/collect-csi-diagnostics.sh](./scripts/collect-csi-diagnostics.sh) script:
 
 ```bash
-bash collect-csi-diagnostics.sh
+bash docs/scripts/collect-csi-diagnostics.sh
 ```
 
 ## Manual Command Collection
@@ -75,10 +75,10 @@ kubectl get csinode
 
 ```bash
 # Get detailed pod information for ALL CSI pods
-kubectl describe pod <pod-name> -n csi-panfs
+kubectl describe pods -n csi-panfs
 
 # Get detailed pod information for a single CSI pod (replace <pod-name> with actual pod name from step 2)
-kubectl describe pod <pod-name> -n csi-panfs 
+kubectl describe pod <pod-name> -n csi-panfs
 ```
 
 ### 4. Container Logs
@@ -95,7 +95,7 @@ kubectl logs -n csi-panfs -l app=csi-panfs-controller --all-containers --previou
 kubectl logs -n csi-panfs -l app=csi-panfs-node --all-containers --previous --tail=1000
 
 # Individual container logs (replace container names as needed)
-kubectl logs <pod-name> -c csi-panfs-driver -n csi-panfs --tail=1000
+kubectl logs <pod-name> -c csi-panfs-plugin -n csi-panfs --tail=1000
 kubectl logs <pod-name> -c csi-provisioner -n csi-panfs --tail=1000
 kubectl logs <pod-name> -c csi-attacher -n csi-panfs --tail=1000
 ```

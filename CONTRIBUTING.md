@@ -18,7 +18,7 @@
 ### 1. Local Development
 
 - Run `make build-driver-image` to build the driver and check for compiler/syntax errors.
-- Run `make sanity-check` to execute unit tests. Add or update tests for new features or bugfixes.
+- Run `make sanity-check` to execute unit tests. Add or update tests for new features or bug fixes.
 
 ### 2. Cluster Setup
 

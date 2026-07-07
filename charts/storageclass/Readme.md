@@ -43,7 +43,7 @@ To use this chart, ensure your Kubernetes cluster has the PanFS CSI driver insta
 Install the chart **in the same namespace** as the PanFS CSI driver.
 
 ```bash
-# Getting a namespace where the Panfs CSI Driver is installed in
+# Getting the namespace where the PanFS CSI Driver is installed
 PANFS_CSI_DRIVER_NAMESPACE="$(kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o jsonpath='{.metadata.annotations.csi-driver-namespace}')"
 
 # Installing chart into PanFS CSI Driver namespace
@@ -79,7 +79,7 @@ helm upgrade --install <STORAGE_CLASS_NAME> ./ \
 Install the chart **in a different namespace** than the PanFS CSI driver.
 
 ```bash
-# Getting a namespace where the Panfs CSI Driver is installed in
+# Getting the namespace where the PanFS CSI Driver is installed
 PANFS_CSI_DRIVER_NAMESPACE="$(kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o jsonpath='{.metadata.annotations.csi-driver-namespace}')"
 
 helm upgrade --install <STORAGE_CLASS_NAME> ./ \
@@ -93,10 +93,10 @@ helm upgrade --install <STORAGE_CLASS_NAME> ./ \
 ```
 
 > Note:
-> - The `--create-namespace` flag is required since installing in a new namespace.
-> - The option `setAsDefaultStorageClass=true` is used to set this storage class the default in your Kubernetes cluster
-> - A new namespace is used for keeping Helm release state, the PanFS realm credentials secret and Role/RoleBinding to let CSI Driver read it from its namespace
-> - You can choose any suitable name for `<REALM_SECRET_NAMESPACE>` but we advice set it equal to `<STORAGE_CLASS_NAME>`
+> - The `--create-namespace` flag is required when installing into a new namespace.
+> - The option `setAsDefaultStorageClass=true` is used to set this storage class as the default in your Kubernetes cluster
+> - A new namespace is used for keeping the Helm release state, the PanFS realm credentials secret, and the Role/RoleBinding that lets the CSI Driver read it from its namespace
+> - You can choose any suitable name for `<REALM_SECRET_NAMESPACE>`, but we advise setting it equal to `<STORAGE_CLASS_NAME>`
 
 #### Using Helm overrides:
 
@@ -146,9 +146,12 @@ spec:
   containers:
     - name: main-container
       image: ubuntu:latest
-      command: |
-        mount | grep /data
-        sleep infinity
+      command:
+        - sh
+        - -c
+        - |
+          mount | grep /data
+          sleep infinity
       volumeMounts:
         - mountPath: "/data"
           name: panfs-volume
@@ -222,7 +225,7 @@ helm uninstall <STORAGE_CLASS_NAME> \
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| allowVolumeExpansion | bool | `true` | Allow volume expansion for realms |
+| allowVolumeExpansion | bool | `true` | Allow expansion of provisioned volumes |
 | allowedTopologies | object | `{}` | Allowed topologies for volume provisioning This can be used to restrict volume provisioning to specific nodes or zones based on node labels. Uncomment and modify the example below as needed. If left empty, no topology constraints will be applied. |
 | csiPanFSDriver.namespace | string | `"csi-panfs"` | Namespace where the PanFS CSI driver is deployed |
 | mountOptions | list | `[]` |  |
@@ -233,7 +236,7 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | realm.privateKey | string | `""` | Private key for the PanFS backend realm |
 | realm.privateKeyPassphrase | string | `""` | Private Key Passphrase |
 | realm.username | string | `""` | Username for the PanFS backend realm |
-| setAsDefaultStorageClass | bool | `false` | Whether to set current storage class default for the cluster or not |
+| setAsDefaultStorageClass | bool | `false` | Whether to set this storage class as the default for the cluster |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |
 | volumeReclaimPolicy | string | `Delete` | Default reclaim policy for volumes |
 

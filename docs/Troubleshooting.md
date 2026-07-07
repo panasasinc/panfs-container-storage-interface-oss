@@ -30,7 +30,6 @@ This guide provides comprehensive troubleshooting steps for common issues encoun
   - [6. Storage Class Issues](#6-storage-class-issues)
   - [7. Network Connectivity Issues](#7-network-connectivity-issues)
 - [Diagnostic Commands](#diagnostic-commands)
-- [Log Analysis](#log-analysis)
 - [Getting Help](#getting-help)
 
 ---
@@ -71,7 +70,7 @@ kubectl get pods -n csi-panfs -o wide
 kubectl describe pod <pod-name> -n csi-panfs
 
 # Check container logs (replace container names as needed)
-kubectl logs <pod-name> -c csi-panfs-driver -n csi-panfs
+kubectl logs <pod-name> -c csi-panfs-plugin -n csi-panfs
 kubectl logs <pod-name> -c csi-provisioner -n csi-panfs --previous
 ```
 
@@ -291,7 +290,7 @@ kubectl get secret -n $NAMESPACE $SECRET_NAME
   # Test connectivity from a node
   kubectl run test-connectivity --image=busybox --rm -it -- ping <realm-ip>
   
-  # Test specific ports (replace <realm-ip> with actual PanFS port)
+  # Test specific ports (replace <realm-ip> and <port> with the actual PanFS address and port)
   kubectl run test-connectivity --image=nicolaka/netshoot --rm -it -- telnet <realm-ip> <port>
   
   # Check firewall rules and routing
@@ -451,7 +450,7 @@ kubectl run dns-test --image=busybox --rm -it -- nslookup <realm-hostname>
     kubectl debug node/$node -it --image=nicolaka/netshoot -- ping -c 3 <realm-ip>
   done
   
-  # Check required ports (common PanFS ports: 106, 988, 7406
+  # Check required ports (common PanFS ports: 106, 988, 7406)
   kubectl run port-test --image=nicolaka/netshoot --rm -it -- nc -zv <realm-ip> 988
   ```
 
@@ -501,7 +500,7 @@ kubectl logs -n csi-panfs -l app=csi-panfs-node --all-containers
 ### Getting Help
 
 - **KMM Issues**: Check module status (`kubectl get module panfs -n csi-panfs`) and node labels if modules fail to load
-- **Registry Errors**: Ensure `$REGISTRY_CREDS_FILE` is valid and accessible
+- **Registry Errors**: Ensure your image pull secret credentials are valid and the registry is accessible
 - **Additional Resources**:
-  - [kmm.md](./kmm.md): KMM configuration details
-  - [usage-guide.md](./usage-guide.md): Workload deployment examples
+  - [KMM.md](./KMM.md): KMM configuration details
+  - [Usage-Guide.md](./Usage-Guide.md): Workload deployment examples
