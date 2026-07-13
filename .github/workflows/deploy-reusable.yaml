@@ -62,7 +62,7 @@ jobs:
     runs-on: ${{ inputs.runner-label }}
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Setup KinD Cluster
         if: ${{ inputs.runner-label == 'ubuntu-latest' }}
@@ -77,7 +77,7 @@ jobs:
 
       - name: GHCR Auth
         id: ghcr-auth
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: "ghcr.io"
           username: "${{ github.actor }}"
