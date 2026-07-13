@@ -1,0 +1,54 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Dependabot keeps dependencies up to date and, together with Dependabot
+# security updates, opens PRs to remediate known CVEs. Version-update PRs run
+# on a monthly cadence; security updates are raised as soon as an advisory is
+# published, regardless of this schedule.
+version: 2
+updates:
+  # Go module dependencies
+  - package-ecosystem: "gomod"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    groups:
+      go-dependencies:
+        patterns:
+          - "*"
+
+  # GitHub Actions used in workflows and composite actions
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    groups:
+      github-actions:
+        patterns:
+          - "*"
+
+  # Docker base images
+  - package-ecosystem: "docker"
+    directories:
+      - "/"
+      - "/tests/csi_sanity"
+    schedule:
+      interval: "monthly"
+    open-pull-requests-limit: 10
+    groups:
+      docker-images:
+        patterns:
+          - "*"
