@@ -12,7 +12,7 @@ This file covers every release published in this repository, starting with 1.2.1
 Versions 1.0.0 to 1.2.0 were released before the driver became open source;
 the [compatibility matrix](README.md#compatibility) lists them, but this repository has no history for them.
 
-## [1.2.6] - Unreleased
+## [1.2.6] - 2026-11-18
 
 ### Changed
 
@@ -142,7 +142,7 @@ First open source release of the PanFS CSI Driver.
   for build, test, vulnerability scan and release.
 - Documentation: overview, usage, upgrade, SELinux, KMM, troubleshooting, and a script that collects diagnostics.
 
-[1.2.6]: https://github.com/panasasinc/panfs-container-storage-interface-oss/compare/1.2.5...HEAD
+[1.2.6]: https://github.com/panasasinc/panfs-container-storage-interface-oss/compare/1.2.5...1.2.6
 [1.2.5]: https://github.com/panasasinc/panfs-container-storage-interface-oss/compare/1.2.4...1.2.5
 [1.2.4]: https://github.com/panasasinc/panfs-container-storage-interface-oss/compare/1.2.3...1.2.4
 [1.2.3]: https://github.com/panasasinc/panfs-container-storage-interface-oss/compare/1.2.2...1.2.3
