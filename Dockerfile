@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the Go version to use (default: 1.25)
-ARG GOLANG_VERSION=1.25
+# Set the Go version to use (default: 1.27)
+ARG GOLANG_VERSION=1.27
 
 # MARK: Stage 1: Download Go modules for caching
 FROM golang:${GOLANG_VERSION} AS modules

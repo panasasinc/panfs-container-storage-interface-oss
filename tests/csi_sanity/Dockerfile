@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the Go version to use (default: 1.24)
-ARG GOLANG_VERSION=1.24
+# Set the Go version to use (default: 1.27)
+ARG GOLANG_VERSION=1.27
 
 FROM golang:${GOLANG_VERSION} AS tests
 ARG K8S_VERSION=1.30.13

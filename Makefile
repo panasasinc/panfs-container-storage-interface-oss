@@ -76,7 +76,7 @@ TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi
 compile-driver-bin: ## Compile the PanFS CSI Driver binary
 	@printf "$(BOLD)Compiling PanFS CSI Driver binary...$(RESET)\n"
 	@mkdir -p build
-	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 go build -o build/panfs-csi cmd/csi-plugin/main.go
+	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.27 go build -o build/panfs-csi cmd/csi-plugin/main.go
 	@printf "$(GREEN)Successfully compiled PanFS CSI Driver binary$(RESET)\n\n"
 
 .PHONY: build
@@ -123,12 +123,12 @@ build-test-image: ## Build the test image for the PanFS CSI Driver
 .PHONY: run-unit-tests
 run-unit-tests: ## Run unit tests for the PanFS CSI Driver
 	@printf "$(BOLD)Running unit tests for the PanFS CSI Driver...$(RESET)\n"
-	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 go test -v -race ./pkg/...
+	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.27 go test -v -race ./pkg/...
 	@printf "$(GREEN)Successfully ran unit tests for the PanFS CSI Driver$(RESET)\n\n"
 
 .PHONY: coverage
 coverage: ## Get code coverage report
-	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 bash -c ' \
+	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.27 bash -c ' \
 		go test -coverprofile=coverage.out ./...; \
 		go tool cover -html=coverage.out -o coverage.html \
 	'
