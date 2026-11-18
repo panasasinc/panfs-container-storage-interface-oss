@@ -59,6 +59,16 @@ jobs:
         with:
           version: v2.15
 
+  version-consistency:
+    name: Version consistency
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # Charts, manifests, the Makefile and the documentation must all use the chart appVersion
+      - name: Check that everything uses one driver version
+        run: make check-version
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:

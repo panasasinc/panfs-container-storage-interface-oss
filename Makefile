@@ -428,3 +428,7 @@ manifests: manifest-driver manifest-storageclass ## Generate manifests for the P
 		exit 1; \
 	fi
 	@printf "$(GREEN)Successfully generated documentation for the PanFS CSI Driver and Storage Class$(RESET)\n\n"
+
+.PHONY: check-version
+check-version: ## Check that charts, manifests and docs use one driver version (VERSION=X.Y.Z, default: chart appVersion)
+	@bash tests/helper/lib/check-version.sh '$(VERSION)'

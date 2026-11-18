@@ -16,11 +16,9 @@ name: Create Release
 
 on:
   workflow_dispatch:
+    # The release version is not an input: it is the appVersion of charts/panfs/Chart.yaml on main.
+    # Set the version everywhere in a pull request first (see `make check-version`), then run this workflow.
     inputs:
-      version:
-        description: 'Release version (X.Y.Z, e.g. 1.2.6)'
-        required: true
-        type: string
       draft:
         description: 'Create the GitHub Release as a draft'
         required: false
@@ -28,11 +26,13 @@ on:
         default: false
 
 jobs:
-  create-release:
-    name: Tag and GitHub Release
+  # Runs first: reads the release version from the driver chart, and stops the release
+  # while a chart, a manifest or a document names another version, or when the tag already exists.
+  check-version:
+    name: Version consistency
     runs-on: ubuntu-latest
     permissions:
-      contents: write
+      contents: read
     outputs:
       version: ${{ steps.version.outputs.version }}
     steps:
@@ -46,40 +46,49 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v7
         with:
-          # Full history is required to check existing tags and generate release notes
+          # Full history is required to check existing tags
           fetch-depth: 0
 
-      - name: Validate version
+      - name: Read the release version from the driver chart
         id: version
-        env:
-          VERSION: ${{ inputs.version }}
         run: |
+          VERSION=$(sed -n -E 's/^appVersion: "([^"]*)"$/\1/p' charts/panfs/Chart.yaml)
           if ! echo "$VERSION" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+$'; then
-            echo "::error::Version '$VERSION' must match X.Y.Z (e.g. 1.2.6)"
+            echo "::error::appVersion '$VERSION' in charts/panfs/Chart.yaml must match X.Y.Z (e.g. 1.2.6)"
             exit 1
           fi
           if git rev-parse -q --verify "refs/tags/$VERSION" >/dev/null; then
-            echo "::error::Tag '$VERSION' already exists"
+            echo "::error::Tag '$VERSION' already exists. Set the next version in a pull request before releasing."
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "Release version: **$VERSION**" >> "$GITHUB_STEP_SUMMARY"
 
-      # Keep Helm chart versions in sync with the release tag
-      - name: Bump Helm chart versions
+      - name: Check that everything uses the release version
         env:
           VERSION: ${{ steps.version.outputs.version }}
-        run: |
-          for chart in charts/panfs/Chart.yaml charts/storageclass/Chart.yaml; do
-            sed -i -E "s/^version: \"[^\"]*\"/version: \"$VERSION\"/" "$chart"
-            sed -i -E "s/^appVersion: \"[^\"]*\"/appVersion: \"$VERSION\"/" "$chart"
-          done
-          git diff --stat
+        run: make check-version VERSION="$VERSION"
+
+  create-release:
+    name: Tag and GitHub Release
+    needs: check-version
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      version: ${{ needs.check-version.outputs.version }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+        with:
+          # Full history is required to generate release notes
+          fetch-depth: 0
 
       # The changelog entry of the next release is marked "Unreleased" on main.
       # Stamp it with the release date, and fail when the release has no entry.
       - name: Stamp CHANGELOG.md
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.check-version.outputs.version }}
         run: |
           escaped="${VERSION//./\\.}"
           if ! grep -Eq "^## \[$escaped\]( |$)" CHANGELOG.md; then
@@ -90,14 +99,16 @@ jobs:
           sed -i -E "s#^(\[$escaped\]: .*)\.\.\.HEAD\$#\1...$VERSION#" CHANGELOG.md
           git diff --stat -- CHANGELOG.md
 
-      - name: Commit version bump and push tag
+      # The chart versions are set in a pull request before the release (the check-version job enforces it),
+      # so the changelog stamp is the only change that this workflow commits.
+      - name: Commit the changelog stamp and push tag
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.check-version.outputs.version }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ! git diff --quiet; then
-            git add charts/panfs/Chart.yaml charts/storageclass/Chart.yaml CHANGELOG.md
+            git add CHANGELOG.md
             git commit -m "chore(release): $VERSION"
             git push origin main
           fi
@@ -107,7 +118,7 @@ jobs:
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.check-version.outputs.version }}
         run: |
           gh release create "$VERSION" \
             --title "$VERSION" \

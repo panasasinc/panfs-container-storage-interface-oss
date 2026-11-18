@@ -43,6 +43,10 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 
 - `SECURITY.md`, `CHANGELOG.md`, `.dockerignore` and a golangci-lint configuration (`.golangci.yml`).
 - Unit tests for `pkg/utils`.
+- `make check-version` checks that the charts, the manifests, the `Makefile` and the documentation use one driver version.
+  CI runs it on every push, and the Create Release workflow runs it first and stops on a mismatch.
+- The Create Release workflow no longer asks for a version: it releases the `appVersion` of `charts/panfs/Chart.yaml`.
+  Set the next version in a pull request (charts, `make manifests`, `Makefile`, changelog, compatibility matrix) first.
 
 ## [1.2.5] - 2026-07-07
 
