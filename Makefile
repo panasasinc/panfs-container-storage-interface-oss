@@ -422,7 +422,7 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 .PHONY: manifests
 manifests: manifest-driver manifest-storageclass ## Generate manifests for the PanFS CSI Driver and Storage Class
 	@if command -v helm-docs >/dev/null 2>&1; then \
-		helm-docs; \
+		helm-docs --template-files Readme.md.gotmpl --output-file Readme.md; \
 	else \
 		printf "$(RED)Error: helm-docs not found, skipping documentation generation$(RESET)\n"; \
 		exit 1; \

@@ -28,6 +28,11 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 - The default `CSI_IMAGE` in the `Makefile` uses the published image name `panfs-csi-driver`.
 - GitHub Actions are updated, and `aquasecurity/trivy-action` is pinned to a release instead of the `master` branch.
 
+- A driver image that is built without `APP_VERSION` reports the version `dev`, not a release number.
+  Release builds and `make build-driver-image` always pass the version.
+- `make manifests` passes the chart readme file names (`Readme.md`, `Readme.md.gotmpl`) to `helm-docs`,
+  so it works on a case-sensitive file system. CI regenerates the manifests and fails when the result differs.
+
 ### Fixed
 
 - `NodePublishVolume` rejects a volume with the `SINGLE_NODE_SINGLE_WRITER` access mode that is already published
@@ -38,6 +43,7 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 ### Removed
 
 - The unused `internal/jsonlog` package.
+- The Go Report Card badge in `README.md`; the service is retired.
 
 ### Added
 

@@ -25,7 +25,7 @@ RUN go mod download
 
 # MARK: Stage 2: Build the Go binary
 FROM golang:${GOLANG_VERSION} AS builder
-ARG APP_VERSION="1.2.6"
+ARG APP_VERSION="dev"
 
 # Copy downloaded Go modules from previous stage
 COPY --from=modules /go/pkg /go/pkg

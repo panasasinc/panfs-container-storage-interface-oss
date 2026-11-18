@@ -17,7 +17,7 @@ description: 'Builds Docker image for CSI driver.'
 inputs:
   app-version:
     description: Driver application version
-    default: '1.2.6'
+    default: 'dev'
     required: false
   build-target:
     description: Build target in Dockerfile

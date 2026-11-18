@@ -69,6 +69,36 @@ jobs:
       - name: Check that everything uses one driver version
         run: make check-version
 
+  manifests-up-to-date:
+    name: Generated manifests are up to date
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version: ${{ env.GO_VERSION }}
+
+      # Pinned: another helm or helm-docs version can render the same charts differently
+      - name: Install helm
+        uses: azure/setup-helm@v5.1.0
+        with:
+          version: v3.22.1
+
+      - name: Install helm-docs
+        run: go install github.com/norwoodj/helm-docs/cmd/helm-docs@v1.14.2
+
+      # deploy/k8s and the chart readmes are generated from the charts. A difference means that a chart
+      # changed without `make manifests`, or that a generated file was edited by hand.
+      - name: Regenerate and compare
+        run: |
+          make manifests
+          if [ -n "$(git status --porcelain)" ]; then
+            git status --porcelain
+            git diff
+            echo "::error::Generated files are not up to date. Run 'make manifests' and commit the result."
+            exit 1
+          fi
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:
