@@ -1,0 +1,8 @@
+# The driver image is built from the Go sources only (see Dockerfile).
+# Keep everything else out of the build context, so that changes to docs, charts
+# or manifests do not invalidate the build cache and nothing local leaks into it.
+*
+!cmd/
+!pkg/
+!go.mod
+!go.sum

@@ -108,6 +108,7 @@ This matrix defines the supported versions of Kubernetes and the CSI Specificati
 | **1.2.3**         | 1.30.1+            | 1.11.0           |
 | **1.2.4**         | 1.30.1+            | 1.11.0           |
 | **1.2.5**         | 1.30.1+            | 1.11.0           |
+| **1.2.6**         | 1.30.1+            | 1.14.0           |
 
 ## Getting started
 

@@ -3,7 +3,7 @@
 
 A Helm chart for deploying VDURA PanFS CSI controller, node components, and KMM module
 
-![Version: 1.2.5](https://img.shields.io/badge/Version-1.2.5-informational?style=flat-square) ![AppVersion: 1.2.5](https://img.shields.io/badge/AppVersion-1.2.5-informational?style=flat-square)
+![Version: 1.2.6](https://img.shields.io/badge/Version-1.2.6-informational?style=flat-square) ![AppVersion: 1.2.6](https://img.shields.io/badge/AppVersion-1.2.6-informational?style=flat-square)
 
 ## Prerequisites
 
@@ -17,9 +17,9 @@ A Helm chart for deploying VDURA PanFS CSI controller, node components, and KMM 
 | Compatible with CSI Version  | Container Image | [Min K8s Version](https://kubernetes-csi.github.io/docs/kubernetes-compatibility.html#minimum-version) | [Recommended K8s Version](https://kubernetes-csi.github.io/docs/kubernetes-compatibility.html#recommended-version) |
 |---|---|---|---|
 | [CSI Spec v1.9.0](https://github.com/container-storage-interface/spec/releases/tag/v1.9.0) | [registry.k8s.io/sig-storage/csi-provisioner:v5.3.0](https://github.com/kubernetes-csi/external-provisioner) | 1.20 | 1.31 |
-| [CSI Spec v1.10.0](https://github.com/container-storage-interface/spec/releases/tag/v1.10.0) | [gcr.io/k8s-staging-sig-storage/csi-resizer:v1.13.2](https://github.com/kubernetes-csi/external-resizer) | 1.16 | 1.32 |
-| [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [registry.k8s.io/sig-storage/csi-attacher:v4.9.0](https://github.com/kubernetes-csi/external-attacher) | 1.17 | 1.22 |
-| [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0](https://github.com/kubernetes-csi/node-driver-registrar) | 1.13 | 1.23.10 |
+| [CSI Spec v1.10.0](https://github.com/container-storage-interface/spec/releases/tag/v1.10.0) | [registry.k8s.io/sig-storage/csi-resizer:v1.14.0](https://github.com/kubernetes-csi/external-resizer) | 1.16 | 1.32 |
+| [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [registry.k8s.io/sig-storage/csi-attacher:v4.13.0](https://github.com/kubernetes-csi/external-attacher) | 1.17 | 1.36 |
+| [CSI Spec v1.5.0](https://github.com/container-storage-interface/spec/releases/tag/v1.5.0) | [registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0](https://github.com/kubernetes-csi/node-driver-registrar) | 1.13 | 1.23.10 |
 
 > **NOTE**: Version compatibility information is based on the upstream [Kubernetes CSI documentation](https://kubernetes-csi.github.io/docs/kubernetes-compatibility.html).
 
@@ -101,7 +101,7 @@ The `values.yaml` file contains configurable parameters.
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | controllerServer.affinity | object | `{...}` | Affinity rules for controller pods |
-| controllerServer.attacher.image | string | `"k8s.gcr.io/sig-storage/csi-attacher:v4.9.0"` | CSI attacher image |
+| controllerServer.attacher.image | string | `"registry.k8s.io/sig-storage/csi-attacher:v4.13.0"` | CSI attacher image |
 | controllerServer.attacher.logLevel | int | `5` | Log level for attacher |
 | controllerServer.attacher.pullPolicy | string | `"IfNotPresent"` | Image pull policy for attacher |
 | controllerServer.attacher.resources | object | `{...}` | Resource requests and limits for attacher |
@@ -110,7 +110,7 @@ The `values.yaml` file contains configurable parameters.
 | controllerServer.podDisruptionBudget | object | `{"minAvailable":1}` | PodDisruptionBudget for controller server |
 | controllerServer.podDisruptionBudget.minAvailable | int | `1` | Minimum number of available pods for controller |
 | controllerServer.priorityClassName | string | `"system-cluster-critical"` | Priority class for controller pods |
-| controllerServer.provisioner.image | string | `"k8s.gcr.io/sig-storage/csi-provisioner:v5.3.0"` | CSI provisioner image |
+| controllerServer.provisioner.image | string | `"registry.k8s.io/sig-storage/csi-provisioner:v5.3.0"` | CSI provisioner image |
 | controllerServer.provisioner.logLevel | int | `5` | Log level for provisioner |
 | controllerServer.provisioner.pullPolicy | string | `"IfNotPresent"` | Image pull policy for provisioner |
 | controllerServer.provisioner.resources | object | `{...}` | Resource requests and limits for provisioner |
@@ -118,7 +118,7 @@ The `values.yaml` file contains configurable parameters.
 | controllerServer.provisioner.timeout | string | `"60s"` | Timeout for provisioner operations |
 | controllerServer.provisioner.workerThreads | int | `5` | Number of worker threads for provisioner |
 | controllerServer.replicaCount | int | `3` | Number of controller replicas |
-| controllerServer.resizer.image | string | `"gcr.io/k8s-staging-sig-storage/csi-resizer:v1.13.2"` | CSI resizer image |
+| controllerServer.resizer.image | string | `"registry.k8s.io/sig-storage/csi-resizer:v1.14.0"` | CSI resizer image |
 | controllerServer.resizer.logLevel | int | `5` | Log level for resizer |
 | controllerServer.resizer.pullPolicy | string | `"IfNotPresent"` | Image pull policy for resizer |
 | controllerServer.resizer.resources | object | `{...}` | Resource requests and limits for resizer |
@@ -144,7 +144,7 @@ The `values.yaml` file contains configurable parameters.
 | kmm.pullPolicy | string | `"Always"` | Image pull policy for the KMM module |
 | kmm.selector | object | `{"node-role.kubernetes.io/worker":""}` | Node selector for the KMM module (nodes where the PanFS kernel module should be loaded) |
 | labels | object | `{}` | Labels for the CSI driver workloads |
-| nodeServer.driverRegistrar.image | string | `"k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0"` | CSI node driver registrar image |
+| nodeServer.driverRegistrar.image | string | `"registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0"` | CSI node driver registrar image |
 | nodeServer.driverRegistrar.logLevel | int | `5` | Log level for driver registrar |
 | nodeServer.driverRegistrar.pullPolicy | string | `"IfNotPresent"` | Image pull policy for driver registrar |
 | nodeServer.driverRegistrar.resources | object | `{...}` | Resource requests and limits for driver registrar |

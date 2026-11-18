@@ -20,7 +20,7 @@ on:
       app-version:
         description: Driver application version
         type: string
-        default: '0.2.0'
+        default: '1.2.6'
         required: false
       build-target:
         description: Build target in Dockerfile

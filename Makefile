@@ -67,7 +67,7 @@ else
 SET_STORAGECLASS_DEFAULT := false
 endif
 
-CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi:1.2.3
+CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
 TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
 
 ## [Build Driver and DFC Images]
@@ -240,7 +240,7 @@ deploy-driver-with-manifest:
 	sed 's@<PANFS_DFC_KMM_PRIVATE_REGISTRY>@$(DFC_REGISTRY)@g' | \
 	sed 's@[^ ]*panfs-csi-driver:.*@$(CSI_IMAGE)@g' | \
 	kubectl apply --server-side -f -
-	@printf "$(GREEN)Successfully deployed PanFS CSI Driver using manifest file deploy/k8s/csi-panfs-driver.yaml$(RESET)\n\n"
+	@printf "$(GREEN)Successfully deployed PanFS CSI Driver using manifest file deploy/k8s/csi-driver/template-csi-panfs.yaml$(RESET)\n\n"
 
 .PHONY: deploy-driver
 deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
@@ -375,7 +375,7 @@ manifest-driver: ## Generate manifests for the PanFS CSI Driver
 	helm template csi-panfs charts/panfs --namespace csi-panfs --set imagePullSecrets[0]="<IMAGE_PULL_SECRET_NAME>" > deploy/k8s/csi-driver/template-csi-panfs.yaml
 	helm template csi-panfs charts/panfs --namespace csi-panfs --set seLinux=false > deploy/k8s/csi-driver/template-csi-panfs-without-selinux.yaml
 	helm template csi-panfs charts/panfs --namespace csi-panfs --set kmm.enabled=false > deploy/k8s/csi-driver/template-csi-panfs-without-kmm.yaml
-	helm template csi-panfs charts/panfs --namespace csi-panfs --set dfc.encryptionSupport=true > deploy/k8s/csi-driver/template-csi-panfs-with-e2ee.yaml
+	helm template csi-panfs charts/panfs --namespace csi-panfs --set kmm.encryptionSupport=true > deploy/k8s/csi-driver/template-csi-panfs-with-e2ee.yaml
 	sed -i $(shell sed -h 2>&1 | grep GNU >/dev/null || echo "''") '/^# Source:/d' deploy/k8s/csi-driver/*.yaml
 	@printf "$(GREEN)Successfully generated manifests for the PanFS CSI Driver$(RESET)\n\n"
 
