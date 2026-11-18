@@ -31,7 +31,9 @@ updates:
 
   # GitHub Actions used in workflows and composite actions
   - package-ecosystem: "github-actions"
-    directory: "/"
+    directories:
+      - "/"
+      - "/.github/actions/*"
     schedule:
       interval: "monthly"
     open-pull-requests-limit: 10
@@ -44,6 +46,7 @@ updates:
   - package-ecosystem: "docker"
     directories:
       - "/"
+      - "/dfc"
       - "/tests/csi_sanity"
     schedule:
       interval: "monthly"
