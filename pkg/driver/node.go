@@ -317,7 +317,7 @@ func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*
 
 	// Set the label when starting up
 	nodeLabelValue := "true"
-	if err := d.updateNodeLabel(NodeLabelKey, nodeLabelValue); err != nil {
+	if err := d.updateNodeLabel(ctx, NodeLabelKey, nodeLabelValue); err != nil {
 		d.log.Error(err, "failed to set node label")
 		return &csi.NodeGetInfoResponse{
 			NodeId: d.host,
