@@ -25,6 +25,8 @@ For releases before 1.2.6, see the
 
 ### Fixed
 
+- `NodePublishVolume` rejects a volume with the `SINGLE_NODE_SINGLE_WRITER` access mode that is already published
+  at another target path on the node (`FailedPrecondition`). Before, the second publish succeeded.
 - `make manifest-driver` set `dfc.encryptionSupport`, which is not a chart value; it now sets `kmm.encryptionSupport`.
 - The removal of the node label during shutdown is limited to 10 seconds, so a slow API server cannot block the exit.
 

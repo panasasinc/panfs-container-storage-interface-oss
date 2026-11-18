@@ -98,6 +98,20 @@ func (p *PanFSMounter) Unmount(target string) error {
 	return mount.CleanupMountPoint(target, p.mounter, false)
 }
 
+// MountedTargets returns the paths where the given source is mounted on this node.
+//
+// Parameters:
+//
+//	source - The mount source, for example panfs://<realm>/<volume>.
+//
+// Returns:
+//
+//	[]string - The mount points of the source; empty if the source is not mounted.
+//	error    - Returns an error if the mount table cannot be read.
+func (p *PanFSMounter) MountedTargets(source string) ([]string, error) {
+	return mountedTargets(p.mounter, source)
+}
+
 // NewPanFSMounter creates a new PanFSMounter instance using the default mount interface.
 //
 // Returns:
@@ -191,6 +205,36 @@ func (p *PanFSFakeMounter) BindMount(source, target string, options []string) er
 //	error - Returns an error if unmount fails.
 func (p *PanFSFakeMounter) Unmount(target string) error {
 	return p.fakeMounter.Unmount(target)
+}
+
+// MountedTargets returns the paths where the given source is mounted, as recorded by the fake mounter.
+//
+// Parameters:
+//
+//	source - The mount source, for example panfs://<realm>/<volume>.
+//
+// Returns:
+//
+//	[]string - The mount points of the source; empty if the source is not mounted.
+//	error    - Returns an error if the mount table cannot be read.
+func (p *PanFSFakeMounter) MountedTargets(source string) ([]string, error) {
+	return mountedTargets(p.fakeMounter, source)
+}
+
+// mountedTargets lists the mount points whose device is the given source.
+func mountedTargets(lister mount.Interface, source string) ([]string, error) {
+	mountPoints, err := lister.List()
+	if err != nil {
+		return nil, fmt.Errorf("failed to list mount points: %w", err)
+	}
+
+	var targets []string
+	for _, mountPoint := range mountPoints {
+		if mountPoint.Device == source {
+			targets = append(targets, mountPoint.Path)
+		}
+	}
+	return targets, nil
 }
 
 // makeDir creates a directory at the specified path with 0755 permissions.

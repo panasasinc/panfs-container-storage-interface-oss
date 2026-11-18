@@ -56,6 +56,8 @@ type PanMounter interface {
 	Mount(source string, target string, options []string) error
 	BindMount(source string, target string, options []string) error
 	Unmount(target string) error
+	// MountedTargets returns the paths where the given source is mounted on this node.
+	MountedTargets(source string) ([]string, error)
 }
 
 // Driver represents the CSI driver for PanFS, implementing identity, controller, and node services.

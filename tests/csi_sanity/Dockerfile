@@ -22,7 +22,7 @@ ARG K8S_VERSION=1.30.14
 RUN mkdir -p /tests
 
 # Install csi-sanity test tool
-RUN go install -v github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity@v5.3.1
+RUN go install -v github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity@v5.6.0
 
 # Install required packages for testing
 RUN apt-get update && \
