@@ -42,7 +42,7 @@ COPY go.mod go.sum ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${APP_VERSION}" -o /bin/panfs-csi ./cmd/csi-plugin/main.go
 
 # MARK: Stage 3: Create the final image
-FROM alpine:3.22 AS plugin
+FROM alpine:3.24 AS plugin
 
 ARG BUILD_DATE
 ARG VERSION
