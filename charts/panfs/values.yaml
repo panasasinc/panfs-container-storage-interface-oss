@@ -54,7 +54,7 @@ controllerServer:
   # CSI provisioner configuration
   provisioner:
     # -- CSI provisioner image
-    image: k8s.gcr.io/sig-storage/csi-provisioner:v5.3.0
+    image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
     # -- Image pull policy for provisioner
     pullPolicy: IfNotPresent
     # -- Log level for provisioner
@@ -79,7 +79,7 @@ controllerServer:
   # CSI attacher configuration
   attacher:
     # -- CSI attacher image
-    image: k8s.gcr.io/sig-storage/csi-attacher:v4.9.0
+    image: registry.k8s.io/sig-storage/csi-attacher:v4.13.0
     # -- Image pull policy for attacher
     pullPolicy: IfNotPresent
     # -- Log level for attacher
@@ -99,7 +99,7 @@ controllerServer:
   # CSI resizer configuration
   resizer:
     # -- CSI resizer image
-    image: gcr.io/k8s-staging-sig-storage/csi-resizer:v1.13.2
+    image: registry.k8s.io/sig-storage/csi-resizer:v1.14.0
     # -- Image pull policy for resizer
     pullPolicy: IfNotPresent
     # -- Log level for resizer
@@ -136,7 +136,7 @@ nodeServer:
   # CSI node driver registrar configuration
   driverRegistrar:
     # -- CSI node driver registrar image
-    image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0
+    image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0
     # -- Image pull policy for driver registrar
     pullPolicy: IfNotPresent
     # -- Log level for driver registrar

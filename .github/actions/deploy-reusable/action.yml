@@ -70,7 +70,7 @@ runs:
         echo "::endgroup::"
 
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         ref: ${{ inputs.ref }}
 
@@ -90,7 +90,7 @@ runs:
 
     - name: Install helm
       if: ${{ inputs.driver-installation-type == 'helm' }}
-      uses: azure/setup-helm@v4.3.0
+      uses: azure/setup-helm@v5.1.0
 
     - name: Deploy CSI driver
       if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'driver' }}

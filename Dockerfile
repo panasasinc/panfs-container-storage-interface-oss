@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the Go version to use (default: 1.25)
-ARG GOLANG_VERSION=1.25
+# Set the Go version to use (default: 1.27)
+ARG GOLANG_VERSION=1.27
 
 # MARK: Stage 1: Download Go modules for caching
 FROM golang:${GOLANG_VERSION} AS modules
@@ -25,7 +25,7 @@ RUN go mod download
 
 # MARK: Stage 2: Build the Go binary
 FROM golang:${GOLANG_VERSION} AS builder
-ARG APP_VERSION="0.2.0"
+ARG APP_VERSION="dev"
 
 # Copy downloaded Go modules from previous stage
 COPY --from=modules /go/pkg /go/pkg
@@ -42,7 +42,7 @@ COPY go.mod go.sum ./
 RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${APP_VERSION}" -o /bin/panfs-csi ./cmd/csi-plugin/main.go
 
 # MARK: Stage 3: Create the final image
-FROM alpine:3.22 AS plugin
+FROM alpine:3.24 AS plugin
 
 ARG BUILD_DATE
 ARG VERSION

@@ -25,6 +25,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
@@ -55,6 +56,8 @@ type PanMounter interface {
 	Mount(source string, target string, options []string) error
 	BindMount(source string, target string, options []string) error
 	Unmount(target string) error
+	// MountedTargets returns the paths where the given source is mounted on this node.
+	MountedTargets(source string) ([]string, error)
 }
 
 // Driver represents the CSI driver for PanFS, implementing identity, controller, and node services.
@@ -87,6 +90,9 @@ const (
 const (
 	DefaultDriverName string = "com.vdura.csi.panfs"
 )
+
+// nodeLabelUpdateTimeout bounds the node label removal that runs during shutdown.
+const nodeLabelUpdateTimeout = 10 * time.Second
 
 // FileWriter defines an interface for writing to files.
 type FileWriter interface {
@@ -219,10 +225,13 @@ func (d *Driver) Run() error {
 
 		d.log.Info("shutting down server", "signal", s.String())
 
-		// Unset the node label when shutting down
-		if err := d.updateNodeLabel(NodeLabelKey, ""); err != nil {
+		// Unset the node label when shutting down. The request contexts are gone at this
+		// point, so bound the API call with its own timeout instead of blocking the shutdown.
+		ctx, cancel := context.WithTimeout(context.Background(), nodeLabelUpdateTimeout)
+		if err := d.updateNodeLabel(ctx, NodeLabelKey, ""); err != nil {
 			d.log.Error(err, "failed to remove node label")
 		}
+		cancel()
 
 		grpcServer.GracefulStop()
 		shutdownError <- nil
@@ -250,6 +259,7 @@ func (d *Driver) Run() error {
 //
 // Parameters:
 //
+//	ctx   - The context that bounds the Kubernetes API call.
 //	key   - The label key to set or remove.
 //	value - The label value to set. If empty, the label will be removed.
 //
@@ -262,7 +272,7 @@ func (d *Driver) Run() error {
 //   - If the global variable IsNodeLabelSet is false and value is empty, the function does nothing.
 //   - If value is empty, the function removes the label with the specified key from the node.
 //   - If value is non-empty, the function sets the label with the specified key to the given value on the node.
-func (d *Driver) updateNodeLabel(key, value string) error {
+func (d *Driver) updateNodeLabel(ctx context.Context, key, value string) error {
 	// If kubeClient is not initialized, do nothing
 	if d.kubeClient == nil {
 		return nil
@@ -283,7 +293,7 @@ func (d *Driver) updateNodeLabel(key, value string) error {
 	}
 
 	_, err := d.kubeClient.CoreV1().Nodes().Patch(
-		context.TODO(),
+		ctx,
 		d.host,
 		types.MergePatchType,
 		patch,

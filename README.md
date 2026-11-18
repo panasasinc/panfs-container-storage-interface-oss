@@ -4,7 +4,6 @@ The official CSI Driver for integrating **PanFS** storage with Container Orchest
 
 [![Driver deployment](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/main.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/main.yaml)
 [![Vulnerability Scan](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml/badge.svg)](https://github.com/panasasinc/panfs-container-storage-interface-oss/actions/workflows/vulnerability.yaml)
-[![Go Report Card](https://goreportcard.com/badge/github.com/panasasinc/panfs-container-storage-interface-oss)](https://goreportcard.com/report/github.com/panasasinc/panfs-container-storage-interface-oss)
 
 ## Documentation
 
@@ -108,6 +107,7 @@ This matrix defines the supported versions of Kubernetes and the CSI Specificati
 | **1.2.3**         | 1.30.1+            | 1.11.0           |
 | **1.2.4**         | 1.30.1+            | 1.11.0           |
 | **1.2.5**         | 1.30.1+            | 1.11.0           |
+| **1.2.6**         | 1.30.1+            | 1.14.0           |
 
 ## Getting started
 

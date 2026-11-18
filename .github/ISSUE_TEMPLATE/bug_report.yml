@@ -37,7 +37,7 @@ body:
     attributes:
       label: Version
       description: CSI Driver Version, or commit hash
-      placeholder: e.g. 1.2.3
+      placeholder: e.g. 1.2.6
     validations:
       required: true
   - type: markdown

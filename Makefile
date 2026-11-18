@@ -67,7 +67,7 @@ else
 SET_STORAGECLASS_DEFAULT := false
 endif
 
-CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi:1.2.3
+CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
 TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
 
 ## [Build Driver and DFC Images]
@@ -76,7 +76,7 @@ TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi
 compile-driver-bin: ## Compile the PanFS CSI Driver binary
 	@printf "$(BOLD)Compiling PanFS CSI Driver binary...$(RESET)\n"
 	@mkdir -p build
-	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 go build -o build/panfs-csi cmd/csi-plugin/main.go
+	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.27 go build -o build/panfs-csi cmd/csi-plugin/main.go
 	@printf "$(GREEN)Successfully compiled PanFS CSI Driver binary$(RESET)\n\n"
 
 .PHONY: build
@@ -123,12 +123,12 @@ build-test-image: ## Build the test image for the PanFS CSI Driver
 .PHONY: run-unit-tests
 run-unit-tests: ## Run unit tests for the PanFS CSI Driver
 	@printf "$(BOLD)Running unit tests for the PanFS CSI Driver...$(RESET)\n"
-	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 go test -v -race ./pkg/...
+	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.27 go test -v -race ./pkg/...
 	@printf "$(GREEN)Successfully ran unit tests for the PanFS CSI Driver$(RESET)\n\n"
 
 .PHONY: coverage
 coverage: ## Get code coverage report
-	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.24 bash -c ' \
+	docker run --rm -v $(shell pwd):$(shell pwd) -w $(shell pwd) golang:1.27 bash -c ' \
 		go test -coverprofile=coverage.out ./...; \
 		go tool cover -html=coverage.out -o coverage.html \
 	'
@@ -240,7 +240,7 @@ deploy-driver-with-manifest:
 	sed 's@<PANFS_DFC_KMM_PRIVATE_REGISTRY>@$(DFC_REGISTRY)@g' | \
 	sed 's@[^ ]*panfs-csi-driver:.*@$(CSI_IMAGE)@g' | \
 	kubectl apply --server-side -f -
-	@printf "$(GREEN)Successfully deployed PanFS CSI Driver using manifest file deploy/k8s/csi-panfs-driver.yaml$(RESET)\n\n"
+	@printf "$(GREEN)Successfully deployed PanFS CSI Driver using manifest file deploy/k8s/csi-driver/template-csi-panfs.yaml$(RESET)\n\n"
 
 .PHONY: deploy-driver
 deploy-driver: deploy-driver-info ## Deploy PanFS CSI Driver (Includes DFC)
@@ -375,7 +375,6 @@ manifest-driver: ## Generate manifests for the PanFS CSI Driver
 	helm template csi-panfs charts/panfs --namespace csi-panfs --set imagePullSecrets[0]="<IMAGE_PULL_SECRET_NAME>" > deploy/k8s/csi-driver/template-csi-panfs.yaml
 	helm template csi-panfs charts/panfs --namespace csi-panfs --set seLinux=false > deploy/k8s/csi-driver/template-csi-panfs-without-selinux.yaml
 	helm template csi-panfs charts/panfs --namespace csi-panfs --set kmm.enabled=false > deploy/k8s/csi-driver/template-csi-panfs-without-kmm.yaml
-	helm template csi-panfs charts/panfs --namespace csi-panfs --set dfc.encryptionSupport=true > deploy/k8s/csi-driver/template-csi-panfs-with-e2ee.yaml
 	sed -i $(shell sed -h 2>&1 | grep GNU >/dev/null || echo "''") '/^# Source:/d' deploy/k8s/csi-driver/*.yaml
 	@printf "$(GREEN)Successfully generated manifests for the PanFS CSI Driver$(RESET)\n\n"
 
@@ -422,9 +421,13 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 .PHONY: manifests
 manifests: manifest-driver manifest-storageclass ## Generate manifests for the PanFS CSI Driver and Storage Class
 	@if command -v helm-docs >/dev/null 2>&1; then \
-		helm-docs; \
+		helm-docs --template-files Readme.md.gotmpl --output-file Readme.md; \
 	else \
 		printf "$(RED)Error: helm-docs not found, skipping documentation generation$(RESET)\n"; \
 		exit 1; \
 	fi
 	@printf "$(GREEN)Successfully generated documentation for the PanFS CSI Driver and Storage Class$(RESET)\n\n"
+
+.PHONY: check-version
+check-version: ## Check that charts, manifests and docs use one driver version (VERSION=X.Y.Z, default: chart appVersion)
+	@bash tests/helper/lib/check-version.sh '$(VERSION)'

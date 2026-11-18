@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"path/filepath"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
@@ -195,7 +196,29 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 		mountOptions = append(mountOptions, fmt.Sprintf("kmip-config-file=%s", kmipConfigFile.Name()))
 	}
 
-	if err := d.mounterV2.Mount(fmt.Sprintf("panfs://%s/%s", in.GetSecrets()[utils.RealmConnectionContext.RealmAddress], volumeID), publishTargetPath, mountOptions); err != nil {
+	source := fmt.Sprintf("panfs://%s/%s", in.GetSecrets()[utils.RealmConnectionContext.RealmAddress], volumeID)
+
+	// A SINGLE_NODE_SINGLE_WRITER volume can be published at one target path only. Publishing it
+	// again at the same path is idempotent; a different path must be rejected.
+	if volumeCapability.GetAccessMode().GetMode() == csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER {
+		targets, err := d.mounterV2.MountedTargets(source)
+		if err != nil {
+			llog.Error(err, UnexpectedErrorInternalStr, "volume_id", volumeID)
+			return nil, status.Error(codes.Internal, "Failed to check where the volume is published: "+err.Error())
+		}
+		for _, target := range targets {
+			if filepath.Clean(target) != filepath.Clean(publishTargetPath) {
+				llog.Error(fmt.Errorf("volume is already published at %s", target),
+					"single node single writer volume is already published at another target path",
+					"volume_id", volumeID,
+					"publish_target_path", publishTargetPath)
+				return nil, status.Error(codes.FailedPrecondition,
+					"Volume with SINGLE_NODE_SINGLE_WRITER access mode is already published at another target path")
+			}
+		}
+	}
+
+	if err := d.mounterV2.Mount(source, publishTargetPath, mountOptions); err != nil {
 		llog.Error(fmt.Errorf("failed to publish volume"), UnexpectedErrorInternalStr,
 			"volume_id", volumeID,
 			"publish_target_path", publishTargetPath,
@@ -317,7 +340,7 @@ func (d *Driver) NodeGetInfo(ctx context.Context, in *csi.NodeGetInfoRequest) (*
 
 	// Set the label when starting up
 	nodeLabelValue := "true"
-	if err := d.updateNodeLabel(NodeLabelKey, nodeLabelValue); err != nil {
+	if err := d.updateNodeLabel(ctx, NodeLabelKey, nodeLabelValue); err != nil {
 		d.log.Error(err, "failed to set node label")
 		return &csi.NodeGetInfoResponse{
 			NodeId: d.host,

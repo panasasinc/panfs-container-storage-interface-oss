@@ -17,7 +17,7 @@ description: 'Builds Docker image for CSI driver.'
 inputs:
   app-version:
     description: Driver application version
-    default: '0.2.0'
+    default: 'dev'
     required: false
   build-target:
     description: Build target in Dockerfile
@@ -59,7 +59,7 @@ runs:
   using: 'composite'
   steps:
     - name: Checkout
-      uses: actions/checkout@v4
+      uses: actions/checkout@v7
       with:
         ref: ${{ inputs.ref }}
 

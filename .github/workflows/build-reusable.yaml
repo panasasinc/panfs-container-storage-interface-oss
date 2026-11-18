@@ -20,7 +20,7 @@ on:
       app-version:
         description: Driver application version
         type: string
-        default: '0.2.0'
+        default: 'dev'
         required: false
       build-target:
         description: Build target in Dockerfile
@@ -89,7 +89,7 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: Build ${{ inputs.repo-url }}/${{ inputs.image-name }} (${{ inputs.image-tags }})
         id: image
@@ -105,7 +105,7 @@ jobs:
 
       - name: Run Trivy vulnerability scanner
         if: inputs.trivy-scan
-        uses: aquasecurity/trivy-action@master
+        uses: aquasecurity/trivy-action@v0.36.0
         with:
           image-ref: '${{ steps.image.outputs.image-url }}:${{ steps.image.outputs.sha-short }}'
           format: 'table'
@@ -116,7 +116,7 @@ jobs:
 
       - name: GHCR Auth
         if: inputs.push
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: "ghcr.io"
           username: "${{ github.actor }}"
@@ -152,11 +152,11 @@ jobs:
       id-token: write
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v7
 
       - name: GHCR Auth
         if: inputs.push
-        uses: docker/login-action@v3
+        uses: docker/login-action@v4
         with:
           registry: "ghcr.io"
           username: "${{ github.actor }}"

@@ -472,7 +472,7 @@ spec: # csi-panfs-node
       initContainers:
         # Init container to enable PanFS mount helper
         - name: get-plugin-bin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.3
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
           imagePullPolicy: IfNotPresent
           command: ["cp", "/panfs-csi", "/var/panfs/"]
           volumeMounts:
@@ -543,7 +543,7 @@ spec: # csi-panfs-node
 
         # CSI node-driver-registrar sidecar
         - name: csi-driver-registrar
-          image: k8s.gcr.io/sig-storage/csi-node-driver-registrar:v2.5.0
+          image: registry.k8s.io/sig-storage/csi-node-driver-registrar:v2.18.0
           imagePullPolicy: IfNotPresent
           args:
             - "--v=5"
@@ -681,7 +681,7 @@ spec: # csi-panfs-controller
       containers:
         # Main PanFS CSI plugin container
         - name: csi-panfs-plugin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.3
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
           imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -717,7 +717,7 @@ spec: # csi-panfs-controller
 
         # CSI sidecar container for provisioning
         - name: csi-provisioner
-          image: k8s.gcr.io/sig-storage/csi-provisioner:v5.3.0
+          image: registry.k8s.io/sig-storage/csi-provisioner:v5.3.0
           imagePullPolicy: IfNotPresent
           args:
             - "--v=5"
@@ -762,7 +762,7 @@ spec: # csi-panfs-controller
 
         # CSI sidecar container for attach/detach operations
         - name: csi-attacher
-          image: k8s.gcr.io/sig-storage/csi-attacher:v4.9.0
+          image: registry.k8s.io/sig-storage/csi-attacher:v4.13.0
           imagePullPolicy: IfNotPresent
           args:
             - "--v=5"
@@ -809,7 +809,7 @@ spec: # csi-panfs-controller
 
         # CSI sidecar container for volume resizing
         - name: csi-resizer
-          image: gcr.io/k8s-staging-sig-storage/csi-resizer:v1.13.2
+          image: registry.k8s.io/sig-storage/csi-resizer:v1.14.0
           imagePullPolicy: IfNotPresent
           args:
             - "--v=5"
