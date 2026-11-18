@@ -75,6 +75,21 @@ jobs:
           done
           git diff --stat
 
+      # The changelog entry of the next release is marked "Unreleased" on main.
+      # Stamp it with the release date, and fail when the release has no entry.
+      - name: Stamp CHANGELOG.md
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          escaped="${VERSION//./\\.}"
+          if ! grep -Eq "^## \[$escaped\]( |$)" CHANGELOG.md; then
+            echo "::error::CHANGELOG.md has no entry for $VERSION. Add '## [$VERSION] - Unreleased' with the changes first."
+            exit 1
+          fi
+          sed -i -E "s/^## \[$escaped\] - Unreleased\$/## [$VERSION] - $(date -u +%F)/" CHANGELOG.md
+          sed -i -E "s#^(\[$escaped\]: .*)\.\.\.HEAD\$#\1...$VERSION#" CHANGELOG.md
+          git diff --stat -- CHANGELOG.md
+
       - name: Commit version bump and push tag
         env:
           VERSION: ${{ steps.version.outputs.version }}
@@ -82,7 +97,7 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           if ! git diff --quiet; then
-            git add charts/panfs/Chart.yaml charts/storageclass/Chart.yaml
+            git add charts/panfs/Chart.yaml charts/storageclass/Chart.yaml CHANGELOG.md
             git commit -m "chore(release): $VERSION"
             git push origin main
           fi

@@ -4,6 +4,10 @@ All notable changes to the PanFS CSI Driver are documented in this file.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+The entry of the next release is marked `Unreleased`.
+The [Create Release](.github/workflows/create-release.yaml) workflow replaces that word with the release date,
+and it stops when the release has no entry in this file.
+
 This file covers every release published in this repository, starting with 1.2.1.
 Versions 1.0.0 to 1.2.0 were released before the driver became open source;
 the [compatibility matrix](README.md#compatibility) lists them, but this repository has no history for them.
