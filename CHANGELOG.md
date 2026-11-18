@@ -37,11 +37,13 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 
 - `NodePublishVolume` rejects a volume with the `SINGLE_NODE_SINGLE_WRITER` access mode that is already published
   at another target path on the node (`FailedPrecondition`). Before, the second publish succeeded.
-- `make manifest-driver` set `dfc.encryptionSupport`, which is not a chart value; it now sets `kmm.encryptionSupport`.
 - The removal of the node label during shutdown is limited to 10 seconds, so a slow API server cannot block the exit.
 
 ### Removed
 
+- `deploy/k8s/csi-driver/template-csi-panfs-with-e2ee.yaml`. It was the same as the standard template:
+  encryption support is enabled by default, and the file was generated with `dfc.encryptionSupport`,
+  which is not a chart value. Use `template-csi-panfs.yaml`.
 - The unused `internal/jsonlog` package.
 - The Go Report Card badge in `README.md`; the service is retired.
 
