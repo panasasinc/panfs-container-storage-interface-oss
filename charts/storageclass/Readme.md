@@ -234,6 +234,7 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | parameters | object | `{...}` | Storage class parameters. `panfs.csi.vdura.com/storageset_id` is required; the others are optional. |
 | realm.api | string | `""` | PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL. The nodes mount volumes from the host of this address. |
 | realm.caCert | string | `""` | Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store. |
+| realm.rmlist | string | `""` | Optional address the nodes mount volumes from. Set it when the volumes are reachable on another address than PanAPI: for a tenant, it is the `rmlist` of the mount recipe of the tenant subnet. Default: the host of `api`. |
 | realm.token | string | `""` | PanAPI service account token. Its tenant must have the storageset of the StorageClass assigned. |
 | setAsDefaultStorageClass | bool | `false` | Whether to set this storage class as the default for the cluster |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |

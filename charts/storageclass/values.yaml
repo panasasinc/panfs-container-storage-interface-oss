@@ -34,6 +34,9 @@ realm:
   api: ""
   # -- PanAPI service account token. Its tenant must have the storageset of the StorageClass assigned.
   token: ""
+  # -- Optional address the nodes mount volumes from. Set it when the volumes are reachable on another address
+  # than PanAPI: for a tenant, it is the `rmlist` of the mount recipe of the tenant subnet. Default: the host of `api`.
+  rmlist: ""
   # -- Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store.
   caCert: ""
 

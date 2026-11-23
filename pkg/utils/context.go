@@ -70,8 +70,10 @@ var RealmConnectionContext = struct {
 	API    string
 	Token  string
 	CACert string
+	RMList string
 }{
 	API:    "api",
 	Token:  "token",
 	CACert: "ca_cert",
+	RMList: "rmlist",
 }

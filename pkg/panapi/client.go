@@ -95,8 +95,22 @@ func APIURL(secrets map[string]string) (*url.URL, error) {
 	return parsed, nil
 }
 
-// MountAddress returns the address the node mounts volumes from: the host of the api key in the secret.
+// MountAddress returns the address the node mounts volumes from.
+// It is the rmlist key of the secret when that is set, and the host of the api key otherwise.
+// A tenant volume is reachable only on the tenant network, where the realm answers on another address
+// than PanAPI; the mount recipe of the tenant subnet names that address as the rmlist.
 func MountAddress(secrets map[string]string) (string, error) {
+	key := utils.RealmConnectionContext.RMList
+	if rmlist := strings.TrimSpace(secrets[key]); rmlist != "" {
+		if strings.ContainsAny(rmlist, "/ \t\n") {
+			return "", fmt.Errorf("%s in secrets must be a host name or an IP address", key)
+		}
+		if strings.Contains(rmlist, ":") && !strings.HasPrefix(rmlist, "[") {
+			return "[" + rmlist + "]", nil // an IPv6 address needs brackets inside a panfs:// URL
+		}
+		return rmlist, nil
+	}
+
 	parsed, err := APIURL(secrets)
 	if err != nil {
 		return "", err

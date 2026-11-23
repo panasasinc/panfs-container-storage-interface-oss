@@ -802,4 +802,27 @@ func TestMountAddress(t *testing.T) {
 			}
 		})
 	}
+
+	rmlistKey := utils.RealmConnectionContext.RMList
+	rmlistCases := []struct {
+		rmlist  string
+		want    string
+		wantErr bool
+	}{
+		{"192.168.0.2", "192.168.0.2", false},
+		{" director.tenant.example.com ", "director.tenant.example.com", false},
+		{"fd00::2", "[fd00::2]", false},
+		{"[fd00::2]", "[fd00::2]", false},
+		{"", "10.0.0.5", false},
+		{"192.168.0.2/volume", "", true},
+		{"192.168.0.2 192.168.0.3", "", true},
+	}
+	for _, tc := range rmlistCases {
+		t.Run("rmlist "+tc.rmlist, func(t *testing.T) {
+			got, err := MountAddress(map[string]string{key: "http://10.0.0.5:8000", rmlistKey: tc.rmlist})
+			if got != tc.want || (err != nil) != tc.wantErr {
+				t.Errorf("MountAddress(rmlist %q) = %q, %v; want %q, error %v", tc.rmlist, got, err, tc.want, tc.wantErr)
+			}
+		})
+	}
 }
