@@ -4,10 +4,8 @@ go 1.27.0
 
 require (
 	github.com/container-storage-interface/spec v1.14.0
-	github.com/google/uuid v1.6.0
 	github.com/stretchr/testify v1.12.1
 	go.uber.org/mock v0.6.0
-	golang.org/x/crypto v0.59.0
 	google.golang.org/grpc v1.85.0
 	k8s.io/apimachinery v0.37.2
 	k8s.io/client-go v0.37.2
@@ -35,6 +33,7 @@ require (
 	github.com/go-openapi/swag/typeutils v0.27.1 // indirect
 	github.com/go-openapi/swag/yamlutils v0.27.1 // indirect
 	github.com/google/gnostic-models v0.7.0 // indirect
+	github.com/google/uuid v1.6.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/moby/sys/mountinfo v0.7.2 // indirect
 	github.com/modern-go/concurrent v0.0.0-20180306012644-bacd9c7ef1dd // indirect

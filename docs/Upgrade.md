@@ -349,11 +349,9 @@ StorageClass is not a namespaced resource, but a Namespace with the same name is
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `<REALM_ADDRESS>` | PanFS backend server address | `panfs.example.com` |
-| `<REALM_USERNAME>` | PanFS Realm service account | `admin` |
-| `<REALM_PASSWORD>` | Authentication password | `your-secure-password` |
-| `<REALM_PRIVATE_KEY>` | Private key for key-based auth | Leave empty if not using |
-| `<REALM_PRIVATE_KEY_PASSPHRASE>` | Passphrase for encrypted keys | Leave empty if no encryption |
+| `<REALM_API>` | PanAPI address of the PanFS realm | `panfs.example.com` |
+| `<REALM_TOKEN>` | PanAPI service account token | `your-service-account-token` |
+| `<STORAGESET_ID>` | Numeric id of the storageset that holds new volumes | `1` |
 
 #### Configuration of PV Binding Mode and Reclaim Policy
 
@@ -631,8 +629,7 @@ SECRET_NAME=$(kubectl get sc <SC_NAME> -o jsonpath="{.parameters.csi\.storage\.k
 
 # Verify secret exists and check credentials
 kubectl get secret -n $NAMESPACE $SECRET_NAME
-kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.realm_ip}' | base64 -d
-kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.user}' | base64 -d
+kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.api}' | base64 -d
 
 # Test connectivity from a node
 kubectl run test-connectivity --image=busybox --rm -it -- ping <realm-ip>

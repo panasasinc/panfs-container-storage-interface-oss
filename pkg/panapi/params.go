@@ -26,7 +26,8 @@ import (
 // PanAPI accepts an id only, and a tenant token cannot list storagesets to resolve a name.
 const StoragesetIDParameter = utils.VendorPrefix + "storageset_id"
 
-// unsupportedParameters maps StorageClass parameters of the SSH backend that PanAPI cannot honor to what to do instead.
+// unsupportedParameters maps StorageClass parameters of earlier driver versions that PanAPI cannot honor
+// to what to do instead.
 // The driver rejects them, so a StorageClass never carries a setting that silently does nothing.
 var unsupportedParameters = map[string]string{
 	"storageset":  "use " + StoragesetIDParameter + " with the numeric id of the storageset",

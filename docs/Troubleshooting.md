@@ -274,15 +274,10 @@ kubectl get secret -n $NAMESPACE $SECRET_NAME
 - **Missing or incorrect credentials**:
   ```bash
   # Check credential values
-  kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.realm_ip}' | base64 -d
-  kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.user}' | base64 -d
-  
-  # Verify password is set to correct value
-  kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.password}' | base64 -d
-  
-  # Check if SSH key set correctly
-  kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.private_key}' | base64 -d
-  kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.private_key_passphrase}' | base64 -d
+  kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.api}' | base64 -d
+
+  # Verify that the token is set (the value is sensitive: do not print or share it)
+  kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.token}' | wc -c
   ```
 
 - **Network connectivity issues**:

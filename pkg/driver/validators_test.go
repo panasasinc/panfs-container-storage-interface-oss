@@ -74,21 +74,12 @@ func TestValidateSecrets(t *testing.T) {
 		{"realm and token", map[string]string{keys.API: "realm", keys.Token: "token"}, false, false},
 		{"empty token", map[string]string{keys.API: "realm", keys.Token: ""}, false, true},
 		{
-			"all PanAPI keys and KMIP data",
+			"all PanAPI keys",
 			map[string]string{
 				keys.API: "https://realm:8443", keys.Token: "token",
-				keys.CACert: "pem", keys.KMIPConfigData: "data",
+				keys.CACert: "pem",
 			},
 			false, false,
-		},
-		{"user is rejected", map[string]string{keys.API: "realm", keys.Token: "token", keys.Username: "u"}, true, true},
-		{"password is rejected", map[string]string{keys.API: "realm", keys.Token: "token", keys.Password: "p"}, true, true},
-		{"empty password is rejected", map[string]string{keys.API: "realm", keys.Token: "token", keys.Password: ""}, true, true},
-		{"private key is rejected", map[string]string{keys.API: "realm", keys.Token: "token", keys.PrivateKey: "k"}, true, true},
-		{
-			"private key passphrase is rejected",
-			map[string]string{keys.API: "realm", keys.Token: "token", keys.PrivateKeyPassphrase: "p"},
-			true, true,
 		},
 	}
 
@@ -516,9 +507,8 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				utils.VolumeParameters.GetSCKey("operm"):      "none",
 			},
 			Secrets: map[string]string{
-				utils.RealmConnectionContext.API:      "10.11.12.13",
-				utils.RealmConnectionContext.Username: "dummy",
-				utils.RealmConnectionContext.Password: "dummy",
+				utils.RealmConnectionContext.API:   "10.11.12.13",
+				utils.RealmConnectionContext.Token: "dummy",
 			},
 		}
 

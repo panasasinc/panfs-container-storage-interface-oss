@@ -25,33 +25,34 @@ const VendorPrefix = "panfs.csi.vdura.com/"
 // The CSI volume ID is the PanAPI volume id, while the node mounts the volume by name.
 const VolumeNameContextKey = VendorPrefix + "volume-name"
 
-// VolumeParametersData defines structure for volume parameters data
-type VolumeParametersData map[string]string
+// VolumeParametersData is the set of known StorageClass parameter names, without the vendor prefix.
+type VolumeParametersData map[string]struct{}
 
-// VolumeParameters holds supported volume provisioning context parameters
+// VolumeParameters holds the known StorageClass parameters.
+// It also lists the parameters of earlier driver versions that the driver now rejects,
+// so that a request carrying one of them gets a clear error.
 var VolumeParameters = VolumeParametersData{
-	// storageset_id is the numeric id of the storageset that holds new volumes; required by the PanAPI backend.
-	"storageset_id": "",
-	"description":   `description "%s"`,
-	"storageset":    `storageset "%s"`,
-	"recovery":      "recoverypriority %s",
-	// recoverypriority is the key the PanAPI backend accepts; recovery is used by the SSH backend only.
-	"recoverypriority": "recoverypriority %s",
-	"efsa":             "efsa %s",
-	"volservice":       "volservice %s",
-	"layout":           "layout %s",
-	"maxwidth":         "maxwidth %s",
-	"stripeunit":       "stripeunit %s",
-	"rgwidth":          "rgwidth %s",
-	"rgdepth":          "rgdepth %s",
-	"user":             `user "%s"`,
-	"group":            `group "%s"`,
-	"uperm":            "uperm %s",
-	"gperm":            "gperm %s",
-	"operm":            "operm %s",
-	"encryption":       "encryption %s",
-	"soft":             "soft %v", // softQuotaGB
-	"hard":             "hard %v", // hardQuotaGB
+	// storageset_id is the numeric id of the storageset that holds new volumes; it is required.
+	"storageset_id":    {},
+	"recoverypriority": {},
+	"efsa":             {},
+	"volservice":       {},
+	"layout":           {},
+	"maxwidth":         {},
+	"stripeunit":       {},
+	"rgwidth":          {},
+	"rgdepth":          {},
+	"user":             {},
+	"group":            {},
+	"uperm":            {},
+	"gperm":            {},
+	"operm":            {},
+
+	// Rejected parameters of earlier driver versions.
+	"description": {},
+	"storageset":  {},
+	"recovery":    {},
+	"encryption":  {},
 }
 
 // GetSCKey retrieves the storage class parameter key for a given context parameter key
@@ -64,34 +65,13 @@ func (c VolumeParametersData) GetSCKey(k string) string {
 	return ""
 }
 
-// GetFmt retrieves the formatting string for a given context parameter key
-func (c VolumeParametersData) GetFmt(k string) string {
-	short := strings.TrimPrefix(c.GetSCKey(k), VendorPrefix)
-	if value, ok := c[short]; ok {
-		return value
-	}
-	return ""
-}
-
 // RealmConnectionContext holds supported realm connection context parameters
 var RealmConnectionContext = struct {
-	RealmAddress         string
-	Username             string
-	Password             string
-	PrivateKey           string
-	PrivateKeyPassphrase string
-	KMIPConfigData       string
-	API                  string
-	Token                string
-	CACert               string
+	API    string
+	Token  string
+	CACert string
 }{
-	RealmAddress:         "realm_ip",
-	Username:             "user",
-	Password:             "password",
-	PrivateKey:           "private_key",
-	PrivateKeyPassphrase: "private_key_passphrase",
-	KMIPConfigData:       "kmip_config_data",
-	API:                  "api",
-	Token:                "token",
-	CACert:               "ca_cert",
+	API:    "api",
+	Token:  "token",
+	CACert: "ca_cert",
 }

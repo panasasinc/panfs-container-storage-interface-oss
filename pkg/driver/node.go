@@ -17,7 +17,6 @@ package driver
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
@@ -35,13 +34,6 @@ const (
 var (
 	// IsNodeLabelSet tracks whether the node label has been set to avoid redundant updates.
 	IsNodeLabelSet = false
-)
-
-// Mockable OS functions
-var (
-	osMkdirAll = os.MkdirAll
-	osChmod    = os.Chmod
-	osRemove   = os.Remove
 )
 
 // NodeStageVolume handles the CSI NodeStageVolume request.
@@ -148,53 +140,6 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 	mountOptions := volumeCapability.GetMount().GetMountFlags()
 	if in.GetReadonly() {
 		mountOptions = append(mountOptions, "ro")
-	}
-
-	if encryptionVal, ok := in.VolumeContext[utils.VolumeParameters.GetSCKey("encryption")]; ok && encryptionVal != "none" && encryptionVal != "" {
-		// Create a temporary KMIP Config file
-		if err := osMkdirAll("/var/tmp/kmip/", 0o700); err != nil {
-			llog.Error(err, "failed to create temp directory for KMIP config file")
-			return nil, status.Error(codes.Internal, "Failed to create temp directory for KMIP config file: "+err.Error())
-		}
-
-		kmipConfigFile, err := d.tempFileFactory.CreateTemp("/var/tmp/kmip/", "config_*.conf")
-		if err != nil {
-			llog.Error(err, "failed to create temporary KMIP config file for mounting")
-			return nil, status.Error(codes.Internal, "Failed to create KMIP config file: "+err.Error())
-		}
-
-		// Cleanup the temp file after mount operation, checking errors
-		defer func() {
-			if err := kmipConfigFile.Close(); err != nil {
-				llog.Error(err, "failed to close KMIP config file")
-			}
-		}()
-
-		defer func() {
-			if err := osRemove(kmipConfigFile.Name()); err != nil {
-				llog.Error(err, "failed to remove KMIP config file")
-			}
-		}()
-
-		// Set file permissions to 0700
-		err = osChmod(kmipConfigFile.Name(), 0o600)
-		if err != nil {
-			llog.Error(err, "failed to set '0700' permissions on KMIP config file")
-			return nil, status.Error(codes.Internal, "Failed to set '0700' permissions on KMIP config file: "+err.Error())
-		}
-
-		if in.Secrets[utils.RealmConnectionContext.KMIPConfigData] == "" {
-			llog.Error(fmt.Errorf("%s key is empty", utils.RealmConnectionContext.KMIPConfigData), "KMIP secret must be provided for encrypted volumes")
-			return nil, status.Error(codes.InvalidArgument, "KMIP secret must be provided for encrypted volumes")
-		}
-
-		data := []byte(in.Secrets[utils.RealmConnectionContext.KMIPConfigData])
-		if _, err := kmipConfigFile.Write(data); err != nil {
-			llog.Error(err, "failed to write KMIP config data to temporary file")
-			return nil, status.Error(codes.Internal, "Failed to write KMIP config data to temporary file: "+err.Error())
-		}
-
-		mountOptions = append(mountOptions, fmt.Sprintf("kmip-config-file=%s", kmipConfigFile.Name()))
 	}
 
 	// The CSI volume ID is the PanAPI volume id; the mount needs the volume name, which the controller

@@ -30,9 +30,8 @@ import (
 
 var (
 	defaultSecrets = map[string]string{
-		utils.RealmConnectionContext.Token:          "token",
-		utils.RealmConnectionContext.API:            "realm",
-		utils.RealmConnectionContext.KMIPConfigData: "# some data",
+		utils.RealmConnectionContext.Token: "token",
+		utils.RealmConnectionContext.API:   "realm",
 	}
 	validVolumeName = "validVolumeName"
 	// validVolumeID is the CSI volume ID of validVolumeName: its PanAPI volume id in decimal form.
@@ -130,7 +129,7 @@ func TestControllerExpandVolume(t *testing.T) {
 			},
 		},
 		{
-			"ExpandFailedPancliError",
+			"ExpandFailedBackendError",
 			&csi.ControllerExpandVolumeRequest{
 				VolumeId:      validVolumeID,
 				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
@@ -398,20 +397,6 @@ func TestControllerCreateVolume(t *testing.T) {
 			noBackendCalls,
 		},
 		{
-			"SSHCredentialsInSecretsError",
-			request(func(r *csi.CreateVolumeRequest) {
-				r.Secrets = map[string]string{
-					utils.RealmConnectionContext.API:      "realm",
-					utils.RealmConnectionContext.Token:    "token",
-					utils.RealmConnectionContext.Password: "pass",
-				}
-			}),
-			nil,
-			status.Error(codes.InvalidArgument,
-				"password in secrets is not supported: the driver uses a PanAPI token (token), not SSH credentials"),
-			noBackendCalls,
-		},
-		{
 			"CreateVolumeInvalidVolumeNameError",
 			request(func(r *csi.CreateVolumeRequest) { r.Name = emptyVolumeName }),
 			nil,
@@ -490,7 +475,7 @@ func TestControllerDeleteVolume(t *testing.T) {
 			},
 		},
 		{
-			name: "PancliDeleteVolumeError",
+			name: "BackendDeleteVolumeError",
 			req: &csi.DeleteVolumeRequest{
 				VolumeId: validVolumeID,
 				Secrets:  defaultSecrets,
@@ -750,7 +735,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 			},
 		},
 		{
-			name: "InternalErrorFromPancli",
+			name: "InternalErrorFromBackend",
 			req: &csi.ValidateVolumeCapabilitiesRequest{
 				VolumeId:           validVolumeID,
 				VolumeCapabilities: []*csi.VolumeCapability{mountCap},

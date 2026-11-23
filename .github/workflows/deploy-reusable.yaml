@@ -37,21 +37,21 @@ on:
         description: DFC version to use
         type: string
         default: "stub"
-      realm_user:
-        description: PanFS Realm user
-        required: false
-        type: string
-        default: "dummy_user"
-      realm_address:
-        description: PanFS Realm address
+      realm_api:
+        description: PanAPI address of the PanFS realm
         required: false
         type: string
         default: "panfs-realm.dummy.com"
-      realm_password:
-        description: PanFS Realm password
+      realm_token:
+        description: PanAPI service account token
         required: false
         type: string
-        default: "dummy_password"
+        default: "dummy_token"
+      storageset_id:
+        description: Numeric id of the storageset that holds new volumes
+        required: false
+        type: string
+        default: "1"
       ref:
         description: Git ref to clone
         required: true
@@ -129,7 +129,7 @@ jobs:
         with:
           deployment-target: storageclass
           driver-installation-type: "${{ inputs.driver-installation-type }}"
-          realm_user: "${{ inputs.realm_user }}"
-          realm_address: "${{ inputs.realm_address }}"
-          realm_password: "${{ inputs.realm_password }}"
+          realm_api: "${{ inputs.realm_api }}"
+          realm_token: "${{ inputs.realm_token }}"
+          storageset_id: "${{ inputs.storageset_id }}"
           ref: "${{ github.ref }}"

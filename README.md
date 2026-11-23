@@ -14,7 +14,6 @@ For more details on specific topics, refer to the following documents:
 | [Overview](./docs/Overview.md) | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow |
 | [Usage Guide](./docs/Usage-Guide.md) | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples |
 | [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
-| [Encryption](./docs/Encryption.md) | Enabling End-to-End Encryption (E2EE) for volumes with a KMIP key management server |
 | [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
 | [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
 | [Troubleshooting](./docs/Troubleshooting.md) | Diagnosing and resolving common issues: installation, volume mounting, KMM, authentication, and networking |
@@ -82,7 +81,6 @@ The driver exposes advanced PanFS features through CSI:
 
   * **Volume Quota Management**: Supports configurable **soft and hard quotas** for PanFS volumes.
   * **Multiple Volume Layouts**: Provisioning support for various PanFS layouts (e.g., `raid6+`, `raid5+`, `raid10+`).
-  * **End-to-End Encryption**: Supports transparent volume encryption using an external **KMIP** provider (see [Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)).
   * **Robust Operation**: Includes extensive parameter validation, unit conversion (e.g., GB/bytes), and mapping of PanFS CLI errors to CSI-compliant error codes.
 
 ### PanFS mount options
@@ -260,31 +258,7 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "true"
 ```
 
-##### 3.3 Optional: Enabling End-to-End Volume Encryption
-
-To enable transparent, end-to-end volume encryption using a KMIP provider:
-
-1.  **Enable Encryption in StorageClass**: Set the parameter below to `"on"` in the StorageClass manifest:
-    ```yaml
-    kind: StorageClass
-    parameters:
-      panfs.csi.vdura.com/encryption: "on" # Enables encryption for volumes
-    ```
-2.  **Configure KMIP Client**: The KMIP client configuration file content must be placed in the Secret under the `kmip_config_data` key as a YAML multi-line string:
-    ```yaml
-    kind: Secret
-    stringData:
-      kmip_config_data: |-
-        # Insert the full KMIP client configuration file content here.
-        # This typically includes server addresses, port, and client TLS/PKI settings.
-    ```
-3. Make sure the KMM module is configured to load the `libwolfssl` kernel module. Verify with:
-    ```bash
-    kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
-    ["panfs","libwolfssl"]
-    ```
-
-##### 3.4 Deployment and Validation
+##### 3.3 Deployment and Validation
 
 **Deploy PanFS Storage Class:**
 

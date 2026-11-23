@@ -207,30 +207,14 @@ func validateVolumeParameters(parameters map[string]string) error {
 	return nil
 }
 
-// sshSecretKeys are the SSH credentials of driver 1.2.x. The driver no longer accepts them.
-var sshSecretKeys = []string{
-	utils.RealmConnectionContext.Username,
-	utils.RealmConnectionContext.Password,
-	utils.RealmConnectionContext.PrivateKey,
-	utils.RealmConnectionContext.PrivateKeyPassphrase,
-}
-
 // validateNodeSecrets validates the secrets of a node request.
 // The node only mounts, from the host of the api key; it never calls PanAPI and needs no token.
-// A secret that still carries SSH credentials is rejected.
 func validateNodeSecrets(secrets map[string]string) error {
 	if secrets == nil {
 		return fmt.Errorf("secrets must be provided")
 	}
 	if _, err := panapi.APIURL(secrets); err != nil {
 		return err
-	}
-
-	for _, key := range sshSecretKeys {
-		if _, ok := secrets[key]; ok {
-			return fmt.Errorf("%s in secrets is not supported: the driver uses a PanAPI token (%s), not SSH credentials",
-				key, utils.RealmConnectionContext.Token)
-		}
 	}
 
 	return nil
