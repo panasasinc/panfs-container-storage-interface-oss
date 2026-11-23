@@ -245,11 +245,10 @@ The StorageClass defines the provisioned volume properties and provides PanFS Re
 Edit [deploy/k8s/storage-class/template-secret-in-driver-ns.yaml](deploy/k8s/storage-class/template-secret-in-driver-ns.yaml) to replace the following placeholders with your PanFS Realm details.
 
   * `<STORAGE_CLASS_NAME>`: The desired name for your StorageClass (e.g., `csi-panfs-storage-class`).
-  * `<REALM_ADDRESS>`: The PanFS backend address (e.g., `panfs.example.com`).
-  * **Credentials**: Provide one of the following sets of authentication data:
-      * `<REALM_USERNAME>` and `<REALM_PASSWORD>` (for user/password authentication)
-      * `<REALM_PRIVATE_KEY>` and `<REALM_PRIVATE_KEY_PASSPHRASE>` (for key-based authentication)
-  * `<KMIP_CONFIG_DATA>`: KMIP server connection details for volume encryption (if used).
+  * `<REALM_API>`: The PanAPI address of the PanFS realm: a host name (HTTPS is used) or a full `https://` or `http://` URL
+    (e.g., `panfs.example.com`).
+  * `<REALM_TOKEN>`: The PanAPI service account token.
+  * `<STORAGESET_ID>`: The numeric id of the storageset that holds the new volumes.
 
 ##### 3.2 Setting the Default StorageClass
 

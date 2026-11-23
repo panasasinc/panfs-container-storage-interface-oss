@@ -22,14 +22,14 @@ PanFS Realm Storage Class Chart
 
 ## What PanFS CSI StorageClass is
 
-The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource that leverages the PanFS Container Storage Interface (CSI) driver to provision and manage persistent storage volumes on a PanFS backend. The chart enables you to configure parameters such as the PanFS realm endpoint, authentication credentials, and volume options.
+The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource that leverages the PanFS Container Storage Interface (CSI) driver to provision and manage persistent storage volumes on a PanFS backend. The chart enables you to configure parameters such as the PanFS realm API address, the service account token, and volume options.
 
 > **Note:** Installation into the `default` namespace is not permitted. You must specify a non-default namespace using the `--namespace <namespace>` option during installation.
 
 ### Resources Created by the Helm Chart
 
 - A `StorageClass` resource that uses the PanFS CSI driver to provision and manage persistent storage volumes on a PanFS backend.
-- A `Secret` resource containing PanFS realm credentials (address, username, password, and private key).
+- A `Secret` resource containing the PanFS realm API address and the service account token.
 - If the PanFS realm credentials secret resides in a different namespace than the PanFS CSI driver, the chart creates a `Role` and `RoleBinding` to allow the CSI driver to access the secret.
 
 ## Usage
@@ -49,9 +49,9 @@ PANFS_CSI_DRIVER_NAMESPACE="$(kubectl get csidrivers.storage.k8s.io com.vdura.cs
 # Installing chart into PanFS CSI Driver namespace
 helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --namespace "${PANFS_CSI_DRIVER_NAMESPACE}" \
-    --set realm.address=panfs-realm.example.com \
-    --set realm.username=username \
-    --set realm.password=password
+    --set realm.api=panfs-realm.example.com \
+    --set realm.token="<service account token>" \
+    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset_id=1'
 ```
 
 > Note: The `--create-namespace` flag is not required when installing in an existing namespace.
@@ -62,9 +62,11 @@ You can also use a YAML file to provide the necessary overrides. Below is an exa
 ```yaml
 # overrides.yaml
 realm:
-  address: "panfs-realm.example.com"
-  username: "username"
-  password: "password"
+  api: "panfs-realm.example.com"
+  token: "<service account token>"
+
+parameters:
+  panfs.csi.vdura.com/storageset_id: "1"
 ```
 
 Install the chart using the overrides file:
@@ -86,9 +88,9 @@ helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --namespace <REALM_SECRET_NAMESPACE> \
     --create-namespace \
     --set setAsDefaultStorageClass="true" \
-    --set realm.address="panfs-realm.example.com" \
-    --set realm.username="username" \
-    --set realm.password="password" \
+    --set realm.api="panfs-realm.example.com" \
+    --set realm.token="<service account token>" \
+    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset_id=1' \
     --set csiPanFSDriver.namespace="${PANFS_CSI_DRIVER_NAMESPACE}"
 ```
 
@@ -104,9 +106,11 @@ You can also use a YAML file to provide the necessary overrides. Below is an exa
 ```yaml
 # overrides.yaml
 realm:
-  address: "panfs-realm.example.com"
-  username: "username"
-  password: "password"
+  api: "panfs-realm.example.com"
+  token: "<service account token>"
+
+parameters:
+  panfs.csi.vdura.com/storageset_id: "1"
 
 setAsDefaultStorageClass: "true"
 
@@ -196,9 +200,7 @@ If you encounter errors when creating or running workload Pods, follow these ste
   # Checking the secret content
   # If you installed the chart in a dedicated namespace, the secret name, its namespace, and the StorageClass name will match the chart release name.
   # If you installed the chart in the same namespace as the CSI driver, the secret name and StorageClass name will match the chart release name, and the secret will reside in the CSI driver's namespace.
-  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.realm_ip}' | base64 -d
-  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.user}' | base64 -d
-  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.password}' | base64 -d
+  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.api}' | base64 -d
   ```
 - Check the logs of the CSI driver:
   - For controller issues (volume provisioning), review the controller logs:
@@ -229,13 +231,10 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | allowedTopologies | object | `{}` | Allowed topologies for volume provisioning This can be used to restrict volume provisioning to specific nodes or zones based on node labels. Uncomment and modify the example below as needed. If left empty, no topology constraints will be applied. |
 | csiPanFSDriver.namespace | string | `"csi-panfs"` | Namespace where the PanFS CSI driver is deployed |
 | mountOptions | list | `[]` |  |
-| parameters | object | `{...}` | Optional storage class parameters |
-| realm.address | string | `""` | Endpoint address for the backend PanFS realm |
-| realm.kmipConfigData | string | `""` | KMIP configuration data for volume encryption key management |
-| realm.password | string | `""` | Password for the PanFS backend realm |
-| realm.privateKey | string | `""` | Private key for the PanFS backend realm |
-| realm.privateKeyPassphrase | string | `""` | Private Key Passphrase |
-| realm.username | string | `""` | Username for the PanFS backend realm |
+| parameters | object | `{...}` | Storage class parameters. `panfs.csi.vdura.com/storageset_id` is required; the others are optional. |
+| realm.api | string | `""` | PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL. The nodes mount volumes from the host of this address. |
+| realm.caCert | string | `""` | Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store. |
+| realm.token | string | `""` | PanAPI service account token. Its tenant must have the storageset of the StorageClass assigned. |
 | setAsDefaultStorageClass | bool | `false` | Whether to set this storage class as the default for the cluster |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |
 | volumeReclaimPolicy | string | `Delete` | Default reclaim policy for volumes |
