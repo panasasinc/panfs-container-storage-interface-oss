@@ -20,10 +20,10 @@ import (
 	"fmt"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"k8s.io/klog/v2"
 )
 
 var (
@@ -96,70 +96,96 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 	}
 
 	secrets := in.GetSecrets()
-	if err := validateReqSecrets(secrets); err != nil {
+	if err := validateControllerSecrets(secrets); err != nil {
 		llog.Error(err, InvalidRequestSecretsErrorStr)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
 	volumeName := in.GetName()
-	parameters := in.GetParameters()
-	if parameters == nil {
-		parameters = make(map[string]string)
+
+	// CSI requires a repeated CreateVolume with the same name to return the existing volume.
+	vol, err := d.panfs.GetVolumeByName(ctx, volumeName, secrets)
+	if err == nil {
+		return d.existingVolumeResponse(llog, in, vol)
+	}
+	if !errors.Is(err, panapi.ErrorNotFound) {
+		llog.Error(err, "failed to look up volume by name", "volume_name", volumeName)
+		return nil, status.Error(grpcCode(err), UnexpectedErrorInternalStr)
 	}
 
-	// handle capacity range
-	cr := in.GetCapacityRange()
-	soft, hard := int64(0), int64(0)
-
-	if cr != nil {
-		soft = cr.GetRequiredBytes()
-		hard = cr.GetLimitBytes()
+	// The requested size is the soft quota. Without an explicit limit it is the hard quota too,
+	// so the size of the PersistentVolumeClaim is enforced.
+	soft := in.GetCapacityRange().GetRequiredBytes()
+	hard := in.GetCapacityRange().GetLimitBytes()
+	if hard == 0 {
+		hard = soft
 	}
 
-	parameters[utils.VolumeParameters.GetSCKey("soft")] = fmt.Sprintf("%d", soft)
-	parameters[utils.VolumeParameters.GetSCKey("hard")] = fmt.Sprintf("%d", hard)
-
-	vol, err := d.panfs.CreateVolume(volumeName, parameters, secrets)
+	vol, err = d.panfs.CreateVolume(ctx, panapi.CreateVolumeParams{
+		Name:           volumeName,
+		Parameters:     in.GetParameters(),
+		SoftQuotaBytes: soft,
+		HardQuotaBytes: hard,
+	}, secrets)
+	if errors.Is(err, panapi.ErrorAlreadyExist) {
+		// A concurrent request may have created the volume. PanAPI also answers with a conflict for
+		// other reasons, so the volume must be found by name before it counts as existing.
+		existing, lookupErr := d.panfs.GetVolumeByName(ctx, volumeName, secrets)
+		if lookupErr != nil {
+			llog.Error(err, "create reported a conflict, but no volume with this name exists", "volume_name", volumeName)
+			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
+		}
+		return d.existingVolumeResponse(llog, in, existing)
+	}
 	if err != nil {
-		// if error happens and it is not ErrorAlreadyExist, we return error
-		if !errors.Is(err, pancli.ErrorAlreadyExist) {
-			d.log.Error(err, "failed to create volume", "volume_id", volumeName)
-			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
+		llog.Error(err, "failed to create volume", "volume_name", volumeName)
+		if errors.Is(err, panapi.ErrorInvalidArgument) {
+			return nil, status.Error(codes.InvalidArgument, err.Error())
 		}
-
-		// this is ErrorAlreadyExist error - need to check volume matches capabilities
-		vol, err := d.panfs.GetVolume(volumeName, secrets)
-		if err != nil || vol == nil {
-			llog.Error(err, "volume already exists but failed to verify capabilities", "volume_id", volumeName)
-			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
-		}
-
-		// if volume is not match requested capabilities
-		if err := validateVolumeCapacity(in.GetCapacityRange(), vol); err != nil {
-			llog.Error(err, "volume already exists, but the capacity does not match", "volume_id", volumeName)
-			return nil, status.Error(codes.AlreadyExists, "Volume capacity does not match: "+err.Error())
-		}
-
-		// existing volume matches requested capabilities - return OK with existing volume info
-		llog.Info("volume already exists", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
-		return &csi.CreateVolumeResponse{
-			Volume: &csi.Volume{
-				CapacityBytes: vol.GetSoftQuotaBytes(),
-				VolumeId:      volumeName,
-				VolumeContext: vol.VolumeContext(),
-			},
-		}, nil
+		return nil, status.Error(grpcCode(err), UnexpectedErrorInternalStr)
 	}
 
-	llog.Info("volume created", "volume_name", volumeName, "capacity", vol.GetSoftQuotaBytes(), "encryption", vol.GetEncryptionMode())
+	llog.Info("volume created", "volume_name", volumeName, "volume_id", vol.CSIID(), "capacity", vol.SoftQuota())
+	return createVolumeResponse(vol), nil
+}
 
+// existingVolumeResponse answers CreateVolume for a volume that already exists.
+// It fails with AlreadyExists when the existing volume does not fit the requested capacity.
+func (d *Driver) existingVolumeResponse(llog klog.Logger, in *csi.CreateVolumeRequest, vol *panapi.Volume) (*csi.CreateVolumeResponse, error) {
+	if err := validateVolumeCapacity(in.GetCapacityRange(), vol); err != nil {
+		llog.Error(err, "volume already exists, but the capacity does not match", "volume_name", in.GetName())
+		return nil, status.Error(codes.AlreadyExists, "Volume capacity does not match: "+err.Error())
+	}
+
+	llog.Info("volume already exists", "volume_name", in.GetName(), "volume_id", vol.CSIID(), "capacity", vol.SoftQuota())
+	return createVolumeResponse(vol), nil
+}
+
+// createVolumeResponse builds the CreateVolume response for a volume.
+func createVolumeResponse(vol *panapi.Volume) *csi.CreateVolumeResponse {
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
-			CapacityBytes: vol.GetSoftQuotaBytes(),
-			VolumeId:      volumeName,
+			CapacityBytes: vol.SoftQuota(),
+			VolumeId:      vol.CSIID(),
 			VolumeContext: vol.VolumeContext(),
 		},
-	}, nil
+	}
+}
+
+// grpcCode maps a PanAPI client error to the gRPC code the CSI call returns.
+func grpcCode(err error) codes.Code {
+	switch {
+	case errors.Is(err, panapi.ErrorNotFound):
+		return codes.NotFound
+	case errors.Is(err, panapi.ErrorInvalidArgument):
+		return codes.InvalidArgument
+	case errors.Is(err, panapi.ErrorUnauthenticated):
+		return codes.Unauthenticated
+	case errors.Is(err, panapi.ErrorUnavailable):
+		return codes.Unavailable
+	default:
+		return codes.Internal
+	}
 }
 
 // DeleteVolume handles the CSI DeleteVolume request.
@@ -188,16 +214,16 @@ func (d *Driver) DeleteVolume(ctx context.Context, in *csi.DeleteVolumeRequest) 
 	}
 
 	secrets := in.GetSecrets()
-	if err := validateReqSecrets(secrets); err != nil {
+	if err := validateControllerSecrets(secrets); err != nil {
 		llog.Error(err, InvalidRequestSecretsErrorStr)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
 
-	err := d.panfs.DeleteVolume(volumeID, secrets)
-	// If volume does not exist, we return OK status
-	if err != nil && !errors.Is(err, pancli.ErrorNotFound) {
+	// A volume that does not exist counts as deleted.
+	err := d.panfs.DeleteVolume(ctx, volumeID, secrets)
+	if err != nil && !errors.Is(err, panapi.ErrorNotFound) {
 		llog.Error(err, "failed to delete volume", "volume_id", volumeID)
-		return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
+		return nil, status.Error(grpcCode(err), UnexpectedErrorInternalStr)
 	}
 	llog.Info("volume deleted", "volume_id", volumeID)
 	return &csi.DeleteVolumeResponse{}, nil
@@ -307,7 +333,7 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, in *csi.Validat
 	}
 
 	secrets := in.GetSecrets()
-	if err := validateReqSecrets(secrets); err != nil {
+	if err := validateControllerSecrets(secrets); err != nil {
 		llog.Error(err, InvalidRequestSecretsErrorStr)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -317,15 +343,13 @@ func (d *Driver) ValidateVolumeCapabilities(ctx context.Context, in *csi.Validat
 		return nil, status.Error(codes.InvalidArgument, VolumeCapabilitiesDoNotMatchErrorStr)
 	}
 
-	_, err := d.panfs.GetVolume(volumeID, secrets)
+	_, err := d.panfs.GetVolume(ctx, volumeID, secrets)
 	if err != nil {
-		switch {
-		case errors.Is(err, pancli.ErrorNotFound):
+		if errors.Is(err, panapi.ErrorNotFound) {
 			return nil, status.Error(codes.NotFound, VolumeNotFoundErrorStr)
-		default:
-			llog.Error(err, "failed to get volume", "volume_id", volumeID)
-			return nil, status.Error(codes.Internal, err.Error())
 		}
+		llog.Error(err, "failed to get volume", "volume_id", volumeID)
+		return nil, status.Error(grpcCode(err), UnexpectedErrorInternalStr)
 	}
 
 	return &csi.ValidateVolumeCapabilitiesResponse{
@@ -461,7 +485,7 @@ func (d *Driver) ControllerExpandVolume(ctx context.Context, in *csi.ControllerE
 	}
 
 	secrets := in.GetSecrets()
-	if err := validateReqSecrets(secrets); err != nil {
+	if err := validateControllerSecrets(secrets); err != nil {
 		llog.Error(err, InvalidRequestSecretsErrorStr)
 		return nil, status.Error(codes.InvalidArgument, err.Error())
 	}
@@ -472,16 +496,14 @@ func (d *Driver) ControllerExpandVolume(ctx context.Context, in *csi.ControllerE
 		return nil, status.Error(codes.InvalidArgument, InvalidCapacityRangeErrorStr)
 	}
 
-	err := d.expandVolume(volumeID, capacityRange, secrets)
+	err := d.panfs.ExpandVolume(ctx, volumeID, capacityRange.GetRequiredBytes(), secrets)
 	if err != nil {
-		switch {
-		case errors.Is(err, pancli.ErrorNotFound):
+		if errors.Is(err, panapi.ErrorNotFound) {
 			llog.Error(err, VolumeNotFoundErrorStr, "volume_id", volumeID)
 			return nil, status.Error(codes.NotFound, VolumeNotFoundErrorStr)
-		default:
-			llog.Error(err, "failed to expand volume capacity: "+err.Error(), "volume_id", volumeID)
-			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
 		}
+		llog.Error(err, "failed to expand volume capacity", "volume_id", volumeID)
+		return nil, status.Error(grpcCode(err), UnexpectedErrorInternalStr)
 	}
 
 	requiredBytes := capacityRange.GetRequiredBytes()
@@ -492,28 +514,6 @@ func (d *Driver) ControllerExpandVolume(ctx context.Context, in *csi.ControllerE
 		CapacityBytes:         requiredBytes,
 		NodeExpansionRequired: false,
 	}, nil
-}
-
-// expandVolume performs the volume expansion operation.
-//
-// Parameters:
-//
-//	volumeID      - The ID of the volume to expand.
-//	capacityRange - The requested capacity range.
-//	secrets       - Secrets for authentication.
-//
-// Returns:
-//
-//	error - Returns an error if expansion fails.
-func (d *Driver) expandVolume(volumeID string, capacityRange *csi.CapacityRange, secrets map[string]string) error {
-	// validate required bytes
-	requiredBytes := capacityRange.GetRequiredBytes()
-
-	err := d.panfs.ExpandVolume(volumeID, requiredBytes, secrets)
-	if err != nil {
-		return err
-	}
-	return nil
 }
 
 // CreateSnapshot handles the CSI CreateSnapshot request (unimplemented).

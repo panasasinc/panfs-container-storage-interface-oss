@@ -201,8 +201,8 @@ kmm:
   selector:
     node-role.kubernetes.io/worker: ""
 
-  # -- Enable encryption support in DFC
-  encryptionSupport: true
+  # -- Enable encryption support in DFC. Volume encryption is not supported with the PanAPI backend.
+  encryptionSupport: false
 
   # -- **PanFS DFC images** for different kernel versions
   # @default -- `[...]`

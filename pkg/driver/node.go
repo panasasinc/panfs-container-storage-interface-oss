@@ -20,6 +20,7 @@ import (
 	"os"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -115,7 +116,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 	}
 
 	secrets := in.GetSecrets()
-	if err := validateReqSecrets(secrets); err != nil {
+	if err := validateNodeSecrets(secrets); err != nil {
 		llog.Error(err, InvalidRequestSecretsErrorStr)
 		return nil, status.Error(codes.InvalidArgument, InvalidRequestSecretsErrorStr)
 	}
@@ -195,7 +196,23 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 		mountOptions = append(mountOptions, fmt.Sprintf("kmip-config-file=%s", kmipConfigFile.Name()))
 	}
 
-	if err := d.mounterV2.Mount(fmt.Sprintf("panfs://%s/%s", in.GetSecrets()[utils.RealmConnectionContext.RealmAddress], volumeID), publishTargetPath, mountOptions); err != nil {
+	// The CSI volume ID is the PanAPI volume id; the mount needs the volume name, which the controller
+	// puts in the volume context. A statically provisioned volume has no such context and is not supported.
+	volumeName := in.GetVolumeContext()[utils.VolumeNameContextKey]
+	if volumeName == "" {
+		llog.Error(fmt.Errorf("volume context has no %s", utils.VolumeNameContextKey), InvalidRequestErrorStr)
+		return nil, status.Error(codes.InvalidArgument,
+			"Volume context must carry "+utils.VolumeNameContextKey+"; static provisioning is not supported")
+	}
+
+	// The node mounts from the host of the PanAPI address in the secret.
+	mountAddress, err := panapi.MountAddress(in.GetSecrets())
+	if err != nil {
+		llog.Error(err, InvalidRequestErrorStr)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	if err := d.mounterV2.Mount(fmt.Sprintf("panfs://%s/%s", mountAddress, volumeName), publishTargetPath, mountOptions); err != nil {
 		llog.Error(fmt.Errorf("failed to publish volume"), UnexpectedErrorInternalStr,
 			"volume_id", volumeID,
 			"publish_target_path", publishTargetPath,

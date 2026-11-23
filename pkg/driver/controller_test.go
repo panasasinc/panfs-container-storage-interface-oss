@@ -20,7 +20,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/driver/mock"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"github.com/stretchr/testify/assert"
 	"go.uber.org/mock/gomock"
@@ -30,26 +30,28 @@ import (
 
 var (
 	defaultSecrets = map[string]string{
-		utils.RealmConnectionContext.Username:       "user",
-		utils.RealmConnectionContext.Password:       "pass",
-		utils.RealmConnectionContext.RealmAddress:   "realm",
+		utils.RealmConnectionContext.Token:          "token",
+		utils.RealmConnectionContext.API:            "realm",
 		utils.RealmConnectionContext.KMIPConfigData: "# some data",
 	}
 	validVolumeName = "validVolumeName"
-	emptyVolumeName = ""
-	GB10Bytes       = utils.GBToBytes(10)
+	// validVolumeID is the CSI volume ID of validVolumeName: its PanAPI volume id in decimal form.
+	validVolumeID       = "7"
+	validVolumeIDNumber = int64(7)
+	emptyVolumeName     = ""
+	GB10Bytes           = utils.GBToBytes(10)
 )
 
 // TestControllerExpandVolume tests the ControllerExpandVolume method of the Driver struct.
 func TestControllerExpandVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	pancliMock := mock.NewMockStorageProviderClient(ctrl)
+	panapiMock := mock.NewMockStorageProviderClient(ctrl)
 	driver := &Driver{
 		Version:  "testing",
 		Name:     DefaultDriverName,
 		endpoint: "unix:///tmp/csi.sock",
 		host:     "localhost",
-		panfs:    pancliMock,
+		panfs:    panapiMock,
 	}
 
 	testCases := []struct {
@@ -62,7 +64,7 @@ func TestControllerExpandVolume(t *testing.T) {
 		{
 			"Success",
 			&csi.ControllerExpandVolumeRequest{
-				VolumeId:      validVolumeName,
+				VolumeId:      validVolumeID,
 				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
 				Secrets:       defaultSecrets,
 			},
@@ -72,7 +74,7 @@ func TestControllerExpandVolume(t *testing.T) {
 			},
 			nil,
 			func() {
-				pancliMock.EXPECT().ExpandVolume(validVolumeName, GB10Bytes, defaultSecrets).Return(nil)
+				panapiMock.EXPECT().ExpandVolume(gomock.Any(), validVolumeID, GB10Bytes, defaultSecrets).Return(nil)
 			},
 		},
 		{
@@ -85,72 +87,72 @@ func TestControllerExpandVolume(t *testing.T) {
 			nil,
 			status.Error(codes.InvalidArgument, "volume id must be provided"),
 			func() {
-				pancliMock.EXPECT().ExpandVolume(gomock.Any(), gomock.Any(), defaultSecrets).Times(0)
+				panapiMock.EXPECT().ExpandVolume(gomock.Any(), gomock.Any(), gomock.Any(), defaultSecrets).Times(0)
 			},
 		},
 		{
 			"EmptyCapacityRangeError",
 			&csi.ControllerExpandVolumeRequest{
-				VolumeId:      validVolumeName,
+				VolumeId:      validVolumeID,
 				CapacityRange: nil,
 				Secrets:       defaultSecrets,
 			},
 			nil,
 			status.Error(codes.InvalidArgument, "volume capacity range must be provided"),
 			func() {
-				pancliMock.EXPECT().ExpandVolume(gomock.Any(), gomock.Any(), defaultSecrets).Times(0)
+				panapiMock.EXPECT().ExpandVolume(gomock.Any(), gomock.Any(), gomock.Any(), defaultSecrets).Times(0)
 			},
 		},
 		{
 			"EmptySecretsError",
 			&csi.ControllerExpandVolumeRequest{
-				VolumeId:      validVolumeName,
+				VolumeId:      validVolumeID,
 				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
 				Secrets:       nil,
 			},
 			nil,
 			status.Error(codes.InvalidArgument, "secrets must be provided"),
 			func() {
-				pancliMock.EXPECT().ExpandVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				panapiMock.EXPECT().ExpandVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 		{
 			"ExpandNonExistingVolumeError",
 			&csi.ControllerExpandVolumeRequest{
-				VolumeId:      validVolumeName,
+				VolumeId:      validVolumeID,
 				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
 				Secrets:       defaultSecrets,
 			},
 			nil,
 			status.Error(codes.NotFound, VolumeNotFoundErrorStr),
 			func() {
-				pancliMock.EXPECT().ExpandVolume(validVolumeName, GB10Bytes, defaultSecrets).Return(pancli.ErrorNotFound)
+				panapiMock.EXPECT().ExpandVolume(gomock.Any(), validVolumeID, GB10Bytes, defaultSecrets).Return(panapi.ErrorNotFound)
 			},
 		},
 		{
 			"ExpandFailedPancliError",
 			&csi.ControllerExpandVolumeRequest{
-				VolumeId:      validVolumeName,
+				VolumeId:      validVolumeID,
 				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
 				Secrets:       defaultSecrets,
 			},
 			nil,
 			status.Error(codes.Internal, UnexpectedErrorInternalStr),
 			func() {
-				pancliMock.EXPECT().ExpandVolume(validVolumeName, GB10Bytes, defaultSecrets).Return(pancli.ErrorInternal)
+				panapiMock.EXPECT().ExpandVolume(gomock.Any(), validVolumeID, GB10Bytes, defaultSecrets).Return(panapi.ErrorInternal)
 			},
 		},
 		{
 			"RequiredLessThan0",
 			&csi.ControllerExpandVolumeRequest{
-				VolumeId:      validVolumeName,
+				VolumeId:      validVolumeID,
 				CapacityRange: &csi.CapacityRange{RequiredBytes: -100},
 				Secrets:       defaultSecrets,
 			},
 			nil,
 			status.Error(codes.InvalidArgument, InvalidCapacityRangeErrorStr),
 			func() {
-				pancliMock.EXPECT().ExpandVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+				panapiMock.EXPECT().ExpandVolume(gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 	}
@@ -171,17 +173,75 @@ func TestControllerExpandVolume(t *testing.T) {
 	}
 }
 
+// mountCapabilities is the volume capability list of a plain mount volume.
+func mountCapabilities() []*csi.VolumeCapability {
+	return []*csi.VolumeCapability{
+		{AccessType: &csi.VolumeCapability_Mount{Mount: &csi.VolumeCapability_MountVolume{}}},
+	}
+}
+
+// testVolume returns a PanAPI volume named validVolumeName with the given quotas.
+func testVolume(soft, hard int64) *panapi.Volume {
+	return &panapi.Volume{
+		ID:             validVolumeIDNumber,
+		Pathname:       "/" + validVolumeName,
+		SoftQuotaBytes: &soft,
+		HardQuotaBytes: &hard,
+	}
+}
+
 // TestControllerCreateVolume tests the CreateVolume method of the Driver struct.
 func TestControllerCreateVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	pancliMock := mock.NewMockStorageProviderClient(ctrl)
+	panapiMock := mock.NewMockStorageProviderClient(ctrl)
 	driver := &Driver{
 		Version:  "testing",
 		Name:     DefaultDriverName,
 		endpoint: "unix:///tmp/csi.sock",
 		host:     "localhost",
-		panfs:    pancliMock,
+		panfs:    panapiMock,
 	}
+
+	const GB9Bytes, GB20Bytes = int64(9) << 30, int64(20) << 30
+
+	request := func(mutate func(*csi.CreateVolumeRequest)) *csi.CreateVolumeRequest {
+		req := &csi.CreateVolumeRequest{
+			Name:               validVolumeName,
+			CapacityRange:      &csi.CapacityRange{RequiredBytes: GB10Bytes},
+			Parameters:         map[string]string{panapi.StoragesetIDParameter: "1"},
+			Secrets:            defaultSecrets,
+			VolumeCapabilities: mountCapabilities(),
+		}
+		if mutate != nil {
+			mutate(req)
+		}
+		return req
+	}
+	response := func(capacity int64) *csi.CreateVolumeResponse {
+		return &csi.CreateVolumeResponse{
+			Volume: &csi.Volume{
+				VolumeId:      validVolumeID,
+				CapacityBytes: capacity,
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
+			},
+		}
+	}
+	lookup := func(vol *panapi.Volume, err error) *gomock.Call {
+		return panapiMock.EXPECT().GetVolumeByName(gomock.Any(), validVolumeName, defaultSecrets).Times(1).Return(vol, err)
+	}
+	create := func(soft, hard int64, vol *panapi.Volume, err error) *gomock.Call {
+		return panapiMock.EXPECT().CreateVolume(gomock.Any(), panapi.CreateVolumeParams{
+			Name:           validVolumeName,
+			Parameters:     map[string]string{panapi.StoragesetIDParameter: "1"},
+			SoftQuotaBytes: soft,
+			HardQuotaBytes: hard,
+		}, defaultSecrets).Times(1).Return(vol, err)
+	}
+	noBackendCalls := func() {
+		panapiMock.EXPECT().GetVolumeByName(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+		panapiMock.EXPECT().CreateVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
+	}
+	invalidParameter := fmt.Errorf("%w: parameter user: not numeric", panapi.ErrorInvalidArgument)
 
 	testCases := []struct {
 		name             string
@@ -191,296 +251,186 @@ func TestControllerCreateVolume(t *testing.T) {
 		mockFunc         func()
 	}{
 		{
-			"CreateVolumeSuccess",
-			&csi.CreateVolumeRequest{
-				Name:          validVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:    map[string]string{},
-				Secrets:       defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
-			&csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      validVolumeName,
-					CapacityBytes: GB10Bytes,
-					VolumeContext: map[string]string{},
-				},
-			},
+			"CreateVolumeSuccessHardQuotaEqualsSize",
+			request(nil),
+			response(GB10Bytes),
 			nil,
 			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), defaultSecrets).Times(1).Return(
-					&utils.Volume{
-						Name: utils.VolumeName(validVolumeName),
-						Soft: 10.00,
-					},
-					nil)
+				gomock.InOrder(
+					lookup(nil, panapi.ErrorNotFound),
+					create(GB10Bytes, GB10Bytes, testVolume(GB10Bytes, GB10Bytes), nil),
+				)
 			},
 		},
 		{
-			"CreateEncryptedVolumeSuccess",
-			&csi.CreateVolumeRequest{
-				Name: validVolumeName,
-				Parameters: map[string]string{
-					utils.VolumeParameters.GetSCKey("encryption"): "on",
-				},
-				Secrets: defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
-			&csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId: validVolumeName,
-					VolumeContext: map[string]string{
-						utils.VolumeParameters.GetSCKey("encryption"): "aes-xts-256",
-					},
-				},
-			},
+			"CreateVolumeExplicitLimitIsHardQuota",
+			request(func(r *csi.CreateVolumeRequest) {
+				r.CapacityRange = &csi.CapacityRange{RequiredBytes: GB10Bytes, LimitBytes: GB20Bytes}
+			}),
+			response(GB10Bytes),
 			nil,
 			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), defaultSecrets).Times(1).Return(
-					&utils.Volume{
-						Name:       utils.VolumeName(validVolumeName),
-						Encryption: "aes-xts-256",
-					},
-					nil)
+				gomock.InOrder(
+					lookup(nil, panapi.ErrorNotFound),
+					create(GB10Bytes, GB20Bytes, testVolume(GB10Bytes, GB20Bytes), nil),
+				)
 			},
 		},
 		{
-			"VolumeExistsCapabilitiesMatch",
-			&csi.CreateVolumeRequest{
-				Name:          validVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:    map[string]string{},
-				Secrets:       defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
-			&csi.CreateVolumeResponse{
-				Volume: &csi.Volume{
-					VolumeId:      validVolumeName,
-					CapacityBytes: GB10Bytes,
-					VolumeContext: map[string]string{},
-				},
-			},
+			"VolumeExistsIsReturnedWithoutCreate",
+			request(nil),
+			response(GB10Bytes),
 			nil,
 			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), defaultSecrets).Times(1).Return(
-					&utils.Volume{
-						Name: utils.VolumeName(validVolumeName),
-						Soft: 10.00,
-					},
-					pancli.ErrorAlreadyExist,
-				)
-				pancliMock.EXPECT().GetVolume(validVolumeName, defaultSecrets).Times(1).Return(
-					&utils.Volume{
-						Name: utils.VolumeName(validVolumeName),
-						Soft: 10.00,
-					},
-					nil,
-				)
+				lookup(testVolume(GB10Bytes, GB10Bytes), nil)
+				panapiMock.EXPECT().CreateVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 		{
 			"VolumeExistsCapacityDoesNotMatchError",
-			&csi.CreateVolumeRequest{
-				Name:          validVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:    map[string]string{},
-				Secrets:       defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
+			request(nil),
 			nil,
 			status.Error(codes.AlreadyExists, "Volume capacity does not match: requiredBytes bytes (10737418240) exceeds soft quota bytes (9663676416)"),
 			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), defaultSecrets).Times(1).Return(
-					nil,
-					pancli.ErrorAlreadyExist,
+				lookup(testVolume(GB9Bytes, GB9Bytes), nil)
+			},
+		},
+		{
+			"ConflictOnCreateThenVolumeFound",
+			request(nil),
+			response(GB10Bytes),
+			nil,
+			func() {
+				gomock.InOrder(
+					lookup(nil, panapi.ErrorNotFound),
+					create(GB10Bytes, GB10Bytes, nil, panapi.ErrorAlreadyExist),
+					lookup(testVolume(GB10Bytes, GB10Bytes), nil),
 				)
-				pancliMock.EXPECT().GetVolume(validVolumeName, defaultSecrets).Times(1).Return(
-					&utils.Volume{
-						Name: utils.VolumeName(validVolumeName),
-						Soft: 9.00, // Different soft quota to simulate capabilities mismatch
-					},
-					nil,
+			},
+		},
+		{
+			"ConflictOnCreateButNoSuchVolumeError",
+			request(nil),
+			nil,
+			status.Error(codes.Internal, UnexpectedErrorInternalStr),
+			func() {
+				gomock.InOrder(
+					lookup(nil, panapi.ErrorNotFound),
+					create(GB10Bytes, GB10Bytes, nil, panapi.ErrorAlreadyExist),
+					lookup(nil, panapi.ErrorNotFound),
+				)
+			},
+		},
+		{
+			"LookupUnavailableError",
+			request(nil),
+			nil,
+			status.Error(codes.Unavailable, UnexpectedErrorInternalStr),
+			func() {
+				lookup(nil, panapi.ErrorUnavailable)
+			},
+		},
+		{
+			"CreateUnauthenticatedError",
+			request(nil),
+			nil,
+			status.Error(codes.Unauthenticated, UnexpectedErrorInternalStr),
+			func() {
+				gomock.InOrder(
+					lookup(nil, panapi.ErrorNotFound),
+					create(GB10Bytes, GB10Bytes, nil, panapi.ErrorUnauthenticated),
+				)
+			},
+		},
+		{
+			"CreateInvalidArgumentKeepsMessage",
+			request(nil),
+			nil,
+			status.Error(codes.InvalidArgument, invalidParameter.Error()),
+			func() {
+				gomock.InOrder(
+					lookup(nil, panapi.ErrorNotFound),
+					create(GB10Bytes, GB10Bytes, nil, invalidParameter),
+				)
+			},
+		},
+		{
+			"CreateInternalError",
+			request(nil),
+			nil,
+			status.Error(codes.Internal, UnexpectedErrorInternalStr),
+			func() {
+				gomock.InOrder(
+					lookup(nil, panapi.ErrorNotFound),
+					create(GB10Bytes, GB10Bytes, nil, panapi.ErrorInternal),
 				)
 			},
 		},
 		{
 			"UnsupportedVolumeCapabilitiesError",
-			&csi.CreateVolumeRequest{
-				Name:          validVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:    map[string]string{},
-				Secrets:       nil,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Block{
-							Block: &csi.VolumeCapability_BlockVolume{},
-						},
-					},
-				},
-			},
+			request(func(r *csi.CreateVolumeRequest) {
+				r.VolumeCapabilities = []*csi.VolumeCapability{
+					{AccessType: &csi.VolumeCapability_Block{Block: &csi.VolumeCapability_BlockVolume{}}},
+				}
+			}),
 			nil,
 			status.Error(
 				codes.InvalidArgument,
 				fmt.Sprintf(
 					"unsupported volume capability: %s",
 					&csi.VolumeCapability{AccessType: &csi.VolumeCapability_Block{Block: &csi.VolumeCapability_BlockVolume{}}})),
-			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), nil).Times(0)
-			},
+			noBackendCalls,
 		},
 		{
 			"EmptySecretsError",
-			&csi.CreateVolumeRequest{
-				Name:          validVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:    map[string]string{},
-				Secrets:       nil,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
+			request(func(r *csi.CreateVolumeRequest) { r.Secrets = nil }),
 			nil,
 			status.Error(codes.InvalidArgument, "secrets must be provided"),
-			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), nil).Times(0)
-			},
+			noBackendCalls,
+		},
+		{
+			"MissingTokenError",
+			request(func(r *csi.CreateVolumeRequest) {
+				r.Secrets = map[string]string{utils.RealmConnectionContext.API: "realm"}
+			}),
+			nil,
+			status.Error(codes.InvalidArgument, "missing token in secrets"),
+			noBackendCalls,
+		},
+		{
+			"SSHCredentialsInSecretsError",
+			request(func(r *csi.CreateVolumeRequest) {
+				r.Secrets = map[string]string{
+					utils.RealmConnectionContext.API:      "realm",
+					utils.RealmConnectionContext.Token:    "token",
+					utils.RealmConnectionContext.Password: "pass",
+				}
+			}),
+			nil,
+			status.Error(codes.InvalidArgument,
+				"password in secrets is not supported: the driver uses a PanAPI token (token), not SSH credentials"),
+			noBackendCalls,
 		},
 		{
 			"CreateVolumeInvalidVolumeNameError",
-			&csi.CreateVolumeRequest{
-				Name:          emptyVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:    map[string]string{},
-				Secrets:       defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
+			request(func(r *csi.CreateVolumeRequest) { r.Name = emptyVolumeName }),
 			nil,
 			status.Error(codes.InvalidArgument, "name must be provided"),
-			func() {
-				pancliMock.EXPECT().CreateVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
-			},
+			noBackendCalls,
 		},
 		{
 			"CreateVolumeInvalidCapacityRangeError",
-			&csi.CreateVolumeRequest{
-				Name:          validVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: -100},
-				Parameters:    map[string]string{},
-				Secrets:       defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
+			request(func(r *csi.CreateVolumeRequest) { r.CapacityRange = &csi.CapacityRange{RequiredBytes: -100} }),
 			nil,
 			status.Error(codes.InvalidArgument, fmt.Sprintf("required_bytes (%d) cannot be less than zero", -100)),
-			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), gomock.Any()).Times(0)
-			},
+			noBackendCalls,
 		},
 		{
 			"CreateVolumeInvalidVolumeCapabilitiesError",
-			&csi.CreateVolumeRequest{
-				Name:               validVolumeName,
-				CapacityRange:      &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:         map[string]string{},
-				Secrets:            defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{},
-			},
+			request(func(r *csi.CreateVolumeRequest) { r.VolumeCapabilities = []*csi.VolumeCapability{} }),
 			nil,
 			status.Error(codes.InvalidArgument, "volume_capabilities must be provided"),
-			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), gomock.Any()).Times(0)
-			},
-		},
-		{
-			"FailedToCreateVolumePancliError",
-			&csi.CreateVolumeRequest{
-				Name:          validVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:    map[string]string{},
-				Secrets:       defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
-			nil,
-			status.Error(codes.Internal, UnexpectedErrorInternalStr),
-			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), gomock.Any()).Times(1).Return(
-					nil,
-					pancli.ErrorInternal,
-				)
-			},
-		},
-		{
-			"VolumeExistsFailedToGetDetails",
-			&csi.CreateVolumeRequest{
-				Name:          validVolumeName,
-				CapacityRange: &csi.CapacityRange{RequiredBytes: GB10Bytes},
-				Parameters:    map[string]string{},
-				Secrets:       defaultSecrets,
-				VolumeCapabilities: []*csi.VolumeCapability{
-					{
-						AccessType: &csi.VolumeCapability_Mount{
-							Mount: &csi.VolumeCapability_MountVolume{},
-						},
-					},
-				},
-			},
-			nil,
-			status.Error(codes.Internal, UnexpectedErrorInternalStr),
-			func() {
-				pancliMock.EXPECT().CreateVolume(validVolumeName, gomock.Any(), gomock.Any()).Times(1).Return(
-					nil,
-					pancli.ErrorAlreadyExist,
-				)
-				pancliMock.EXPECT().GetVolume(validVolumeName, defaultSecrets).Times(1).Return(
-					nil,
-					pancli.ErrorInternal,
-				)
-			},
+			noBackendCalls,
 		},
 	}
 
@@ -499,13 +449,13 @@ func TestControllerCreateVolume(t *testing.T) {
 // TestControllerDeleteVolume tests the DeleteVolume method of the Driver struct.
 func TestControllerDeleteVolume(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	pancliMock := mock.NewMockStorageProviderClient(ctrl)
+	panapiMock := mock.NewMockStorageProviderClient(ctrl)
 	driver := &Driver{
 		Version:  "testing",
 		Name:     DefaultDriverName,
 		endpoint: "unix:///tmp/csi.sock",
 		host:     "localhost",
-		panfs:    pancliMock,
+		panfs:    panapiMock,
 	}
 
 	testCases := []struct {
@@ -518,37 +468,37 @@ func TestControllerDeleteVolume(t *testing.T) {
 		{
 			name: "DeleteVolumeSuccess",
 			req: &csi.DeleteVolumeRequest{
-				VolumeId: validVolumeName,
+				VolumeId: validVolumeID,
 				Secrets:  defaultSecrets,
 			},
 			expectedResponse: &csi.DeleteVolumeResponse{},
 			expectedError:    nil,
 			mockFunc: func() {
-				pancliMock.EXPECT().DeleteVolume(validVolumeName, defaultSecrets).Return(nil)
+				panapiMock.EXPECT().DeleteVolume(gomock.Any(), validVolumeID, defaultSecrets).Return(nil)
 			},
 		},
 		{
 			name: "VolumeNotFoundReturnsOK",
 			req: &csi.DeleteVolumeRequest{
-				VolumeId: validVolumeName,
+				VolumeId: validVolumeID,
 				Secrets:  defaultSecrets,
 			},
 			expectedResponse: &csi.DeleteVolumeResponse{},
 			expectedError:    nil,
 			mockFunc: func() {
-				pancliMock.EXPECT().DeleteVolume(validVolumeName, defaultSecrets).Return(pancli.ErrorNotFound)
+				panapiMock.EXPECT().DeleteVolume(gomock.Any(), validVolumeID, defaultSecrets).Return(panapi.ErrorNotFound)
 			},
 		},
 		{
 			name: "PancliDeleteVolumeError",
 			req: &csi.DeleteVolumeRequest{
-				VolumeId: validVolumeName,
+				VolumeId: validVolumeID,
 				Secrets:  defaultSecrets,
 			},
 			expectedResponse: nil,
 			expectedError:    status.Error(codes.Internal, UnexpectedErrorInternalStr),
 			mockFunc: func() {
-				pancliMock.EXPECT().DeleteVolume(validVolumeName, defaultSecrets).Return(pancli.ErrorInternal)
+				panapiMock.EXPECT().DeleteVolume(gomock.Any(), validVolumeID, defaultSecrets).Return(panapi.ErrorInternal)
 			},
 		},
 		{
@@ -560,19 +510,19 @@ func TestControllerDeleteVolume(t *testing.T) {
 			expectedResponse: nil,
 			expectedError:    status.Error(codes.InvalidArgument, "volume id must be provided"),
 			mockFunc: func() {
-				pancliMock.EXPECT().DeleteVolume(gomock.Any(), gomock.Any()).Times(0)
+				panapiMock.EXPECT().DeleteVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 		{
 			name: "EmptySecretsError",
 			req: &csi.DeleteVolumeRequest{
-				VolumeId: validVolumeName,
+				VolumeId: validVolumeID,
 				Secrets:  nil,
 			},
 			expectedResponse: nil,
 			expectedError:    status.Error(codes.InvalidArgument, "secrets must be provided"),
 			mockFunc: func() {
-				pancliMock.EXPECT().DeleteVolume(gomock.Any(), gomock.Any()).Times(0)
+				panapiMock.EXPECT().DeleteVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 	}
@@ -690,13 +640,13 @@ func TestControllerGetCapabilities(t *testing.T) {
 // TestValidateVolumeCapabilities tests the ValidateVolumeCapabilities method of the Driver struct.
 func TestValidateVolumeCapabilities(t *testing.T) {
 	ctrl := gomock.NewController(t)
-	pancliMock := mock.NewMockStorageProviderClient(ctrl)
+	panapiMock := mock.NewMockStorageProviderClient(ctrl)
 	driver := &Driver{
 		Version:  "testing",
 		Name:     DefaultDriverName,
 		endpoint: "unix:///tmp/csi.sock",
 		host:     "localhost",
-		panfs:    pancliMock,
+		panfs:    panapiMock,
 	}
 
 	mountCap := &csi.VolumeCapability{
@@ -720,7 +670,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 		{
 			name: "Success",
 			req: &csi.ValidateVolumeCapabilitiesRequest{
-				VolumeId:           validVolumeName,
+				VolumeId:           validVolumeID,
 				VolumeCapabilities: []*csi.VolumeCapability{mountCap},
 				Secrets:            defaultSecrets,
 			},
@@ -731,7 +681,7 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 			},
 			expectedError: nil,
 			mockFunc: func() {
-				pancliMock.EXPECT().GetVolume(validVolumeName, defaultSecrets).Return(&utils.Volume{Name: utils.VolumeName(validVolumeName)}, nil)
+				panapiMock.EXPECT().GetVolume(gomock.Any(), validVolumeID, defaultSecrets).Return(testVolume(GB10Bytes, GB10Bytes), nil)
 			},
 		},
 		{
@@ -744,72 +694,72 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 			expectedResponse: nil,
 			expectedError:    status.Error(codes.InvalidArgument, "volume id must not be empty"),
 			mockFunc: func() {
-				pancliMock.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Times(0)
+				panapiMock.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 		{
 			name: "EmptyVolumeCapabilitiesError",
 			req: &csi.ValidateVolumeCapabilitiesRequest{
-				VolumeId:           validVolumeName,
+				VolumeId:           validVolumeID,
 				VolumeCapabilities: []*csi.VolumeCapability{},
 				Secrets:            defaultSecrets,
 			},
 			expectedResponse: nil,
 			expectedError:    status.Error(codes.InvalidArgument, "volume capabilities must be provided"),
 			mockFunc: func() {
-				pancliMock.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Times(0)
+				panapiMock.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 		{
 			name: "EmptySecretsError",
 			req: &csi.ValidateVolumeCapabilitiesRequest{
-				VolumeId:           validVolumeName,
+				VolumeId:           validVolumeID,
 				VolumeCapabilities: []*csi.VolumeCapability{mountCap},
 				Secrets:            nil,
 			},
 			expectedResponse: nil,
 			expectedError:    status.Error(codes.InvalidArgument, "secrets must be provided"),
 			mockFunc: func() {
-				pancliMock.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Times(0)
+				panapiMock.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 		{
 			name: "UnsupportedVolumeCapabilitiesError",
 			req: &csi.ValidateVolumeCapabilitiesRequest{
-				VolumeId:           validVolumeName,
+				VolumeId:           validVolumeID,
 				VolumeCapabilities: []*csi.VolumeCapability{blockCap},
 				Secrets:            defaultSecrets,
 			},
 			expectedResponse: nil,
 			expectedError:    status.Error(codes.InvalidArgument, VolumeCapabilitiesDoNotMatchErrorStr),
 			mockFunc: func() {
-				pancliMock.EXPECT().GetVolume(gomock.Any(), gomock.Any()).Times(0)
+				panapiMock.EXPECT().GetVolume(gomock.Any(), gomock.Any(), gomock.Any()).Times(0)
 			},
 		},
 		{
 			name: "VolumeNotFoundError",
 			req: &csi.ValidateVolumeCapabilitiesRequest{
-				VolumeId:           validVolumeName,
+				VolumeId:           validVolumeID,
 				VolumeCapabilities: []*csi.VolumeCapability{mountCap},
 				Secrets:            defaultSecrets,
 			},
 			expectedResponse: nil,
 			expectedError:    status.Error(codes.NotFound, VolumeNotFoundErrorStr),
 			mockFunc: func() {
-				pancliMock.EXPECT().GetVolume(validVolumeName, defaultSecrets).Return(nil, pancli.ErrorNotFound)
+				panapiMock.EXPECT().GetVolume(gomock.Any(), validVolumeID, defaultSecrets).Return(nil, panapi.ErrorNotFound)
 			},
 		},
 		{
 			name: "InternalErrorFromPancli",
 			req: &csi.ValidateVolumeCapabilitiesRequest{
-				VolumeId:           validVolumeName,
+				VolumeId:           validVolumeID,
 				VolumeCapabilities: []*csi.VolumeCapability{mountCap},
 				Secrets:            defaultSecrets,
 			},
 			expectedResponse: nil,
-			expectedError:    status.Error(codes.Internal, pancli.ErrorInternal.Error()),
+			expectedError:    status.Error(codes.Internal, UnexpectedErrorInternalStr),
 			mockFunc: func() {
-				pancliMock.EXPECT().GetVolume(validVolumeName, defaultSecrets).Return(nil, pancli.ErrorInternal)
+				panapiMock.EXPECT().GetVolume(gomock.Any(), validVolumeID, defaultSecrets).Return(nil, panapi.ErrorInternal)
 			},
 		},
 	}

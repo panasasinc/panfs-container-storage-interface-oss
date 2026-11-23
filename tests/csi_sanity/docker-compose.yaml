@@ -66,6 +66,7 @@ services:
         --csi.endpoint $(printenv CSI_NODE_ENDPOINT) \
         -csi.mountdir /tmp/vdura-csi/sanity-tests \
         -csi.secrets /tests/csi_secrets.yaml \
+        -csi.testvolumeparameters /tests/csi_parameters.yaml \
         -ginkgo.v \
         -ginkgo.poll-progress-after 3s \
         -ginkgo.seed 0
@@ -73,6 +74,7 @@ services:
     volumes:
       - shared-volume:/tmp/vdura-csi
       - ./secrets.yaml:/tests/csi_secrets.yaml
+      - ./parameters.yaml:/tests/csi_parameters.yaml
     depends_on:
       - plugin_controller
       - plugin_node

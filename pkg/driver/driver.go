@@ -27,8 +27,7 @@ import (
 	"syscall"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -43,11 +42,16 @@ import (
 
 // StorageProviderClient defines an interface for managing volumes with a storage provider.
 type StorageProviderClient interface {
-	CreateVolume(volumeName string, params pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error)
-	DeleteVolume(volID string, secret map[string]string) error
-	ExpandVolume(volumeName string, targetSize int64, secret map[string]string) error
-	ListVolumes(secret map[string]string) (*utils.VolumeList, error)
-	GetVolume(volumeName string, secret map[string]string) (*utils.Volume, error)
+	// CreateVolume creates a volume; it returns panapi.ErrorAlreadyExist on a conflict.
+	CreateVolume(ctx context.Context, params panapi.CreateVolumeParams, secrets map[string]string) (*panapi.Volume, error)
+	// DeleteVolume deletes a volume by CSI volume ID; it returns panapi.ErrorNotFound when it does not exist.
+	DeleteVolume(ctx context.Context, volumeID string, secrets map[string]string) error
+	// ExpandVolume raises the quota of a volume, addressed by CSI volume ID, to targetSize bytes.
+	ExpandVolume(ctx context.Context, volumeID string, targetSize int64, secrets map[string]string) error
+	// GetVolume returns a volume by CSI volume ID.
+	GetVolume(ctx context.Context, volumeID string, secrets map[string]string) (*panapi.Volume, error)
+	// GetVolumeByName returns a volume by name; CreateVolume needs it to be idempotent by name.
+	GetVolumeByName(ctx context.Context, volumeName string, secrets map[string]string) (*panapi.Volume, error)
 }
 
 // PanMounter defines the interface for mounting and unmounting PanFS volumes.

@@ -21,29 +21,37 @@ import (
 // VendorPrefix for PanFS CSI Driver
 const VendorPrefix = "panfs.csi.vdura.com/"
 
+// VolumeNameContextKey is the volume context key that carries the volume name from the controller to the node.
+// The CSI volume ID is the PanAPI volume id, while the node mounts the volume by name.
+const VolumeNameContextKey = VendorPrefix + "volume-name"
+
 // VolumeParametersData defines structure for volume parameters data
 type VolumeParametersData map[string]string
 
 // VolumeParameters holds supported volume provisioning context parameters
 var VolumeParameters = VolumeParametersData{
-	"description": `description "%s"`,
-	"storageset":  `storageset "%s"`,
-	"recovery":    "recoverypriority %s",
-	"efsa":        "efsa %s",
-	"volservice":  "volservice %s",
-	"layout":      "layout %s",
-	"maxwidth":    "maxwidth %s",
-	"stripeunit":  "stripeunit %s",
-	"rgwidth":     "rgwidth %s",
-	"rgdepth":     "rgdepth %s",
-	"user":        `user "%s"`,
-	"group":       `group "%s"`,
-	"uperm":       "uperm %s",
-	"gperm":       "gperm %s",
-	"operm":       "operm %s",
-	"encryption":  "encryption %s",
-	"soft":        "soft %v", // softQuotaGB
-	"hard":        "hard %v", // hardQuotaGB
+	// storageset_id is the numeric id of the storageset that holds new volumes; required by the PanAPI backend.
+	"storageset_id": "",
+	"description":   `description "%s"`,
+	"storageset":    `storageset "%s"`,
+	"recovery":      "recoverypriority %s",
+	// recoverypriority is the key the PanAPI backend accepts; recovery is used by the SSH backend only.
+	"recoverypriority": "recoverypriority %s",
+	"efsa":             "efsa %s",
+	"volservice":       "volservice %s",
+	"layout":           "layout %s",
+	"maxwidth":         "maxwidth %s",
+	"stripeunit":       "stripeunit %s",
+	"rgwidth":          "rgwidth %s",
+	"rgdepth":          "rgdepth %s",
+	"user":             `user "%s"`,
+	"group":            `group "%s"`,
+	"uperm":            "uperm %s",
+	"gperm":            "gperm %s",
+	"operm":            "operm %s",
+	"encryption":       "encryption %s",
+	"soft":             "soft %v", // softQuotaGB
+	"hard":             "hard %v", // hardQuotaGB
 }
 
 // GetSCKey retrieves the storage class parameter key for a given context parameter key
@@ -73,6 +81,9 @@ var RealmConnectionContext = struct {
 	PrivateKey           string
 	PrivateKeyPassphrase string
 	KMIPConfigData       string
+	API                  string
+	Token                string
+	CACert               string
 }{
 	RealmAddress:         "realm_ip",
 	Username:             "user",
@@ -80,4 +91,7 @@ var RealmConnectionContext = struct {
 	PrivateKey:           "private_key",
 	PrivateKeyPassphrase: "private_key_passphrase",
 	KMIPConfigData:       "kmip_config_data",
+	API:                  "api",
+	Token:                "token",
+	CACert:               "ca_cert",
 }

@@ -138,7 +138,7 @@ The `values.yaml` file contains configurable parameters.
 | dfc.version | string | `<DFC_RELEASE_VERSION>` | DFC release version |
 | imagePullSecrets | list | `[]` | List of image pull secrets for private registries |
 | kmm.enabled | bool | `true` | Enable or disable KMM module for PanFS |
-| kmm.encryptionSupport | bool | `true` | Enable encryption support in DFC |
+| kmm.encryptionSupport | bool | `false` | Enable encryption support in DFC. Volume encryption is not supported with the PanAPI backend. |
 | kmm.kernelMappings | list | `[...]` | **PanFS DFC images** for different kernel versions |
 | kmm.nodeReadyLabel | object | `{"kmm.node.kubernetes.io/<csi-driver-namespace>.<module-name>.ready": ""}` | Label applied to nodes when the PanFS kernel module is successfully loaded |
 | kmm.pullPolicy | string | `"Always"` | Image pull policy for the KMM module |

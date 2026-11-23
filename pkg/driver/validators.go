@@ -16,10 +16,13 @@ package driver
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
+	"slices"
 	"strconv"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 )
 
@@ -39,16 +42,16 @@ var (
 // Returns:
 //
 //	error - Returns an error if requiredBytes exceeds soft quota or limitBytes does not match hard quota.
-func validateVolumeCapacity(capacity *csi.CapacityRange, vol *utils.Volume) error {
+func validateVolumeCapacity(capacity *csi.CapacityRange, vol *panapi.Volume) error {
 	requiredBytes := capacity.GetRequiredBytes()
-	softBytes := utils.GBToBytes(vol.Soft)
+	softBytes := vol.SoftQuota()
 
 	if requiredBytes != 0 && requiredBytes > softBytes {
 		return fmt.Errorf("requiredBytes bytes (%d) exceeds soft quota bytes (%d)", requiredBytes, softBytes)
 	}
 
 	limit := capacity.GetLimitBytes()
-	hardBytes := utils.GBToBytes(vol.Hard)
+	hardBytes := vol.HardQuota()
 
 	if limit != 0 && limit != hardBytes {
 		return fmt.Errorf("limit bytes (%d) not equal to hard quota bytes (%d)", limit, hardBytes)
@@ -115,8 +118,11 @@ func validateCreateVolumeRequest(req *csi.CreateVolumeRequest) error {
 //	error - Returns an error if any parameter is invalid.
 func validateVolumeParameters(parameters map[string]string) error {
 	// Validate optional parameters if they are present
-	if val, exist := parameters[utils.VolumeParameters.GetSCKey("storageset")]; exist && val == "" {
-		return fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("storageset"))
+	// Reject parameters the PanAPI backend cannot honor, in key order so the reported one is stable.
+	for _, key := range slices.Sorted(maps.Keys(parameters)) {
+		if err := panapi.UnsupportedParameter(key); err != nil {
+			return err
+		}
 	}
 
 	if val, exist := parameters[utils.VolumeParameters.GetSCKey("volservice")]; exist && val == "" {
@@ -192,51 +198,52 @@ func validateVolumeParameters(parameters map[string]string) error {
 		return fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("operm"), permList)
 	}
 
-	if val, exist := parameters[utils.VolumeParameters.GetSCKey("encryption")]; exist {
-		if valid := validateEncryptionParameter(val); !valid {
-			return fmt.Errorf("%s must be 'on' or 'off'", utils.VolumeParameters.GetSCKey("encryption"))
-		}
+	// The storageset id is the one required parameter.
+	if _, err := panapi.StoragesetID(parameters); err != nil {
+		return err
 	}
 
 	// Additional validation rules can be added here as needed.
 	return nil
 }
 
-// validateReqSecrets validates the secrets map for required authentication keys.
-// Ensures realm, SSH user, and either password or private key are present.
-//
-// Parameters:
-//
-//	secrets - Map of secret keys and values.
-//
-// Returns:
-//
-//	error - Returns an error if required secrets are missing or invalid.
-func validateReqSecrets(secrets map[string]string) error {
+// sshSecretKeys are the SSH credentials of driver 1.2.x. The driver no longer accepts them.
+var sshSecretKeys = []string{
+	utils.RealmConnectionContext.Username,
+	utils.RealmConnectionContext.Password,
+	utils.RealmConnectionContext.PrivateKey,
+	utils.RealmConnectionContext.PrivateKeyPassphrase,
+}
+
+// validateNodeSecrets validates the secrets of a node request.
+// The node only mounts, from the host of the api key; it never calls PanAPI and needs no token.
+// A secret that still carries SSH credentials is rejected.
+func validateNodeSecrets(secrets map[string]string) error {
 	if secrets == nil {
 		return fmt.Errorf("secrets must be provided")
 	}
-	if _, ok := secrets[utils.RealmConnectionContext.RealmAddress]; !ok {
-		return fmt.Errorf("missing %s in secrets", utils.RealmConnectionContext.RealmAddress)
+	if _, err := panapi.APIURL(secrets); err != nil {
+		return err
 	}
 
-	if _, ok := secrets[utils.RealmConnectionContext.Username]; !ok {
-		return fmt.Errorf("missing %s in secrets", utils.RealmConnectionContext.Username)
+	for _, key := range sshSecretKeys {
+		if _, ok := secrets[key]; ok {
+			return fmt.Errorf("%s in secrets is not supported: the driver uses a PanAPI token (%s), not SSH credentials",
+				key, utils.RealmConnectionContext.Token)
+		}
 	}
 
-	password, ok := secrets[utils.RealmConnectionContext.Password]
-	if !ok {
-		password = "" // Default to empty if not provided
-	}
+	return nil
+}
 
-	privateKey, ok := secrets[utils.RealmConnectionContext.PrivateKey]
-	if !ok {
-		privateKey = "" // Default to empty if not provided
+// validateControllerSecrets validates the secrets of a controller request.
+// On top of the node rules, the controller needs the PanAPI service account token.
+func validateControllerSecrets(secrets map[string]string) error {
+	if err := validateNodeSecrets(secrets); err != nil {
+		return err
 	}
-
-	if password == "" && privateKey == "" {
-		// If neither password nor private key is provided, return an error.
-		return fmt.Errorf("no valid authentication credentials provided in secrets, either password or public key is required")
+	if secrets[utils.RealmConnectionContext.Token] == "" {
+		return fmt.Errorf("missing %s in secrets", utils.RealmConnectionContext.Token)
 	}
 
 	return nil
@@ -293,18 +300,4 @@ func validateStripeUnit(input string) bool {
 	}
 
 	return true
-}
-
-// validateEncryptionParameter checks if the encryption parameter is valid.
-// Accepts only "on" or "off".
-//
-// Parameters:
-//
-//	input - The encryption parameter string to validate.
-//
-// Returns:
-//
-//	bool - True if valid, false otherwise.
-func validateEncryptionParameter(input string) bool {
-	return utils.In(input, "on", "off", "aes-xts-256", "none")
 }

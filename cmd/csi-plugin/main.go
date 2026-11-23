@@ -19,7 +19,7 @@ import (
 	"os"
 
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/driver"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 
 	"k8s.io/klog/v2"
 )
@@ -62,12 +62,12 @@ func main() {
 	var panfs driver.StorageProviderClient
 	var mounter driver.PanMounter
 	if cfg.sanity {
-		klog.Info("CSI sanity mode enabled: using mock pancli and mounter")
-		panfs = pancli.NewFakePancliSSHClient()
+		klog.Info("CSI sanity mode enabled: using fake PanAPI client and mounter")
+		panfs = panapi.NewFakeClient()
 		mounter = driver.NewPanFSFakeMounter()
 	} else {
 		klog.Info("Starting driver in default operation mode")
-		panfs = pancli.NewPancliSSHClient(pancli.NewSSHClient())
+		panfs = panapi.NewClient()
 		mounter = driver.NewPanFSMounter()
 	}
 

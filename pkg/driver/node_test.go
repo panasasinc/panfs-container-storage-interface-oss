@@ -117,16 +117,54 @@ func TestNodePublishVolume(t *testing.T) {
 						},
 					},
 				},
-				Secrets: defaultSecrets,
+				Secrets:       defaultSecrets,
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
 			},
 			&csi.NodePublishVolumeResponse{},
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.API], validVolumeName),
 					validPublishTargetPath,
 					[]string{}).Times(1)
 			},
+		},
+		{
+			"Volume context without volume name (static provisioning)",
+			&csi.NodePublishVolumeRequest{
+				VolumeId:   validVolumeID,
+				TargetPath: validPublishTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+				},
+				Secrets: defaultSecrets,
+			},
+			nil,
+			status.Error(codes.InvalidArgument,
+				"Volume context must carry "+utils.VolumeNameContextKey+"; static provisioning is not supported"),
+			bindMountCalledZeroTimes,
+		},
+		{
+			"Secret with SSH credentials is rejected",
+			&csi.NodePublishVolumeRequest{
+				VolumeId:   validVolumeID,
+				TargetPath: validPublishTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{},
+					},
+				},
+				Secrets: map[string]string{
+					utils.RealmConnectionContext.API:        "realm",
+					utils.RealmConnectionContext.PrivateKey: "key",
+				},
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
+			},
+			nil,
+			status.Error(codes.InvalidArgument, InvalidRequestSecretsErrorStr),
+			bindMountCalledZeroTimes,
 		},
 		{
 			"Empty volume id",
@@ -141,7 +179,8 @@ func TestNodePublishVolume(t *testing.T) {
 						},
 					},
 				},
-				Secrets: defaultSecrets,
+				Secrets:       defaultSecrets,
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
 			},
 			nil,
 			status.Error(codes.InvalidArgument, "Volume id must be provided"),
@@ -160,13 +199,14 @@ func TestNodePublishVolume(t *testing.T) {
 						},
 					},
 				},
-				Secrets: defaultSecrets,
+				Secrets:       defaultSecrets,
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
 			},
 			nil,
 			status.Error(codes.Internal, "Failed to publish volume: mounter error"),
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.API], validVolumeName),
 					validPublishTargetPath,
 					[]string{"noatime"}).Return(fmt.Errorf("mounter error")).Times(1)
 			},
@@ -184,13 +224,14 @@ func TestNodePublishVolume(t *testing.T) {
 						},
 					},
 				},
-				Secrets: defaultSecrets,
+				Secrets:       defaultSecrets,
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
 			},
 			&csi.NodePublishVolumeResponse{},
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.API], validVolumeName),
 					validPublishTargetPath,
 					[]string{}).Times(1)
 			},
@@ -208,7 +249,8 @@ func TestNodePublishVolume(t *testing.T) {
 						},
 					},
 				},
-				Secrets: defaultSecrets,
+				Secrets:       defaultSecrets,
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
 			},
 			nil,
 			status.Error(codes.InvalidArgument, "Target Path must be provided"),
@@ -222,6 +264,7 @@ func TestNodePublishVolume(t *testing.T) {
 				TargetPath:        validPublishTargetPath,
 				VolumeCapability:  nil,
 				Secrets:           defaultSecrets,
+				VolumeContext:     map[string]string{utils.VolumeNameContextKey: validVolumeName},
 			},
 			nil,
 			status.Error(codes.InvalidArgument, "Volume Capability must be provided"),
@@ -238,7 +281,8 @@ func TestNodePublishVolume(t *testing.T) {
 						Block: &csi.VolumeCapability_BlockVolume{},
 					},
 				},
-				Secrets: defaultSecrets,
+				Secrets:       defaultSecrets,
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
 			},
 			nil,
 			status.Error(codes.FailedPrecondition, "unsupported volume capability provided"),
@@ -279,14 +323,15 @@ func TestNodePublishVolume(t *testing.T) {
 						},
 					},
 				},
-				Secrets:  defaultSecrets,
-				Readonly: true,
+				Secrets:       defaultSecrets,
+				Readonly:      true,
+				VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
 			},
 			&csi.NodePublishVolumeResponse{},
 			nil,
 			func() {
 				mockMounter.EXPECT().Mount(
-					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName),
+					fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.API], validVolumeName),
 					validPublishTargetPath,
 					[]string{"noatime", "ro"}).Times(1)
 			},
@@ -424,13 +469,12 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				},
 			},
 			Secrets: map[string]string{
-				utils.RealmConnectionContext.RealmAddress:   "realm",
-				utils.RealmConnectionContext.Username:       "user",
-				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.API:            "realm",
 				utils.RealmConnectionContext.KMIPConfigData: "some-kmip-data",
 			},
 			VolumeContext: map[string]string{
 				utils.VolumeParameters.GetSCKey("encryption"): "on",
+				utils.VolumeNameContextKey:                    validVolumeName,
 			},
 		}
 		resp, err := driver.NodePublishVolume(t.Context(), req)
@@ -469,13 +513,12 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				},
 			},
 			Secrets: map[string]string{
-				utils.RealmConnectionContext.RealmAddress:   "realm",
-				utils.RealmConnectionContext.Username:       "user",
-				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.API:            "realm",
 				utils.RealmConnectionContext.KMIPConfigData: "some-kmip-data",
 			},
 			VolumeContext: map[string]string{
 				utils.VolumeParameters.GetSCKey("encryption"): "on",
+				utils.VolumeNameContextKey:                    validVolumeName,
 			},
 		}
 
@@ -522,13 +565,12 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				},
 			},
 			Secrets: map[string]string{
-				utils.RealmConnectionContext.RealmAddress:   "realm",
-				utils.RealmConnectionContext.Username:       "user",
-				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.API:            "realm",
 				utils.RealmConnectionContext.KMIPConfigData: "",
 			},
 			VolumeContext: map[string]string{
 				utils.VolumeParameters.GetSCKey("encryption"): "on",
+				utils.VolumeNameContextKey:                    validVolumeName,
 			},
 		}
 
@@ -574,13 +616,12 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				},
 			},
 			Secrets: map[string]string{
-				utils.RealmConnectionContext.RealmAddress:   "realm",
-				utils.RealmConnectionContext.Username:       "user",
-				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.API:            "realm",
 				utils.RealmConnectionContext.KMIPConfigData: "some data",
 			},
 			VolumeContext: map[string]string{
 				utils.VolumeParameters.GetSCKey("encryption"): "on",
+				utils.VolumeNameContextKey:                    validVolumeName,
 			},
 		}
 
@@ -629,13 +670,12 @@ func TestNodePublishVolume_EncryptedVolume(t *testing.T) {
 				},
 			},
 			Secrets: map[string]string{
-				utils.RealmConnectionContext.RealmAddress:   "realm",
-				utils.RealmConnectionContext.Username:       "user",
-				utils.RealmConnectionContext.Password:       "password",
+				utils.RealmConnectionContext.API:            "realm",
 				utils.RealmConnectionContext.KMIPConfigData: "some data",
 			},
 			VolumeContext: map[string]string{
 				utils.VolumeParameters.GetSCKey("encryption"): "on",
+				utils.VolumeNameContextKey:                    validVolumeName,
 			},
 		}
 
