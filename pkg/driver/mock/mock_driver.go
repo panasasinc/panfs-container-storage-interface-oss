@@ -166,6 +166,21 @@ func (mr *MockPanMounterMockRecorder) Mount(source, target, options any) *gomock
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Mount", reflect.TypeOf((*MockPanMounter)(nil).Mount), source, target, options)
 }
 
+// MountedTargets mocks base method.
+func (m *MockPanMounter) MountedTargets(source string) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "MountedTargets", source)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// MountedTargets indicates an expected call of MountedTargets.
+func (mr *MockPanMounterMockRecorder) MountedTargets(source any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "MountedTargets", reflect.TypeOf((*MockPanMounter)(nil).MountedTargets), source)
+}
+
 // Unmount mocks base method.
 func (m *MockPanMounter) Unmount(target string) error {
 	m.ctrl.T.Helper()

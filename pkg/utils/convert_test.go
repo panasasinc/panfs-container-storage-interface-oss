@@ -44,6 +44,28 @@ func TestGBToBytes(t *testing.T) {
 	}
 }
 
+// TestBytesStringToGB tests the BytesStringToGB function.
+func TestBytesStringToGB(t *testing.T) {
+	testCases := []struct {
+		input    string
+		expected float64
+	}{
+		{"0", 0},
+		{"1073741824", 1},
+		{"536870912", 0.5},
+		{"", 0},
+		{"not a number", 0},
+		{"1.5", 0},
+	}
+
+	for _, testCase := range testCases {
+		actual := BytesStringToGB(testCase.input)
+		if actual-testCase.expected > tolerance || testCase.expected-actual > tolerance {
+			t.Errorf("BytesStringToGB(%q) = %f; expected %f", testCase.input, actual, testCase.expected)
+		}
+	}
+}
+
 // TestBytesToGB tests the BytesToGB function.
 func TestBytesToGB(t *testing.T) {
 	testCases := []struct {

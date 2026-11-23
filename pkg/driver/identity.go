@@ -49,12 +49,14 @@ var pluginCapabilities = []*csi.PluginCapability{
 // GetPluginInfo returns the name and version of the CSI plugin.
 //
 // Parameters:
-//   ctx - The context for the request.
-//   in  - The GetPluginInfoRequest.
+//
+//	ctx - The context for the request.
+//	in  - The GetPluginInfoRequest.
 //
 // Returns:
-//   *csi.GetPluginInfoResponse - The response containing plugin name and version.
-//   error - Returns an error if the driver name is not configured.
+//
+//	*csi.GetPluginInfoResponse - The response containing plugin name and version.
+//	error - Returns an error if the driver name is not configured.
 func (d *Driver) GetPluginInfo(ctx context.Context, in *csi.GetPluginInfoRequest) (*csi.GetPluginInfoResponse, error) {
 	klog.V(2).Info("GetPluginInfo called")
 
@@ -72,12 +74,14 @@ func (d *Driver) GetPluginInfo(ctx context.Context, in *csi.GetPluginInfoRequest
 // GetPluginCapabilities returns available capabilities of the plugin.
 //
 // Parameters:
-//   ctx - The context for the request.
-//   in  - The GetPluginCapabilitiesRequest.
+//
+//	ctx - The context for the request.
+//	in  - The GetPluginCapabilitiesRequest.
 //
 // Returns:
-//   *csi.GetPluginCapabilitiesResponse - The response containing supported plugin capabilities.
-//   error - Always returns nil.
+//
+//	*csi.GetPluginCapabilitiesResponse - The response containing supported plugin capabilities.
+//	error - Always returns nil.
 func (d *Driver) GetPluginCapabilities(ctx context.Context, in *csi.GetPluginCapabilitiesRequest) (*csi.GetPluginCapabilitiesResponse, error) {
 	klog.V(2).Info("GetPluginCapabilities called")
 
@@ -89,12 +93,14 @@ func (d *Driver) GetPluginCapabilities(ctx context.Context, in *csi.GetPluginCap
 // Probe returns the health and readiness of the plugin.
 //
 // Parameters:
-//   ctx - The context for the request.
-//   in  - The ProbeRequest.
+//
+//	ctx - The context for the request.
+//	in  - The ProbeRequest.
 //
 // Returns:
-//   *csi.ProbeResponse - The response indicating plugin readiness.
-//   error - Always returns nil.
+//
+//	*csi.ProbeResponse - The response indicating plugin readiness.
+//	error - Always returns nil.
 func (d *Driver) Probe(ctx context.Context, in *csi.ProbeRequest) (*csi.ProbeResponse, error) {
 	klog.V(2).Info("Probe called")
 

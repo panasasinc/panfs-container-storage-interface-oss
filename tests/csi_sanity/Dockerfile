@@ -12,17 +12,17 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# Set the Go version to use (default: 1.24)
-ARG GOLANG_VERSION=1.24
+# Set the Go version to use (default: 1.27)
+ARG GOLANG_VERSION=1.27
 
 FROM golang:${GOLANG_VERSION} AS tests
-ARG K8S_VERSION=1.30.13
+ARG K8S_VERSION=1.30.14
 
 # Make sure /tests directory exists
 RUN mkdir -p /tests
 
 # Install csi-sanity test tool
-RUN go install -v github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity@v5.3.1
+RUN go install -v github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity@v5.6.0
 
 # Install required packages for testing
 RUN apt-get update && \
