@@ -457,6 +457,65 @@ func TestDeleteVolume(t *testing.T) {
 	}
 }
 
+// TestVolumeNameAsVolumeID covers a statically provisioned volume: its CSI volume ID is the volume name.
+func TestVolumeNameAsVolumeID(t *testing.T) {
+	const gb = int64(1) << 30
+
+	for _, handle := range []string{"static-volume", "/static-volume"} {
+		t.Run(handle, func(t *testing.T) {
+			realm, secrets := startRealm(t)
+			existing := realm.addVolume("/static-volume", gb, gb)
+			realm.addVolume("/other", gb, gb)
+			client := NewClient()
+
+			vol, err := client.GetVolume(t.Context(), handle, secrets)
+			if err != nil || vol.ID != existing.ID {
+				t.Fatalf("GetVolume(%q) = %+v, %v; want volume %d", handle, vol, err, existing.ID)
+			}
+
+			if err := client.ExpandVolume(t.Context(), handle, 2*gb, secrets); err != nil {
+				t.Fatalf("ExpandVolume(%q) error = %v", handle, err)
+			}
+			got, err := client.GetVolume(t.Context(), existing.CSIID(), secrets)
+			if err != nil || got.SoftQuota() != 2*gb || got.HardQuota() != 2*gb {
+				t.Errorf("after ExpandVolume(%q): soft %d hard %d, err %v; want %d", handle, got.SoftQuota(), got.HardQuota(), err, 2*gb)
+			}
+
+			if err := client.DeleteVolume(t.Context(), handle, secrets); err != nil {
+				t.Fatalf("DeleteVolume(%q) error = %v", handle, err)
+			}
+			if _, err := client.GetVolume(t.Context(), existing.CSIID(), secrets); !errors.Is(err, ErrorNotFound) {
+				t.Errorf("GetVolume() after delete error = %v, want ErrorNotFound", err)
+			}
+			if _, err := client.GetVolumeByName(t.Context(), "other", secrets); err != nil {
+				t.Errorf("the other volume must stay, GetVolumeByName(other) error = %v", err)
+			}
+		})
+	}
+
+	t.Run("a directory inside a volume is not a volume", func(t *testing.T) {
+		realm, secrets := startRealm(t)
+		realm.addVolume("/static-volume", gb, gb)
+		client := NewClient()
+
+		handle := "/static-volume/dir1"
+		if err := client.ExpandVolume(t.Context(), handle, 2*gb, secrets); !errors.Is(err, ErrorNotFound) {
+			t.Errorf("ExpandVolume(%q) error = %v, want ErrorNotFound", handle, err)
+		}
+		if err := client.DeleteVolume(t.Context(), handle, secrets); !errors.Is(err, ErrorNotFound) {
+			t.Errorf("DeleteVolume(%q) error = %v, want ErrorNotFound", handle, err)
+		}
+	})
+
+	t.Run("ParseVolumeID", func(t *testing.T) {
+		for handle, want := range map[string]bool{"8": true, "08": true, "0": false, "/8": false, "pvc-8": false, "": false, "-1": false} {
+			if _, got := ParseVolumeID(handle); got != want {
+				t.Errorf("ParseVolumeID(%q) = %v, want %v", handle, got, want)
+			}
+		}
+	})
+}
+
 func TestAuthentication(t *testing.T) {
 	realm, secrets := startRealm(t)
 	realm.addVolume("/home", 0, 0)

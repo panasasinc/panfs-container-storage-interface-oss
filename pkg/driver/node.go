@@ -18,6 +18,7 @@ import (
 	"context"
 	"fmt"
 	"path/filepath"
+	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
@@ -142,13 +143,18 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 		mountOptions = append(mountOptions, "ro")
 	}
 
-	// The CSI volume ID is the PanAPI volume id; the mount needs the volume name, which the controller
-	// puts in the volume context. A statically provisioned volume has no such context and is not supported.
+	// The mount needs the volume name. For a volume the driver created, the CSI volume ID is the PanAPI
+	// volume id and the controller puts the name in the volume context. A statically provisioned volume
+	// has no such context: its CSI volume ID is the volume name, or a path inside a volume.
 	volumeName := in.GetVolumeContext()[utils.VolumeNameContextKey]
 	if volumeName == "" {
-		llog.Error(fmt.Errorf("volume context has no %s", utils.VolumeNameContextKey), InvalidRequestErrorStr)
-		return nil, status.Error(codes.InvalidArgument,
-			"Volume context must carry "+utils.VolumeNameContextKey+"; static provisioning is not supported")
+		if _, isID := panapi.ParseVolumeID(volumeID); isID {
+			llog.Error(fmt.Errorf("volume context has no %s", utils.VolumeNameContextKey), InvalidRequestErrorStr)
+			return nil, status.Error(codes.InvalidArgument,
+				"Volume id "+volumeID+" needs the volume name in the volume context key "+utils.VolumeNameContextKey+
+					"; for a statically provisioned volume, use the volume name as the volume handle")
+		}
+		volumeName = strings.TrimPrefix(volumeID, "/")
 	}
 
 	// The node mounts from the host of the PanAPI address in the secret.

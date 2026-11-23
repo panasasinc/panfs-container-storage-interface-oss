@@ -17,7 +17,6 @@ package panapi
 import (
 	"context"
 	"fmt"
-	"strconv"
 	"strings"
 	"sync"
 )
@@ -128,9 +127,15 @@ func (f *FakeClient) DeleteVolume(_ context.Context, volumeID string, _ map[stri
 
 // find returns the stored volume for a CSI volume ID. The caller holds the lock.
 func (f *FakeClient) find(volumeID string) (*Volume, error) {
-	id, err := strconv.ParseInt(volumeID, 10, 64)
-	if err != nil {
-		return nil, fmt.Errorf("%w: %q is not a PanAPI volume id", ErrorNotFound, volumeID)
+	id, isID := ParseVolumeID(volumeID)
+	if !isID {
+		want := strings.TrimPrefix(volumeID, "/")
+		for _, vol := range f.volumes {
+			if vol.Name() == want {
+				return vol, nil
+			}
+		}
+		return nil, fmt.Errorf("%w: no volume named %s", ErrorNotFound, volumeID)
 	}
 	vol, ok := f.volumes[id]
 	if !ok {

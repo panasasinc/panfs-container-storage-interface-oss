@@ -126,7 +126,49 @@ func TestNodePublishVolume(t *testing.T) {
 			},
 		},
 		{
-			"Volume context without volume name (static provisioning)",
+			"Static volume: the volume handle is the volume name",
+			&csi.NodePublishVolumeRequest{
+				VolumeId:   "/static-volume",
+				TargetPath: validPublishTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{MountFlags: []string{}},
+					},
+				},
+				Secrets: defaultSecrets,
+			},
+			&csi.NodePublishVolumeResponse{},
+			nil,
+			func() {
+				mockMounter.EXPECT().Mount(
+					fmt.Sprintf("panfs://%s/static-volume", defaultSecrets[utils.RealmConnectionContext.API]),
+					validPublishTargetPath,
+					[]string{}).Times(1)
+			},
+		},
+		{
+			"Static volume: the volume handle is a directory inside a volume",
+			&csi.NodePublishVolumeRequest{
+				VolumeId:   "/static-volume/dir1/inside",
+				TargetPath: validPublishTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{MountFlags: []string{}},
+					},
+				},
+				Secrets: defaultSecrets,
+			},
+			&csi.NodePublishVolumeResponse{},
+			nil,
+			func() {
+				mockMounter.EXPECT().Mount(
+					fmt.Sprintf("panfs://%s/static-volume/dir1/inside", defaultSecrets[utils.RealmConnectionContext.API]),
+					validPublishTargetPath,
+					[]string{}).Times(1)
+			},
+		},
+		{
+			"Volume id without the volume name in the volume context",
 			&csi.NodePublishVolumeRequest{
 				VolumeId:   validVolumeID,
 				TargetPath: validPublishTargetPath,
@@ -139,7 +181,8 @@ func TestNodePublishVolume(t *testing.T) {
 			},
 			nil,
 			status.Error(codes.InvalidArgument,
-				"Volume context must carry "+utils.VolumeNameContextKey+"; static provisioning is not supported"),
+				"Volume id "+validVolumeID+" needs the volume name in the volume context key "+utils.VolumeNameContextKey+
+					"; for a statically provisioned volume, use the volume name as the volume handle"),
 			bindMountCalledZeroTimes,
 		},
 		{

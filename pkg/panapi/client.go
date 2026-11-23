@@ -213,14 +213,21 @@ func (c *Client) do(ctx context.Context, secrets map[string]string, method, path
 	return nil
 }
 
-// volumePath returns the route of one volume.
-// A CSI volume ID that is not a PanAPI volume id cannot name an existing volume, so it reports ErrorNotFound.
-func volumePath(volumeID string) (string, error) {
+// ParseVolumeID reports whether a CSI volume ID is a PanAPI volume id, and returns the id.
+// The driver gives every volume it creates its PanAPI volume id as the CSI volume ID.
+// A statically provisioned volume carries the volume name instead; a name that consists of digits only
+// must be written with a leading slash, so that it is not taken for an id.
+func ParseVolumeID(volumeID string) (int64, bool) {
 	id, err := strconv.ParseUint(volumeID, 10, 32)
 	if err != nil || id == 0 {
-		return "", fmt.Errorf("%w: %q is not a PanAPI volume id", ErrorNotFound, volumeID)
+		return 0, false
 	}
-	return volumesPath + "/" + strconv.FormatUint(id, 10), nil
+	return int64(id), true
+}
+
+// volumePath returns the route of the volume with the given PanAPI volume id.
+func volumePath(id int64) string {
+	return volumesPath + "/" + strconv.FormatInt(id, 10)
 }
 
 // CreateVolume creates a volume and returns it as PanAPI stores it.
@@ -240,14 +247,15 @@ func (c *Client) CreateVolume(ctx context.Context, p CreateVolumeParams, secrets
 }
 
 // GetVolume returns the volume with the given CSI volume ID, or ErrorNotFound.
+// The CSI volume ID is a PanAPI volume id, or the volume name for a statically provisioned volume.
 func (c *Client) GetVolume(ctx context.Context, volumeID string, secrets map[string]string) (*Volume, error) {
-	path, err := volumePath(volumeID)
-	if err != nil {
-		return nil, err
+	id, ok := ParseVolumeID(volumeID)
+	if !ok {
+		return c.GetVolumeByName(ctx, volumeID, secrets)
 	}
 
 	var got volumeGetResponse
-	if err := c.do(ctx, secrets, http.MethodGet, path, nil, &got); err != nil {
+	if err := c.do(ctx, secrets, http.MethodGet, volumePath(id), nil, &got); err != nil {
 		return nil, err
 	}
 	return &got.Volume, nil
@@ -283,19 +291,19 @@ func (c *Client) ExpandVolume(ctx context.Context, volumeID string, sizeBytes in
 		patch.HardQuotaBytes = &sizeBytes
 	}
 
-	path, err := volumePath(volumeID)
-	if err != nil {
-		return err
-	}
-	return c.do(ctx, secrets, http.MethodPatch, path, patch, nil)
+	return c.do(ctx, secrets, http.MethodPatch, volumePath(vol.ID), patch, nil)
 }
 
 // DeleteVolume deletes the volume with the given CSI volume ID.
 // It returns ErrorNotFound when the volume does not exist.
 func (c *Client) DeleteVolume(ctx context.Context, volumeID string, secrets map[string]string) error {
-	path, err := volumePath(volumeID)
-	if err != nil {
-		return err
+	id, ok := ParseVolumeID(volumeID)
+	if !ok {
+		vol, err := c.GetVolumeByName(ctx, volumeID, secrets)
+		if err != nil {
+			return err
+		}
+		id = vol.ID
 	}
-	return c.do(ctx, secrets, http.MethodDelete, path, nil, nil)
+	return c.do(ctx, secrets, http.MethodDelete, volumePath(id), nil, nil)
 }
