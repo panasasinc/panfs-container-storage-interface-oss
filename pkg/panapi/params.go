@@ -22,15 +22,16 @@ import (
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 )
 
-// StoragesetIDParameter is the StorageClass parameter that names the storageset of new volumes by its numeric id.
-// PanAPI accepts an id only, and a tenant token cannot list storagesets to resolve a name.
-const StoragesetIDParameter = utils.VendorPrefix + "storageset_id"
+// StoragesetParameter is the optional StorageClass parameter that names the storageset of new volumes.
+// A number is the id of the storageset. Any other value is its name, which the client looks up among the
+// storagesets that are assigned to the tenant of the token. Without the parameter, the first assigned
+// storageset is used.
+const StoragesetParameter = utils.VendorPrefix + "storageset"
 
 // unsupportedParameters maps StorageClass parameters of earlier driver versions that PanAPI cannot honor
 // to what to do instead.
 // The driver rejects them, so a StorageClass never carries a setting that silently does nothing.
 var unsupportedParameters = map[string]string{
-	"storageset":  "use " + StoragesetIDParameter + " with the numeric id of the storageset",
 	"description": "PanAPI has no volume description",
 	"encryption":  "PanAPI has no encryption setting for a volume",
 	"recovery":    "use " + utils.VendorPrefix + "recoverypriority",
@@ -49,7 +50,7 @@ func UnsupportedParameter(key string) error {
 }
 
 // buildCreateRequest translates StorageClass parameters and quotas into a PanAPI create body.
-// The storageset id parameter is required.
+// It does not set the storageset: the caller resolves it, because a name needs a lookup in PanAPI.
 // Unsupported parameters are rejected; parameters without the vendor prefix, and unknown ones, are skipped.
 func buildCreateRequest(p CreateVolumeParams) (*volumeCreateRequest, error) {
 	req := &volumeCreateRequest{
@@ -108,24 +109,28 @@ func buildCreateRequest(p CreateVolumeParams) (*volumeCreateRequest, error) {
 		}
 	}
 
-	if req.StoragesetID, err = StoragesetID(p.Parameters); err != nil {
+	if _, _, err := ParseStorageset(p.Parameters); err != nil {
 		return nil, fmt.Errorf("%w: %v", ErrorInvalidArgument, err)
 	}
 
 	return req, nil
 }
 
-// StoragesetID reads the required storageset id from StorageClass parameters.
-func StoragesetID(parameters map[string]string) (int64, error) {
-	value := parameters[StoragesetIDParameter]
+// ParseStorageset reads the storageset parameter. It returns the id when the value is a number,
+// the name when it is any other text, and neither when the parameter is absent or empty.
+func ParseStorageset(parameters map[string]string) (id int64, name string, err error) {
+	value := strings.TrimSpace(parameters[StoragesetParameter])
 	if value == "" {
-		return 0, fmt.Errorf("parameter %s must be provided", StoragesetIDParameter)
+		return 0, "", nil
 	}
-	id, err := strconv.ParseUint(value, 10, 32)
-	if err != nil || id == 0 {
-		return 0, fmt.Errorf("parameter %s: %q is not a storageset id", StoragesetIDParameter, value)
+	number, parseErr := strconv.ParseUint(value, 10, 32)
+	if parseErr != nil {
+		return 0, value, nil
 	}
-	return int64(id), nil
+	if number == 0 {
+		return 0, "", fmt.Errorf("parameter %s: 0 is not a storageset id", StoragesetParameter)
+	}
+	return int64(number), "", nil
 }
 
 // parseInt parses a decimal integer parameter value.

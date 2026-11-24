@@ -21,6 +21,7 @@ import (
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"k8s.io/klog/v2"
@@ -106,7 +107,7 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 	// CSI requires a repeated CreateVolume with the same name to return the existing volume.
 	vol, err := d.panfs.GetVolumeByName(ctx, volumeName, secrets)
 	if err == nil {
-		return d.existingVolumeResponse(llog, in, vol)
+		return d.existingVolumeResponse(ctx, llog, in, vol)
 	}
 	if !errors.Is(err, panapi.ErrorNotFound) {
 		llog.Error(err, "failed to look up volume by name", "volume_name", volumeName)
@@ -135,7 +136,7 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 			llog.Error(err, "create reported a conflict, but no volume with this name exists", "volume_name", volumeName)
 			return nil, status.Error(codes.Internal, UnexpectedErrorInternalStr)
 		}
-		return d.existingVolumeResponse(llog, in, existing)
+		return d.existingVolumeResponse(ctx, llog, in, existing)
 	}
 	if err != nil {
 		llog.Error(err, "failed to create volume", "volume_name", volumeName)
@@ -146,28 +147,42 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 	}
 
 	llog.Info("volume created", "volume_name", volumeName, "volume_id", vol.CSIID(), "capacity", vol.SoftQuota())
-	return createVolumeResponse(vol), nil
+	return d.createVolumeResponse(ctx, llog, vol, secrets), nil
 }
 
 // existingVolumeResponse answers CreateVolume for a volume that already exists.
 // It fails with AlreadyExists when the existing volume does not fit the requested capacity.
-func (d *Driver) existingVolumeResponse(llog klog.Logger, in *csi.CreateVolumeRequest, vol *panapi.Volume) (*csi.CreateVolumeResponse, error) {
+func (d *Driver) existingVolumeResponse(ctx context.Context, llog klog.Logger, in *csi.CreateVolumeRequest, vol *panapi.Volume) (*csi.CreateVolumeResponse, error) {
 	if err := validateVolumeCapacity(in.GetCapacityRange(), vol); err != nil {
 		llog.Error(err, "volume already exists, but the capacity does not match", "volume_name", in.GetName())
 		return nil, status.Error(codes.AlreadyExists, "Volume capacity does not match: "+err.Error())
 	}
 
 	llog.Info("volume already exists", "volume_name", in.GetName(), "volume_id", vol.CSIID(), "capacity", vol.SoftQuota())
-	return createVolumeResponse(vol), nil
+	return d.createVolumeResponse(ctx, llog, vol, in.GetSecrets()), nil
 }
 
 // createVolumeResponse builds the CreateVolume response for a volume.
-func createVolumeResponse(vol *panapi.Volume) *csi.CreateVolumeResponse {
+// The volume context carries what the node needs for the mount: the volume name, and the mount address
+// when PanAPI names one. Without a mount address the node mounts from the host of the PanAPI address.
+func (d *Driver) createVolumeResponse(ctx context.Context, llog klog.Logger, vol *panapi.Volume, secrets map[string]string) *csi.CreateVolumeResponse {
+	volumeContext := vol.VolumeContext()
+
+	mountAddress, err := d.panfs.GetMountAddress(ctx, secrets)
+	switch {
+	case err != nil:
+		// The volume exists, so the request must not fail. On a realm with tenants the mount will be refused;
+		// the token needs the permission to read the subnets and the mount recipe of its tenant.
+		llog.Error(err, "failed to read the mount address; the nodes will mount from the PanAPI host", "volume_id", vol.CSIID())
+	case mountAddress != "":
+		volumeContext[utils.MountAddressContextKey] = mountAddress
+	}
+
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
 			CapacityBytes: vol.SoftQuota(),
 			VolumeId:      vol.CSIID(),
-			VolumeContext: vol.VolumeContext(),
+			VolumeContext: volumeContext,
 		},
 	}
 }

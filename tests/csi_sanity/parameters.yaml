@@ -1,2 +1,2 @@
 # StorageClass parameters csi-sanity sends with every CreateVolume call.
-panfs.csi.vdura.com/storageset_id: "1"
+panfs.csi.vdura.com/storageset: "1"

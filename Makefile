@@ -50,7 +50,7 @@ help:
 	@printf "    REALM_API                                PanAPI address of the PanFS realm (e.g., "panfs.example.com" or "https://panfs.example.com").\n"
 	@printf "    REALM_TOKEN                              PanAPI service account token.\n"
 	@printf "    REALM_CA_CERT                            Optional PEM certificate of the CA that signed the realm certificate.\n"
-	@printf "    STORAGESET_ID                            Numeric id of the storageset that holds new volumes.\n\n"
+	@printf "    STORAGESET                               Optional id or name of the storageset that holds new volumes (default: the first one of the tenant).\n\n"
 	@printf "  $(BOLD)$(GREEN)[Storage Class Settings]$(RESET)\n"
 	@printf "    STORAGE_CLASS_NAME                       Name of the storage class to deploy (default: $(STORAGE_CLASS_NAME)).\n"
 	@printf "    SET_STORAGECLASS_DEFAULT                 Boolean indicating if the storage class is set as default (default: true if STORAGE_CLASS_NAME is $(STORAGE_CLASS_NAME)).\n\n"
@@ -257,9 +257,9 @@ deploy-storageclass-info: ## Display information about the PanFS CSI Storage Cla
 	@printf "\n$(BOLD)PanFS Realm credentials defined through environment variables:$(RESET)\n"
 	@printf "  %-25s "%s"\n" "REALM_API:" "$(shell [ -n '$(REALM_API)' ] && echo $(REALM_API) || echo "$(RED)unknown$(RESET)")"
 	@printf "  %-25s "%s"\n" "REALM_TOKEN:" "$(shell [ -n '$(REALM_TOKEN)' ] && echo "*****" || echo "$(RED)unknown$(RESET)")"
-	@printf "  %-25s "%s"\n" "STORAGESET_ID:" "$(shell [ -n '$(STORAGESET_ID)' ] && echo $(STORAGESET_ID) || echo "$(RED)unknown$(RESET)")"
+	@printf "  %-25s "%s"\n" "STORAGESET:" "$(shell [ -n '$(STORAGESET)' ] && echo '$(STORAGESET)' || echo "(the first storageset of the tenant)")"
 
-	@if [ -z "$(REALM_API)" ] || [ -z "$(REALM_TOKEN)" ] || [ -z "$(STORAGESET_ID)" ]; then \
+	@if [ -z "$(REALM_API)" ] || [ -z "$(REALM_TOKEN)" ]; then \
 		printf '\nPlease set the above environment variables before deploying the storage class.\n'; \
 		exit 1; \
 	fi
@@ -280,7 +280,7 @@ deploy-storageclass-with-helm:
 		--set realm.api="${REALM_API}" \
 		--set realm.token="${REALM_TOKEN}" \
 		--set-string realm.caCert="$(REALM_CA_CERT)" \
-		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset_id=$(STORAGESET_ID)' \
+		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=$(STORAGESET)' \
 		--wait
 	@printf "$(GREEN)Successfully deployed PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)'$(RESET)\n\n"
 
@@ -290,7 +290,7 @@ deploy-storageclass-with-manifest:
 	@export STORAGE_CLASS_NAME=$(STORAGE_CLASS_NAME); \
 	export REALM_API=$(REALM_API); \
 	export REALM_TOKEN=$(REALM_TOKEN); \
-	export STORAGESET_ID=$(STORAGESET_ID); \
+	export STORAGESET='$(STORAGESET)'; \
 	export CSI_CONTROLLER_SA=csi-panfs-controller; \
 	export CSI_NAMESPACE=csi-panfs; \
 	kubectl create namespace $(STORAGE_CLASS_NAME) --dry-run=client -o yaml | kubectl apply -f -; \
@@ -381,7 +381,7 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--set setAsDefaultStorageClass=false \
 		--set realm.api="panfs-dummy.com" \
 		--set realm.token="dummy-token" \
-		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset_id=1' | \
+		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1' | \
 		grep -v '^# Source:' > deploy/k8s/storage-class/example-csi-panfs-storage-class.yaml
 	helm template csi-panfs-storage-class charts/storageclass \
 		--namespace csi-panfs-storage-class \
@@ -389,7 +389,7 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--set setAsDefaultStorageClass=false \
 		--set realm.api="<REALM_API>" \
 		--set realm.token="<REALM_TOKEN>" \
-		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset_id=<STORAGESET_ID>' | \
+		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=<STORAGESET>' | \
 		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
 		grep -v '^# Source:' > deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml
 	helm template csi-panfs-storage-class-name charts/storageclass \
@@ -397,7 +397,7 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--set setAsDefaultStorageClass=false \
 		--set realm.api="<REALM_API>" \
 		--set realm.token="<REALM_TOKEN>" \
-		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset_id=<STORAGESET_ID>' | \
+		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=<STORAGESET>' | \
 		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
 		grep -v '^# Source:' | \
 		sed 's|csi-panfs|<CSI_NAMESPACE>|' > deploy/k8s/storage-class/template-secret-in-driver-ns.yaml

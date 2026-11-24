@@ -44,7 +44,8 @@ Choose the manifest that matches your namespace and topology requirements:
     - Replace these placeholders with your actual credentials:
       - `<REALM_API>`
       - `<REALM_TOKEN>`
-    - Replace `<STORAGESET_ID>` with the numeric id of the storageset
+    - Replace `<STORAGESET>` with the id or the name of the storageset, or remove the line
+      to use the first storageset that is assigned to the tenant
   - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
   - Configures Role and RoleBinding to allow the CSI Driver ServiceAccount to read the Secret
     - Update namespace or permissions if needed (`<CSI_NAMESPACE>`)
@@ -57,7 +58,8 @@ Choose the manifest that matches your namespace and topology requirements:
     - Replace these placeholders with your actual credentials:
       - `<REALM_API>`
       - `<REALM_TOKEN>`
-    - Replace `<STORAGESET_ID>` with the numeric id of the storageset
+    - Replace `<STORAGESET>` with the id or the name of the storageset, or remove the line
+      to use the first storageset that is assigned to the tenant
   - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
   - Update namespace or permissions if your CSI Driver namespace differs
 

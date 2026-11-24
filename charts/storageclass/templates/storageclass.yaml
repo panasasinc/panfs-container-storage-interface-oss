@@ -55,12 +55,11 @@ parameters:
   csi.storage.k8s.io/controller-expand-secret-name: *secretName
   csi.storage.k8s.io/controller-expand-secret-namespace: *secretNamespace
 
-  # Numeric id of the storageset that holds the volumes created with this StorageClass
-  panfs.csi.vdura.com/storageset_id: {{ required "parameters.\"panfs.csi.vdura.com/storageset_id\" is required!" (index .Values.parameters "panfs.csi.vdura.com/storageset_id") | quote }}
-
-  # Specific parameters for volumes (to be) created in the PanFS Realm
+  # Specific parameters for volumes (to be) created in the PanFS Realm.
+  # panfs.csi.vdura.com/storageset is the id or the name of the storageset that holds the volumes;
+  # without it, the first storageset that is assigned to the tenant is used.
   {{- range $k, $v := .Values.parameters }}
-  {{- if ne $k "panfs.csi.vdura.com/storageset_id" }}
+  {{- if ne (toString $v) "" }}
   {{ $k }}: {{ $v | quote }}
   {{- end }}
   {{- end }}

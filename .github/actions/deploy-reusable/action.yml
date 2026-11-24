@@ -47,9 +47,9 @@ inputs:
     description: PanAPI service account token
     required: true
     type: string
-  storageset_id:
-    description: Numeric id of the storageset that holds new volumes
-    required: true
+  storageset:
+    description: Id or name of the storageset that holds new volumes (default, the first one of the tenant)
+    default: ""
     type: string
   kubectl_version:
     description: Version of kubectl to install (if not already present)
@@ -119,7 +119,7 @@ runs:
     - name: Deploy Storage Class
       if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'storageclass' }}
       env:
-        STORAGESET_ID: ${{ inputs.storageset_id }}
+        STORAGESET: ${{ inputs.storageset }}
         REGISTRY_CREDS_FILE: gcr-pull-secret.json
         USE_HELM: "${{ inputs.driver-installation-type == 'helm' }}"
       shell: bash

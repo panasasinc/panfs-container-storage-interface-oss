@@ -30,13 +30,10 @@ allowedTopologies: {}
 # PanFS Realm API (PanAPI) connection
 realm:
   # -- PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL.
-  # The nodes mount volumes from the host of this address.
+  # The nodes mount volumes from the host of this address, unless PanAPI names another mount address for the tenant.
   api: ""
-  # -- PanAPI service account token. Its tenant must have the storageset of the StorageClass assigned.
+  # -- PanAPI service account token. Its tenant must have a storageset assigned.
   token: ""
-  # -- Optional address the nodes mount volumes from. Set it when the volumes are reachable on another address
-  # than PanAPI: for a tenant, it is the `rmlist` of the mount recipe of the tenant subnet. Default: the host of `api`.
-  rmlist: ""
   # -- Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store.
   caCert: ""
 
@@ -53,11 +50,12 @@ volumeReclaimPolicy: Delete # Options: Retain, Delete
 # -- Default volume binding mode
 volumeBindingMode: WaitForFirstConsumer # Options: Immediate, WaitForFirstConsumer
 
-# -- Storage class parameters. `panfs.csi.vdura.com/storageset_id` is required; the others are optional.
+# -- Storage class parameters. All of them are optional; a parameter with an empty value is left out.
 # @default -- `{...}`
 parameters:
-  # Numeric id of the storageset that holds new volumes (required)
-  panfs.csi.vdura.com/storageset_id: ""
+  # Storageset that holds new volumes: its id (a number) or its name.
+  # Without it, the first storageset that is assigned to the tenant is used.
+  panfs.csi.vdura.com/storageset: ""
 
   panfs.csi.vdura.com/recoverypriority: "50"
   panfs.csi.vdura.com/efsa: "retry"

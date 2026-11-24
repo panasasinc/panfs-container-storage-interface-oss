@@ -169,6 +169,8 @@ metadata:
   name: selinux-enabled-panfs
 provisioner: com.vdura.csi.panfs
 parameters:
+  # Storageset that holds the volumes: its id or its name (optional)
+  panfs.csi.vdura.com/storageset: "1"
   # ... other configuration ...
 
 # SELinux context configuration for mounted volumes

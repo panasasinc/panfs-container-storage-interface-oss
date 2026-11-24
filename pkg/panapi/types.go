@@ -114,3 +114,28 @@ type volumeGetResponse struct {
 type volumeListResponse struct {
 	Volumes []Volume `json:"volumes"`
 }
+
+// authMeResponse is the body of GET /api/v1/auth/me; only the tenant of the token is used.
+type authMeResponse struct {
+	TenantID string `json:"tenant_id"`
+}
+
+// tenantStoragesetsResponse is the body of GET /api/v1/tenants/{tenant_id}/storagesets.
+type tenantStoragesetsResponse struct {
+	Storagesets []struct {
+		ID   int64  `json:"storageset_id"`
+		Name string `json:"storageset_name"`
+	} `json:"storagesets"`
+}
+
+// subnetListResponse is the body of GET /api/v1/subnets; only the id is used.
+type subnetListResponse struct {
+	Subnets []struct {
+		ID string `json:"id"`
+	} `json:"subnets"`
+}
+
+// mountInfoResponse is the body of GET /api/v1/subnets/{subnet_id}/mount-info; only the rmlist is used.
+type mountInfoResponse struct {
+	RMList string `json:"rmlist"`
+}

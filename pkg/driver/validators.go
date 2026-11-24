@@ -198,8 +198,9 @@ func validateVolumeParameters(parameters map[string]string) error {
 		return fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("operm"), permList)
 	}
 
-	// The storageset id is the one required parameter.
-	if _, err := panapi.StoragesetID(parameters); err != nil {
+	// The storageset is optional: a number is an id, other text is a name, and without it the first
+	// storageset of the tenant is used. Only a value that can never be valid is refused here.
+	if _, _, err := panapi.ParseStorageset(parameters); err != nil {
 		return err
 	}
 

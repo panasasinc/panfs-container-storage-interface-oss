@@ -44,6 +44,9 @@ const (
 	maxResponseBytes = 16 << 20
 
 	volumesPath = "/api/v1/volumes"
+	subnetsPath = "/api/v1/subnets"
+	tenantsPath = "/api/v1/tenants"
+	authMePath  = "/api/v1/auth/me"
 )
 
 var llog klog.Logger = klog.NewKlogr()
@@ -95,31 +98,37 @@ func APIURL(secrets map[string]string) (*url.URL, error) {
 	return parsed, nil
 }
 
-// MountAddress returns the address the node mounts volumes from.
-// It is the rmlist key of the secret when that is set, and the host of the api key otherwise.
-// A tenant volume is reachable only on the tenant network, where the realm answers on another address
-// than PanAPI; the mount recipe of the tenant subnet names that address as the rmlist.
-func MountAddress(secrets map[string]string) (string, error) {
-	key := utils.RealmConnectionContext.RMList
-	if rmlist := strings.TrimSpace(secrets[key]); rmlist != "" {
-		if strings.ContainsAny(rmlist, "/ \t\n") {
-			return "", fmt.Errorf("%s in secrets must be a host name or an IP address", key)
-		}
-		if strings.Contains(rmlist, ":") && !strings.HasPrefix(rmlist, "[") {
-			return "[" + rmlist + "]", nil // an IPv6 address needs brackets inside a panfs:// URL
-		}
-		return rmlist, nil
-	}
-
+// APIHost returns the host of the api key in the secret, in the form a panfs:// URL takes.
+// The node mounts volumes from it when the volume context names no mount address.
+func APIHost(secrets map[string]string) (string, error) {
 	parsed, err := APIURL(secrets)
 	if err != nil {
 		return "", err
 	}
-	host := parsed.Hostname()
-	if strings.Contains(host, ":") {
-		return "[" + host + "]", nil // an IPv6 address needs brackets inside a panfs:// URL
+	return mountHost(parsed.Hostname()), nil
+}
+
+// MountSource reads the rmlist that the controller put in the volume context.
+// The rmlist is one address, or several separated by commas. It returns the host of the panfs:// URL,
+// which is the first address, and the mount option that names the whole list: rmlist=(a,b).
+func MountSource(rmlist string) (host, option string, err error) {
+	var addresses []string
+	for _, address := range strings.Split(rmlist, ",") {
+		address = strings.TrimSpace(address)
+		if address == "" || strings.ContainsAny(address, "/ \t\n()\"'") {
+			return "", "", fmt.Errorf("rmlist %q must be a list of host names or IP addresses, separated by commas", rmlist)
+		}
+		addresses = append(addresses, address)
 	}
-	return host, nil
+	return mountHost(strings.Trim(addresses[0], "[]")), "rmlist=(" + strings.Join(addresses, ",") + ")", nil
+}
+
+// mountHost puts an IPv6 address in brackets, as a panfs:// URL needs it.
+func mountHost(host string) string {
+	if strings.Contains(host, ":") {
+		return "[" + host + "]"
+	}
+	return host
 }
 
 // endpointFromSecrets reads the PanAPI address and the credentials from a StorageClass secret.
@@ -252,6 +261,10 @@ func (c *Client) CreateVolume(ctx context.Context, p CreateVolumeParams, secrets
 		return nil, err
 	}
 
+	if req.StoragesetID, err = c.resolveStorageset(ctx, p.Parameters, secrets); err != nil {
+		return nil, err
+	}
+
 	var created volumeCreateResponse
 	if err := c.do(ctx, secrets, http.MethodPost, volumesPath, req, &created); err != nil {
 		return nil, err
@@ -290,6 +303,67 @@ func (c *Client) GetVolumeByName(ctx context.Context, name string, secrets map[s
 		}
 	}
 	return nil, fmt.Errorf("%w: no volume with pathname %s", ErrorNotFound, pathname)
+}
+
+// resolveStorageset returns the id of the storageset a new volume goes to.
+// A numeric parameter is the id and needs no request. A name, or no parameter at all, is resolved
+// against the storagesets that are assigned to the tenant of the token.
+func (c *Client) resolveStorageset(ctx context.Context, parameters, secrets map[string]string) (int64, error) {
+	id, name, err := ParseStorageset(parameters)
+	if err != nil {
+		return 0, fmt.Errorf("%w: %v", ErrorInvalidArgument, err)
+	}
+	if id != 0 {
+		return id, nil
+	}
+
+	var me authMeResponse
+	if err := c.do(ctx, secrets, http.MethodGet, authMePath, nil, &me); err != nil {
+		return 0, err
+	}
+	var assigned tenantStoragesetsResponse
+	path := tenantsPath + "/" + url.PathEscape(me.TenantID) + "/storagesets"
+	if err := c.do(ctx, secrets, http.MethodGet, path, nil, &assigned); err != nil {
+		return 0, err
+	}
+	if len(assigned.Storagesets) == 0 {
+		return 0, fmt.Errorf("%w: no storageset is assigned to the tenant of the token", ErrorInvalidArgument)
+	}
+	if name == "" {
+		return assigned.Storagesets[0].ID, nil
+	}
+
+	names := make([]string, 0, len(assigned.Storagesets))
+	for _, storageset := range assigned.Storagesets {
+		if storageset.Name == name {
+			return storageset.ID, nil
+		}
+		names = append(names, strconv.Quote(storageset.Name))
+	}
+	return 0, fmt.Errorf("%w: parameter %s: no storageset named %q is assigned to the tenant (assigned: %s)",
+		ErrorInvalidArgument, StoragesetParameter, name, strings.Join(names, ", "))
+}
+
+// GetMountAddress returns the address the nodes mount the volumes of the token's tenant from:
+// the rmlist of the mount recipe of the tenant subnet. It returns "" when the tenant has no subnet;
+// the volumes are then reachable at the PanAPI host.
+func (c *Client) GetMountAddress(ctx context.Context, secrets map[string]string) (string, error) {
+	var list subnetListResponse
+	if err := c.do(ctx, secrets, http.MethodGet, subnetsPath, nil, &list); err != nil {
+		return "", err
+	}
+	if len(list.Subnets) == 0 {
+		return "", nil
+	}
+
+	// A tenant has one subnet today. With more than one, PanAPI does not say which subnet serves a volume,
+	// so the first one is used.
+	var info mountInfoResponse
+	path := subnetsPath + "/" + url.PathEscape(list.Subnets[0].ID) + "/mount-info"
+	if err := c.do(ctx, secrets, http.MethodGet, path, nil, &info); err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(info.RMList), nil
 }
 
 // ExpandVolume raises the soft quota of a volume to sizeBytes.

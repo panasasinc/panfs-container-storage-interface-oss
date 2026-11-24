@@ -246,7 +246,7 @@ Edit [deploy/k8s/storage-class/template-secret-in-driver-ns.yaml](deploy/k8s/sto
   * `<REALM_API>`: The PanAPI address of the PanFS realm: a host name (HTTPS is used) or a full `https://` or `http://` URL
     (e.g., `panfs.example.com`).
   * `<REALM_TOKEN>`: The PanAPI service account token.
-  * `<STORAGESET_ID>`: The numeric id of the storageset that holds the new volumes.
+  * `<STORAGESET>`: The id or the name of the storageset that holds the new volumes. Remove the line to use the first storageset that is assigned to the tenant.
 
 ##### 3.2 Setting the Default StorageClass
 

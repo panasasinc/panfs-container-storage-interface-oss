@@ -33,6 +33,9 @@ import (
 
 const testToken = "test-token"
 
+// testTenantID is the tenant of testToken on the fake realm.
+const testTenantID = "11111111-2222-3333-4444-555555555555"
+
 // recordedRequest is one request the fake realm received.
 type recordedRequest struct {
 	Method string
@@ -49,6 +52,22 @@ type fakeRealm struct {
 	requests []recordedRequest
 	// failures maps "METHOD /path" to a status code the realm answers with instead of serving the route.
 	failures map[string]int
+	// storagesets are the storagesets assigned to the tenant of the token, in the order the realm lists them.
+	storagesets []map[string]any
+	// subnets maps the id of a tenant subnet to the rmlist of its mount recipe.
+	subnets map[string]string
+	// subnetOrder keeps the ids in the order the realm lists them.
+	subnetOrder []string
+}
+
+func (r *fakeRealm) addSubnet(id, rmlist string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if r.subnets == nil {
+		r.subnets = make(map[string]string)
+	}
+	r.subnets[id] = rmlist
+	r.subnetOrder = append(r.subnetOrder, id)
 }
 
 func newFakeRealm() *fakeRealm {
@@ -56,6 +75,10 @@ func newFakeRealm() *fakeRealm {
 		nextID:   10,
 		volumes:  make(map[int64]Volume),
 		failures: make(map[string]int),
+		storagesets: []map[string]any{
+			{"storageset_id": 3, "storageset_name": "Set 1", "quota_bytes": 100000000000},
+			{"storageset_id": 7, "storageset_name": "Fast Set", "quota_bytes": 100000000000},
+		},
 	}
 }
 
@@ -121,6 +144,28 @@ func (r *fakeRealm) ServeHTTP(w http.ResponseWriter, req *http.Request) {
 	}
 
 	switch {
+	case req.URL.Path == authMePath && req.Method == http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"tenant_id": testTenantID, "roles": []string{"admin"}})
+
+	case req.URL.Path == tenantsPath+"/"+testTenantID+"/storagesets" && req.Method == http.MethodGet:
+		writeJSON(w, http.StatusOK, map[string]any{"storagesets": r.storagesets, "total": len(r.storagesets)})
+
+	case req.URL.Path == subnetsPath && req.Method == http.MethodGet:
+		list := make([]map[string]string, 0, len(r.subnetOrder))
+		for _, id := range r.subnetOrder {
+			list = append(list, map[string]string{"id": id, "name": "subnet-" + id})
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"subnets": list, "total": len(list)})
+
+	case strings.HasPrefix(req.URL.Path, subnetsPath+"/") && strings.HasSuffix(req.URL.Path, "/mount-info") && req.Method == http.MethodGet:
+		id := strings.TrimSuffix(strings.TrimPrefix(req.URL.Path, subnetsPath+"/"), "/mount-info")
+		rmlist, ok := r.subnets[id]
+		if !ok {
+			writeDetail(w, http.StatusNotFound, "Subnet not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]string{"subnet_id": id, "rmlist": rmlist})
+
 	case req.URL.Path == volumesPath && req.Method == http.MethodGet:
 		list := make([]Volume, 0, len(r.volumes))
 		for _, vol := range r.volumes {
@@ -209,7 +254,7 @@ func param(short string) string {
 
 // inStorageset returns the parameters with the required storageset id 3 added, unless they already carry one.
 func inStorageset(parameters map[string]string) map[string]string {
-	out := map[string]string{StoragesetIDParameter: "3"}
+	out := map[string]string{StoragesetParameter: "3"}
 	for key, value := range parameters {
 		out[key] = value
 	}
@@ -225,7 +270,7 @@ func TestCreateVolume(t *testing.T) {
 		vol, err := NewClient().CreateVolume(t.Context(), CreateVolumeParams{
 			Name: "pvc-1",
 			Parameters: map[string]string{
-				StoragesetIDParameter:         "3",
+				StoragesetParameter:           "3",
 				param("layout"):               "raid6+",
 				param("recoverypriority"):     "75",
 				param("efsa"):                 "retry",
@@ -319,8 +364,8 @@ func TestCreateVolume(t *testing.T) {
 	}{
 		{"existing pathname is a conflict", nil,
 			func(r *fakeRealm) { r.addVolume("/pvc-1", 1, 1) }, ErrorAlreadyExist, true},
-		{"storageset name parameter", map[string]string{param("storageset"): "Set 1"}, nil, ErrorInvalidArgument, false},
-		{"empty storageset name parameter", map[string]string{param("storageset"): ""}, nil, ErrorInvalidArgument, false},
+		{"storageset name that is not assigned to the tenant", map[string]string{param("storageset"): "No Such Set"}, nil, ErrorInvalidArgument, false},
+		{"storageset id 0", map[string]string{param("storageset"): "0"}, nil, ErrorInvalidArgument, false},
 		{"description parameter", map[string]string{param("description"): "text"}, nil, ErrorInvalidArgument, false},
 		{"encryption parameter", map[string]string{param("encryption"): "off"}, nil, ErrorInvalidArgument, false},
 		{"legacy recovery parameter", map[string]string{param("recovery"): "10"}, nil, ErrorInvalidArgument, false},
@@ -758,28 +803,66 @@ func TestFakeClientMatchesClient(t *testing.T) {
 	}
 }
 
-func TestCreateVolumeStoragesetID(t *testing.T) {
-	for _, value := range []string{"", "0", "-1", "Set 1", "4294967296"} {
-		t.Run("storageset_id="+value, func(t *testing.T) {
-			type backend interface {
-				CreateVolume(ctx context.Context, p CreateVolumeParams, secrets map[string]string) (*Volume, error)
-			}
+// TestCreateVolumeStorageset covers the optional storageset parameter: an id, a name, or nothing.
+func TestCreateVolumeStorageset(t *testing.T) {
+	testCases := []struct {
+		name string
+		// params is nil when the StorageClass has no storageset parameter.
+		params map[string]string
+		wantID int64
+		// wantLookup says whether the client must read the storagesets of the tenant.
+		wantLookup bool
+	}{
+		{"a number is the id", map[string]string{StoragesetParameter: "5"}, 5, false},
+		{"a name is looked up", map[string]string{StoragesetParameter: "Fast Set"}, 7, true},
+		{"without the parameter the first assigned storageset is used", nil, 3, true},
+		{"an empty value is the same as no parameter", map[string]string{StoragesetParameter: " "}, 3, true},
+	}
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
 			realm, secrets := startRealm(t)
 
-			for name, b := range map[string]backend{"Client": NewClient(), "FakeClient": NewFakeClient()} {
-				vol, err := b.CreateVolume(t.Context(), CreateVolumeParams{Name: "pvc-1", Parameters: map[string]string{StoragesetIDParameter: value}}, secrets)
-				if !errors.Is(err, ErrorInvalidArgument) || vol != nil {
-					t.Errorf("%s.CreateVolume() = %v, %v; want nil, ErrorInvalidArgument", name, vol, err)
+			vol, err := NewClient().CreateVolume(t.Context(), CreateVolumeParams{Name: "pvc-1", Parameters: tc.params}, secrets)
+			if err != nil || vol.StoragesetID != tc.wantID {
+				t.Fatalf("CreateVolume() = %+v, %v; want storageset %d", vol, err, tc.wantID)
+			}
+
+			lookedUp := false
+			for _, request := range realm.recorded() {
+				if strings.HasSuffix(request.Path, "/storagesets") {
+					lookedUp = true
 				}
 			}
-			if got := len(realm.recorded()); got != 0 {
-				t.Errorf("%d requests reached the realm, want 0", got)
+			if lookedUp != tc.wantLookup {
+				t.Errorf("storageset lookup = %v, want %v", lookedUp, tc.wantLookup)
 			}
 		})
 	}
+
+	t.Run("no storageset is assigned to the tenant", func(t *testing.T) {
+		realm, secrets := startRealm(t)
+		realm.storagesets = nil
+
+		vol, err := NewClient().CreateVolume(t.Context(), CreateVolumeParams{Name: "pvc-1"}, secrets)
+		if !errors.Is(err, ErrorInvalidArgument) || vol != nil {
+			t.Errorf("CreateVolume() = %v, %v; want nil, ErrorInvalidArgument", vol, err)
+		}
+	})
+
+	t.Run("the fake client keeps a numeric id and has one storageset", func(t *testing.T) {
+		fake := NewFakeClient()
+		byID, err := fake.CreateVolume(t.Context(), CreateVolumeParams{Name: "pvc-1", Parameters: map[string]string{StoragesetParameter: "5"}}, nil)
+		if err != nil || byID.StoragesetID != 5 {
+			t.Errorf("CreateVolume(storageset 5) = %+v, %v", byID, err)
+		}
+		byDefault, err := fake.CreateVolume(t.Context(), CreateVolumeParams{Name: "pvc-2"}, nil)
+		if err != nil || byDefault.StoragesetID != 1 {
+			t.Errorf("CreateVolume(no storageset) = %+v, %v", byDefault, err)
+		}
+	})
 }
 
-func TestMountAddress(t *testing.T) {
+func TestAPIHost(t *testing.T) {
 	key := utils.RealmConnectionContext.API
 	cases := []struct {
 		api     string
@@ -796,33 +879,81 @@ func TestMountAddress(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.api, func(t *testing.T) {
-			got, err := MountAddress(map[string]string{key: tc.api})
+			got, err := APIHost(map[string]string{key: tc.api})
 			if got != tc.want || (err != nil) != tc.wantErr {
-				t.Errorf("MountAddress(%q) = %q, %v; want %q, error %v", tc.api, got, err, tc.want, tc.wantErr)
+				t.Errorf("APIHost(%q) = %q, %v; want %q, error %v", tc.api, got, err, tc.want, tc.wantErr)
 			}
 		})
 	}
+}
 
-	rmlistKey := utils.RealmConnectionContext.RMList
-	rmlistCases := []struct {
-		rmlist  string
-		want    string
-		wantErr bool
+func TestMountSource(t *testing.T) {
+	cases := []struct {
+		rmlist     string
+		wantHost   string
+		wantOption string
+		wantErr    bool
 	}{
-		{"192.168.0.2", "192.168.0.2", false},
-		{" director.tenant.example.com ", "director.tenant.example.com", false},
-		{"fd00::2", "[fd00::2]", false},
-		{"[fd00::2]", "[fd00::2]", false},
-		{"", "10.0.0.5", false},
-		{"192.168.0.2/volume", "", true},
-		{"192.168.0.2 192.168.0.3", "", true},
+		{"192.168.0.2", "192.168.0.2", "rmlist=(192.168.0.2)", false},
+		{" director.tenant.example.com ", "director.tenant.example.com", "rmlist=(director.tenant.example.com)", false},
+		{"192.168.0.2,192.168.0.54, 192.168.0.55", "192.168.0.2", "rmlist=(192.168.0.2,192.168.0.54,192.168.0.55)", false},
+		{"fd00::2", "[fd00::2]", "rmlist=(fd00::2)", false},
+		{"", "", "", true},
+		{"192.168.0.2,", "", "", true},
+		{"192.168.0.2/volume", "", "", true},
+		{"192.168.0.2 192.168.0.3", "", "", true},
+		{"192.168.0.2),ro,(x", "", "", true},
 	}
-	for _, tc := range rmlistCases {
-		t.Run("rmlist "+tc.rmlist, func(t *testing.T) {
-			got, err := MountAddress(map[string]string{key: "http://10.0.0.5:8000", rmlistKey: tc.rmlist})
-			if got != tc.want || (err != nil) != tc.wantErr {
-				t.Errorf("MountAddress(rmlist %q) = %q, %v; want %q, error %v", tc.rmlist, got, err, tc.want, tc.wantErr)
+	for _, tc := range cases {
+		t.Run(tc.rmlist, func(t *testing.T) {
+			host, option, err := MountSource(tc.rmlist)
+			if host != tc.wantHost || option != tc.wantOption || (err != nil) != tc.wantErr {
+				t.Errorf("MountSource(%q) = %q, %q, %v; want %q, %q, error %v",
+					tc.rmlist, host, option, err, tc.wantHost, tc.wantOption, tc.wantErr)
 			}
 		})
 	}
+}
+
+func TestGetMountAddress(t *testing.T) {
+	t.Run("tenant without a subnet", func(t *testing.T) {
+		_, secrets := startRealm(t)
+		got, err := NewClient().GetMountAddress(t.Context(), secrets)
+		if got != "" || err != nil {
+			t.Errorf("GetMountAddress() = %q, %v; want \"\", nil", got, err)
+		}
+	})
+
+	t.Run("rmlist of the tenant subnet", func(t *testing.T) {
+		realm, secrets := startRealm(t)
+		realm.addSubnet("subnet-1", "192.168.0.2")
+		realm.addSubnet("subnet-2", "192.168.9.9")
+
+		got, err := NewClient().GetMountAddress(t.Context(), secrets)
+		if got != "192.168.0.2" || err != nil {
+			t.Errorf("GetMountAddress() = %q, %v; want the rmlist of the first subnet", got, err)
+		}
+	})
+
+	t.Run("token may not read the subnets", func(t *testing.T) {
+		realm, secrets := startRealm(t)
+		realm.addSubnet("subnet-1", "192.168.0.2")
+		realm.failures[http.MethodGet+" "+subnetsPath] = http.StatusForbidden
+
+		got, err := NewClient().GetMountAddress(t.Context(), secrets)
+		if got != "" || err == nil {
+			t.Errorf("GetMountAddress() = %q, %v; want an error", got, err)
+		}
+	})
+
+	t.Run("token may not read the mount recipe", func(t *testing.T) {
+		realm, secrets := startRealm(t)
+		realm.addSubnet("subnet-1", "192.168.0.2")
+		realm.failures[http.MethodGet+" "+subnetsPath+"/subnet-1/mount-info"] = http.StatusForbidden
+
+		got, err := NewClient().GetMountAddress(t.Context(), secrets)
+		if got != "" || err == nil {
+			t.Errorf("GetMountAddress() = %q, %v; want an error", got, err)
+		}
+	})
 }

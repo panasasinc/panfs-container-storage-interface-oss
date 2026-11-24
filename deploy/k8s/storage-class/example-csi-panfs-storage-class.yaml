@@ -14,7 +14,8 @@ metadata:
 type: Opaque
 stringData:
   # PanAPI address of the PanFS realm: a host (HTTPS is used) or a full https:// or http:// URL.
-  # The CSI controller calls PanAPI at this address; the nodes mount volumes from its host.
+  # The CSI controller calls PanAPI at this address. The nodes mount volumes from its host,
+  # unless PanAPI names another mount address for the tenant.
   api: "panfs-dummy.com"
 
   # PanAPI service account token
@@ -62,10 +63,9 @@ parameters:
   csi.storage.k8s.io/controller-expand-secret-name: *secretName
   csi.storage.k8s.io/controller-expand-secret-namespace: *secretNamespace
 
-  # Numeric id of the storageset that holds the volumes created with this StorageClass
-  panfs.csi.vdura.com/storageset_id: "1"
-
-  # Specific parameters for volumes (to be) created in the PanFS Realm
+  # Specific parameters for volumes (to be) created in the PanFS Realm.
+  # panfs.csi.vdura.com/storageset is the id or the name of the storageset that holds the volumes;
+  # without it, the first storageset that is assigned to the tenant is used.
   panfs.csi.vdura.com/efsa: "retry"
   panfs.csi.vdura.com/layout: "raid6+"
   panfs.csi.vdura.com/maxwidth: "3"
@@ -73,6 +73,7 @@ parameters:
   panfs.csi.vdura.com/recoverypriority: "50"
   panfs.csi.vdura.com/rgdepth: "2"
   panfs.csi.vdura.com/rgwidth: "3"
+  panfs.csi.vdura.com/storageset: "1"
   panfs.csi.vdura.com/stripeunit: "64k"
 
 # No custom mount options specified; using defaults

@@ -126,6 +126,52 @@ func TestNodePublishVolume(t *testing.T) {
 			},
 		},
 		{
+			"The rmlist from the volume context is the mount source and a mount option",
+			&csi.NodePublishVolumeRequest{
+				VolumeId:   validVolumeID,
+				TargetPath: validPublishTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{MountFlags: []string{}},
+					},
+				},
+				Secrets: defaultSecrets,
+				VolumeContext: map[string]string{
+					utils.VolumeNameContextKey:   validVolumeName,
+					utils.MountAddressContextKey: "192.168.0.2",
+				},
+			},
+			&csi.NodePublishVolumeResponse{},
+			nil,
+			func() {
+				mockMounter.EXPECT().Mount(
+					"panfs://192.168.0.2/"+validVolumeName,
+					validPublishTargetPath,
+					[]string{"rmlist=(192.168.0.2)"}).Times(1)
+			},
+		},
+		{
+			"The rmlist in the volume context is not a list of addresses",
+			&csi.NodePublishVolumeRequest{
+				VolumeId:   validVolumeID,
+				TargetPath: validPublishTargetPath,
+				VolumeCapability: &csi.VolumeCapability{
+					AccessType: &csi.VolumeCapability_Mount{
+						Mount: &csi.VolumeCapability_MountVolume{MountFlags: []string{}},
+					},
+				},
+				Secrets: defaultSecrets,
+				VolumeContext: map[string]string{
+					utils.VolumeNameContextKey:   validVolumeName,
+					utils.MountAddressContextKey: "192.168.0.2/other",
+				},
+			},
+			nil,
+			status.Error(codes.InvalidArgument,
+				`rmlist "192.168.0.2/other" must be a list of host names or IP addresses, separated by commas`),
+			bindMountCalledZeroTimes,
+		},
+		{
 			"Static volume: the volume handle is the volume name",
 			&csi.NodePublishVolumeRequest{
 				VolumeId:   "/static-volume",

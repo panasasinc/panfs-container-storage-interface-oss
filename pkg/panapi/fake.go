@@ -50,12 +50,18 @@ func (f *FakeClient) CreateVolume(_ context.Context, p CreateVolumeParams, _ map
 		}
 	}
 
+	// The fake realm has one storageset, with the id 1. A numeric parameter is kept as the id.
+	storagesetID, _, _ := ParseStorageset(p.Parameters)
+	if storagesetID == 0 {
+		storagesetID = 1
+	}
+
 	soft, hard := p.SoftQuotaBytes, p.HardQuotaBytes
 	vol := &Volume{
 		ID:             f.nextID,
 		Pathname:       req.Pathname,
 		Status:         "online",
-		StoragesetID:   req.StoragesetID,
+		StoragesetID:   storagesetID,
 		SoftQuotaBytes: &soft,
 		HardQuotaBytes: &hard,
 	}
@@ -92,6 +98,11 @@ func (f *FakeClient) GetVolumeByName(_ context.Context, name string, _ map[strin
 		}
 	}
 	return nil, fmt.Errorf("%w: no volume named %s", ErrorNotFound, name)
+}
+
+// GetMountAddress returns "": the fake realm has no tenant subnet.
+func (f *FakeClient) GetMountAddress(_ context.Context, _ map[string]string) (string, error) {
+	return "", nil
 }
 
 // ExpandVolume raises the quotas of a volume the way Client does.

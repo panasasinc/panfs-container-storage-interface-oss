@@ -157,8 +157,19 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 		volumeName = strings.TrimPrefix(volumeID, "/")
 	}
 
-	// The node mounts from the host of the PanAPI address in the secret.
-	mountAddress, err := panapi.MountAddress(in.GetSecrets())
+	// The controller puts the rmlist of the tenant subnet in the volume context. The node mounts from its
+	// first address and passes the whole list to the client: mount -t panfs -o "rmlist=(a,b)" panfs://a/<volume>.
+	// Without an rmlist, it mounts from the host of the PanAPI address in the secret.
+	var mountAddress string
+	var err error
+	if rmlist, ok := in.GetVolumeContext()[utils.MountAddressContextKey]; ok {
+		var rmlistOption string
+		if mountAddress, rmlistOption, err = panapi.MountSource(rmlist); err == nil {
+			mountOptions = append(mountOptions, rmlistOption)
+		}
+	} else {
+		mountAddress, err = panapi.APIHost(in.GetSecrets())
+	}
 	if err != nil {
 		llog.Error(err, InvalidRequestErrorStr)
 		return nil, status.Error(codes.InvalidArgument, err.Error())

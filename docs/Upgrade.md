@@ -351,7 +351,7 @@ StorageClass is not a namespaced resource, but a Namespace with the same name is
 |-----------|-------------|---------|
 | `<REALM_API>` | PanAPI address of the PanFS realm | `panfs.example.com` |
 | `<REALM_TOKEN>` | PanAPI service account token | `your-service-account-token` |
-| `<STORAGESET_ID>` | Numeric id of the storageset that holds new volumes | `1` |
+| `<STORAGESET>` | Id or name of the storageset that holds new volumes (optional) | `1` |
 
 #### Configuration of PV Binding Mode and Reclaim Policy
 

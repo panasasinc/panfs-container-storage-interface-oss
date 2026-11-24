@@ -51,7 +51,7 @@ helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --namespace "${PANFS_CSI_DRIVER_NAMESPACE}" \
     --set realm.api=panfs-realm.example.com \
     --set realm.token="<service account token>" \
-    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset_id=1'
+    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1'
 ```
 
 > Note: The `--create-namespace` flag is not required when installing in an existing namespace.
@@ -66,7 +66,7 @@ realm:
   token: "<service account token>"
 
 parameters:
-  panfs.csi.vdura.com/storageset_id: "1"
+  panfs.csi.vdura.com/storageset: "1"
 ```
 
 Install the chart using the overrides file:
@@ -90,7 +90,7 @@ helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --set setAsDefaultStorageClass="true" \
     --set realm.api="panfs-realm.example.com" \
     --set realm.token="<service account token>" \
-    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset_id=1' \
+    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1' \
     --set csiPanFSDriver.namespace="${PANFS_CSI_DRIVER_NAMESPACE}"
 ```
 
@@ -110,7 +110,7 @@ realm:
   token: "<service account token>"
 
 parameters:
-  panfs.csi.vdura.com/storageset_id: "1"
+  panfs.csi.vdura.com/storageset: "1"
 
 setAsDefaultStorageClass: "true"
 
@@ -231,33 +231,31 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | allowedTopologies | object | `{}` | Allowed topologies for volume provisioning This can be used to restrict volume provisioning to specific nodes or zones based on node labels. Uncomment and modify the example below as needed. If left empty, no topology constraints will be applied. |
 | csiPanFSDriver.namespace | string | `"csi-panfs"` | Namespace where the PanFS CSI driver is deployed |
 | mountOptions | list | `[]` |  |
-| parameters | object | `{...}` | Storage class parameters. `panfs.csi.vdura.com/storageset_id` is required; the others are optional. |
-| realm.api | string | `""` | PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL. The nodes mount volumes from the host of this address. |
+| parameters | object | `{...}` | Storage class parameters. All of them are optional; a parameter with an empty value is left out. |
+| realm.api | string | `""` | PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL. The nodes mount volumes from the host of this address, unless PanAPI names another mount address for the tenant. |
 | realm.caCert | string | `""` | Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store. |
-| realm.rmlist | string | `""` | Optional address the nodes mount volumes from. Set it when the volumes are reachable on another address than PanAPI: for a tenant, it is the `rmlist` of the mount recipe of the tenant subnet. Default: the host of `api`. |
-| realm.token | string | `""` | PanAPI service account token. Its tenant must have the storageset of the StorageClass assigned. |
+| realm.token | string | `""` | PanAPI service account token. Its tenant must have a storageset assigned. |
 | setAsDefaultStorageClass | bool | `false` | Whether to set this storage class as the default for the cluster |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |
 | volumeReclaimPolicy | string | `Delete` | Default reclaim policy for volumes |
 
-### PanFS Specific Volume Parameters (see PanCLI User Guide for the details)
+### PanFS Specific Volume Parameters
 
-Refer to the PanCLI User Guide for details on the following parameters:
+The driver passes the following parameters to the realm when it creates a volume:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| parameters."panfs.csi.vdura.com/storageset" | string | `"Set 1"` | Name of the storageset to use for realm volumes |
+| parameters."panfs.csi.vdura.com/storageset" | string | `""` | Storageset that holds the volumes: its id (a number) or its name. Optional: without it, the first storageset assigned to the tenant is used |
 | parameters."panfs.csi.vdura.com/recoverypriority" | string | `"50"` | Recovery priority for the realm volumes |
 | parameters."panfs.csi.vdura.com/efsa" | string | `"retry"` | EFSA volume mode |
-| parameters."panfs.csi.vdura.com/layout" | string | `"raid10+"` | Default layout for the realm volumes |
+| parameters."panfs.csi.vdura.com/layout" | string | `"raid6+"` | Default layout for the realm volumes |
 | parameters."panfs.csi.vdura.com/maxwidth" | int | 3 | Maximum number of storages to stripe over |
 | parameters."panfs.csi.vdura.com/stripeunit" | string | `"64k"` | Stripe unit for the realm volumes |
 | parameters."panfs.csi.vdura.com/rgwidth" | int | 3 | Number of storage nodes to stripe over in a single RAID group |
 | parameters."panfs.csi.vdura.com/rgdepth" | int | 2 | Number of stripes written to a RAID parity group before advancing to the next parity group |
 | parameters."panfs.csi.vdura.com/volservice" | string |  | Volume service id for the realm volumes |
-| parameters."panfs.csi.vdura.com/description" | string |  | Description for the realm volumes |
-| parameters."panfs.csi.vdura.com/user" | string |  | User name or ID |
-| parameters."panfs.csi.vdura.com/group" | string |  | Group name or ID |
+| parameters."panfs.csi.vdura.com/user" | string |  | Numeric id of the owner user |
+| parameters."panfs.csi.vdura.com/group" | string |  | Numeric id of the owner group |
 | parameters."panfs.csi.vdura.com/uperm" | string |  | User permissions |
 | parameters."panfs.csi.vdura.com/gperm" | string |  | Group permissions |
 | parameters."panfs.csi.vdura.com/operm" | string | `"all"` | Other permissions |

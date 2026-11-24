@@ -84,6 +84,21 @@ func (mr *MockStorageProviderClientMockRecorder) ExpandVolume(ctx, volumeID, tar
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpandVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).ExpandVolume), ctx, volumeID, targetSize, secrets)
 }
 
+// GetMountAddress mocks base method.
+func (m *MockStorageProviderClient) GetMountAddress(ctx context.Context, secrets map[string]string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMountAddress", ctx, secrets)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMountAddress indicates an expected call of GetMountAddress.
+func (mr *MockStorageProviderClientMockRecorder) GetMountAddress(ctx, secrets any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMountAddress", reflect.TypeOf((*MockStorageProviderClient)(nil).GetMountAddress), ctx, secrets)
+}
+
 // GetVolume mocks base method.
 func (m *MockStorageProviderClient) GetVolume(ctx context.Context, volumeID string, secrets map[string]string) (*panapi.Volume, error) {
 	m.ctrl.T.Helper()

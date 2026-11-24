@@ -23,6 +23,7 @@ import (
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"go.uber.org/mock/gomock"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -201,13 +202,16 @@ func TestControllerCreateVolume(t *testing.T) {
 		panfs:    panapiMock,
 	}
 
+	// The realm of these cases has no tenant subnet, so the volume context carries no mount address.
+	panapiMock.EXPECT().GetMountAddress(gomock.Any(), gomock.Any()).Return("", nil).AnyTimes()
+
 	const GB9Bytes, GB20Bytes = int64(9) << 30, int64(20) << 30
 
 	request := func(mutate func(*csi.CreateVolumeRequest)) *csi.CreateVolumeRequest {
 		req := &csi.CreateVolumeRequest{
 			Name:               validVolumeName,
 			CapacityRange:      &csi.CapacityRange{RequiredBytes: GB10Bytes},
-			Parameters:         map[string]string{panapi.StoragesetIDParameter: "1"},
+			Parameters:         map[string]string{panapi.StoragesetParameter: "1"},
 			Secrets:            defaultSecrets,
 			VolumeCapabilities: mountCapabilities(),
 		}
@@ -231,7 +235,7 @@ func TestControllerCreateVolume(t *testing.T) {
 	create := func(soft, hard int64, vol *panapi.Volume, err error) *gomock.Call {
 		return panapiMock.EXPECT().CreateVolume(gomock.Any(), panapi.CreateVolumeParams{
 			Name:           validVolumeName,
-			Parameters:     map[string]string{panapi.StoragesetIDParameter: "1"},
+			Parameters:     map[string]string{panapi.StoragesetParameter: "1"},
 			SoftQuotaBytes: soft,
 			HardQuotaBytes: hard,
 		}, defaultSecrets).Times(1).Return(vol, err)
@@ -757,6 +761,74 @@ func TestValidateVolumeCapabilities(t *testing.T) {
 			response, err := driver.ValidateVolumeCapabilities(t.Context(), tc.req)
 			assert.Equal(t, tc.expectedResponse, response)
 			assert.ErrorIs(t, err, tc.expectedError)
+		})
+	}
+}
+
+// TestCreateVolumeMountAddress tests that the controller passes the mount address to the node in the volume context.
+func TestCreateVolumeMountAddress(t *testing.T) {
+	request := &csi.CreateVolumeRequest{
+		Name:               validVolumeName,
+		CapacityRange:      &csi.CapacityRange{RequiredBytes: GB10Bytes},
+		Parameters:         map[string]string{panapi.StoragesetParameter: "1"},
+		Secrets:            defaultSecrets,
+		VolumeCapabilities: mountCapabilities(),
+	}
+	size := GB10Bytes
+	created := &panapi.Volume{ID: validVolumeIDNumber, Pathname: "/" + validVolumeName, SoftQuotaBytes: &size, HardQuotaBytes: &size}
+
+	testCases := []struct {
+		name        string
+		address     string
+		lookupErr   error
+		existing    bool
+		wantContext map[string]string
+	}{
+		{
+			name:    "new volume: the address is in the volume context",
+			address: "192.168.0.2",
+			wantContext: map[string]string{
+				utils.VolumeNameContextKey:   validVolumeName,
+				utils.MountAddressContextKey: "192.168.0.2",
+			},
+		},
+		{
+			name:     "existing volume: the address is in the volume context",
+			address:  "192.168.0.2",
+			existing: true,
+			wantContext: map[string]string{
+				utils.VolumeNameContextKey:   validVolumeName,
+				utils.MountAddressContextKey: "192.168.0.2",
+			},
+		},
+		{
+			name:        "no tenant subnet: no address in the volume context",
+			wantContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
+		},
+		{
+			name:        "the lookup fails: the volume is still returned, without an address",
+			lookupErr:   panapi.ErrorUnauthenticated,
+			wantContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			panapiMock := mock.NewMockStorageProviderClient(gomock.NewController(t))
+			driver := &Driver{Version: "testing", Name: DefaultDriverName, endpoint: "unix:///tmp/csi.sock", host: "localhost", panfs: panapiMock}
+
+			if tc.existing {
+				panapiMock.EXPECT().GetVolumeByName(gomock.Any(), validVolumeName, defaultSecrets).Return(created, nil)
+			} else {
+				panapiMock.EXPECT().GetVolumeByName(gomock.Any(), validVolumeName, defaultSecrets).Return(nil, panapi.ErrorNotFound)
+				panapiMock.EXPECT().CreateVolume(gomock.Any(), gomock.Any(), defaultSecrets).Return(created, nil)
+			}
+			panapiMock.EXPECT().GetMountAddress(gomock.Any(), defaultSecrets).Return(tc.address, tc.lookupErr)
+
+			response, err := driver.CreateVolume(t.Context(), request)
+			require.NoError(t, err)
+			assert.Equal(t, validVolumeID, response.GetVolume().GetVolumeId())
+			assert.Equal(t, tc.wantContext, response.GetVolume().GetVolumeContext())
 		})
 	}
 }

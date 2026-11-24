@@ -25,6 +25,12 @@ const VendorPrefix = "panfs.csi.vdura.com/"
 // The CSI volume ID is the PanAPI volume id, while the node mounts the volume by name.
 const VolumeNameContextKey = VendorPrefix + "volume-name"
 
+// MountAddressContextKey is the volume context key that carries the rmlist: the addresses the node mounts the
+// volume from. The controller reads it from PanAPI (the mount recipe of the tenant subnet) when it creates
+// the volume. The node mounts from the first address and passes the list as the rmlist mount option.
+// Without the key, the node mounts from the host of the PanAPI address.
+const MountAddressContextKey = VendorPrefix + "rmlist"
+
 // VolumeParametersData is the set of known StorageClass parameter names, without the vendor prefix.
 type VolumeParametersData map[string]struct{}
 
@@ -32,8 +38,8 @@ type VolumeParametersData map[string]struct{}
 // It also lists the parameters of earlier driver versions that the driver now rejects,
 // so that a request carrying one of them gets a clear error.
 var VolumeParameters = VolumeParametersData{
-	// storageset_id is the numeric id of the storageset that holds new volumes; it is required.
-	"storageset_id":    {},
+	// storageset is the id or the name of the storageset that holds new volumes; it is optional.
+	"storageset":       {},
 	"recoverypriority": {},
 	"efsa":             {},
 	"volservice":       {},
@@ -50,7 +56,6 @@ var VolumeParameters = VolumeParametersData{
 
 	// Rejected parameters of earlier driver versions.
 	"description": {},
-	"storageset":  {},
 	"recovery":    {},
 	"encryption":  {},
 }
@@ -70,10 +75,8 @@ var RealmConnectionContext = struct {
 	API    string
 	Token  string
 	CACert string
-	RMList string
 }{
 	API:    "api",
 	Token:  "token",
 	CACert: "ca_cert",
-	RMList: "rmlist",
 }

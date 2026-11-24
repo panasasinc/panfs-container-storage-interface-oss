@@ -53,6 +53,8 @@ type StorageProviderClient interface {
 	GetVolume(ctx context.Context, volumeID string, secrets map[string]string) (*panapi.Volume, error)
 	// GetVolumeByName returns a volume by name; CreateVolume needs it to be idempotent by name.
 	GetVolumeByName(ctx context.Context, volumeName string, secrets map[string]string) (*panapi.Volume, error)
+	// GetMountAddress returns the address the nodes mount volumes from, or "" when it is the PanAPI host.
+	GetMountAddress(ctx context.Context, secrets map[string]string) (string, error)
 }
 
 // PanMounter defines the interface for mounting and unmounting PanFS volumes.

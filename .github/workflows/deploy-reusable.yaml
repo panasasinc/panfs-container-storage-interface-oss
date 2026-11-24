@@ -47,11 +47,11 @@ on:
         required: false
         type: string
         default: "dummy_token"
-      storageset_id:
-        description: Numeric id of the storageset that holds new volumes
+      storageset:
+        description: Id or name of the storageset that holds new volumes (default, the first one of the tenant)
         required: false
         type: string
-        default: "1"
+        default: ""
       ref:
         description: Git ref to clone
         required: true
@@ -131,5 +131,5 @@ jobs:
           driver-installation-type: "${{ inputs.driver-installation-type }}"
           realm_api: "${{ inputs.realm_api }}"
           realm_token: "${{ inputs.realm_token }}"
-          storageset_id: "${{ inputs.storageset_id }}"
+          storageset: "${{ inputs.storageset }}"
           ref: "${{ github.ref }}"

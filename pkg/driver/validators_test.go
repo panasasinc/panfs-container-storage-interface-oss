@@ -176,18 +176,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			err: fmt.Errorf("required_bytes (10) should not be greater than limit_bytes (1)"),
 		},
 		{
-			name: "missing storageset id parameter",
-			request: &csi.CreateVolumeRequest{
-				Name: "test",
-				CapacityRange: &csi.CapacityRange{
-					RequiredBytes: 10,
-				},
-				VolumeCapabilities: []*csi.VolumeCapability{{}},
-			},
-			err: fmt.Errorf("parameter %s must be provided", panapi.StoragesetIDParameter),
-		},
-		{
-			name: "storageset id parameter is a name",
+			name: "storageset parameter is the id 0",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -195,25 +184,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					panapi.StoragesetIDParameter: "Set 1",
+					panapi.StoragesetParameter: "0",
 				},
 			},
-			err: fmt.Errorf("parameter %s: %q is not a storageset id", panapi.StoragesetIDParameter, "Set 1"),
-		},
-		{
-			name: "storageset parameter is not supported",
-			request: &csi.CreateVolumeRequest{
-				Name: "test",
-				CapacityRange: &csi.CapacityRange{
-					RequiredBytes: 10,
-				},
-				VolumeCapabilities: []*csi.VolumeCapability{{}},
-				Parameters: map[string]string{
-					utils.VolumeParameters.GetSCKey("storageset"): "Set 1",
-				},
-			},
-			err: fmt.Errorf("parameter %s is not supported; use %s with the numeric id of the storageset",
-				utils.VolumeParameters.GetSCKey("storageset"), panapi.StoragesetIDParameter),
+			err: fmt.Errorf("parameter %s: 0 is not a storageset id", panapi.StoragesetParameter),
 		},
 		{
 			name: "empty volservice parameter",
@@ -484,6 +458,25 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 		})
 	}
 
+	// The storageset parameter is optional, and a value that is not a number is a name.
+	for name, parameters := range map[string]map[string]string{
+		"no storageset parameter":      nil,
+		"storageset parameter by name": {panapi.StoragesetParameter: "Set 1"},
+		"storageset parameter by id":   {panapi.StoragesetParameter: "1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := validateCreateVolumeRequest(&csi.CreateVolumeRequest{
+				Name:               "test",
+				CapacityRange:      &csi.CapacityRange{RequiredBytes: 10},
+				VolumeCapabilities: []*csi.VolumeCapability{{}},
+				Parameters:         parameters,
+			})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+
 	t.Run("valid request", func(t *testing.T) {
 		req := &csi.CreateVolumeRequest{
 			Name: "test",
@@ -493,7 +486,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			},
 			VolumeCapabilities: []*csi.VolumeCapability{{}},
 			Parameters: map[string]string{
-				panapi.StoragesetIDParameter:                  "1",
+				panapi.StoragesetParameter:                    "1",
 				utils.VolumeParameters.GetSCKey("volservice"): "vol_service_id",
 				utils.VolumeParameters.GetSCKey("layout"):     "raid10+",
 				utils.VolumeParameters.GetSCKey("maxwidth"):   "3",
