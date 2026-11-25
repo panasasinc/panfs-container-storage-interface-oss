@@ -310,12 +310,43 @@ kubectl get secret -n $NAMESPACE $SECRET_NAME
   kubectl run test-auth --image=curlimages/curl --rm -it -- curl -v <realm-endpoint>
   ```
 
+- **PanAPI rejects the request**:
+
+  The controller log shows the HTTP status and the message that PanAPI returned.
+
+  | What the log shows                                       | Cause                                                          | Solution                                                         |
+  |:---------------------------------------------------------|:---------------------------------------------------------------|:-----------------------------------------------------------------|
+  | `missing api in secrets` or `missing token in secrets`   | The Secret has the keys of a driver version before PanAPI      | Create the Secret again with the keys `api` and `token`          |
+  | HTTP 401                                                 | The token is wrong, expired or revoked                         | Put a valid service account token in the Secret                  |
+  | HTTP 403                                                 | The service account lacks a permission                         | Grant the permissions listed in the README                       |
+  | `no storageset is assigned to the tenant of the token`   | The tenant has no storageset                                   | Assign a storageset to the tenant in the realm                   |
+  | `no storageset named "..." is assigned to the tenant`    | The `storageset` parameter names a storageset the tenant lacks | Fix the parameter, or remove it to use the first assigned one    |
+  | A certificate error                                      | The realm certificate is signed by a private CA                | Add the CA certificate to the Secret key `ca_cert`               |
+  | A parameter `description`, `encryption` or `recovery`    | The StorageClass has a parameter that PanAPI cannot honor      | Remove it (`recovery` is now `recoverypriority`)                 |
+
+  The required permissions are listed in [PanFS Realm Requirements](../README.md#panfs-realm-requirements).
+
+- **The volume is created, but the mount fails**:
+
+  A volume of a tenant is reachable only from the network of that tenant.
+  ```bash
+  # The mount address that the controller passed to the node
+  kubectl get pv <pv-name> -o jsonpath='{.spec.csi.volumeAttributes.panfs\.csi\.vdura\.com/rmlist}'
+
+  # Test that the node reaches this address
+  kubectl debug node/<node-name> -it --image=nicolaka/netshoot -- ping -c 3 <mount-address>
+  ```
+  - If the address does not answer, attach the node to the network of the tenant. The driver does not do this.
+  - If the PV has no `rmlist` attribute, the token may not read the subnets of the tenant, or the tenant has no subnet.
+    The node then mounts from the host of the PanAPI address, and the realm can refuse that mount.
+
 **Verification steps**:
-- Verify credentials are correct and not expired
-- Check network connectivity to PanFS realm
+- Verify that the service account token is correct and not expired
+- Check network connectivity from the CSI controller to PanAPI (HTTPS, port 443 by default)
+- Check network connectivity from the worker nodes to the mount address of the tenant network
 - Validate firewall rules and required ports (typically 106, 988, and 7406)
 - Ensure realm address is resolvable from cluster nodes
-- Confirm user has appropriate permissions on PanFS realm
+- Confirm that the service account has the required permissions (see the [README](../README.md#panfs-realm-requirements))
 
 #### 5. Performance Issues
 

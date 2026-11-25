@@ -32,7 +32,8 @@ Ensure the following are in place before proceeding:
 
 - **KMM Engine**: Installed and configured to load PanFS kernel modules on worker nodes
 - **PanFS CSI Driver**: Deployed and operational in the `csi-panfs` namespace
-- **PanFS StorageClass**: Configured to connect to the PanFS Realm backend
+- **PanFS StorageClass**: Configured with the PanAPI address and the service account token of the PanFS realm
+- **Tenant network**: Worker nodes are attached to the network of the tenant, so they can mount its volumes
 - **kubectl**: Installed for interacting with the Kubernetes cluster
 
 > **Tip**: Refer to the [README](../README.md) for setup instructions and the [Architecture Overview](./Overview.md) for design details.
@@ -244,6 +245,19 @@ statefulset.apps/sample-statefulset created
 
 This scenario demonstrates **static provisioning**, where a PersistentVolume (PV) and PersistentVolumeClaim (PVC) are manually created and bound to a pod, bypassing dynamic provisioning.
 
+The PanFS volume must exist in the realm, in the tenant of the service account token. In the PV:
+
+| Field                                               | Value                                                                              |
+|:----------------------------------------------------|:-----------------------------------------------------------------------------------|
+| `csi.volumeHandle`                                  | Name of the volume (`/static-volume`), or a path inside it (`/static-volume/dir1`) |
+| `csi.nodePublishSecretRef`                          | Secret with the keys `api` and `token` (the Secret of a PanFS StorageClass)        |
+| `csi.controllerExpandSecretRef`                     | The same Secret; needed only to expand the volume                                  |
+| `csi.volumeAttributes."panfs.csi.vdura.com/rmlist"` | Optional mount address of the tenant network, for example `"192.0.2.10"`           |
+
+Use the volume name in `volumeHandle`, not the numeric PanAPI volume id.
+A static volume has no mount address from the controller. Without the `rmlist` attribute, the node mounts from
+the host of the PanAPI address in the Secret. Set the attribute when the volumes of the tenant are served from another address.
+
 #### Deploy the Workload
 
 ```bash
@@ -305,6 +319,8 @@ persistentvolume/panfs-static-volume-pv created
   - Check pod logs: `kubectl logs <pod-name>`.
   - Verify KMM module status: `kubectl get module panfs -n csi-panfs`.
   - Confirm PanFS Realm connectivity and credentials.
+  - Confirm that the node is attached to the network of the tenant.
+  - See [Troubleshooting.md](./Troubleshooting.md) for PanAPI and mount errors.
 
 - **Additional Resources**:
   - [examples/k8s](../examples/k8s): Sample YAML manifests.

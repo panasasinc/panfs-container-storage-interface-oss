@@ -33,6 +33,16 @@ The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource
 - A `Secret` resource containing the PanFS realm API address and the service account token.
 - If the PanFS realm credentials secret resides in a different namespace than the PanFS CSI driver, the chart creates a `Role` and `RoleBinding` to allow the CSI driver to access the secret.
 
+## Requirements on the PanFS realm
+
+- `realm.api` is the PanAPI address of the realm, and `realm.token` is the token of a PanAPI service account.
+- A storageset must be assigned to the tenant of the token.
+- The token needs these permissions for its own tenant: read the tenant and its storageset assignments;
+  list, read, create, update and delete volumes; list the subnets and read the mount recipe of a subnet.
+- The worker nodes must be attached to the network of the tenant. The driver does not attach them.
+- If the realm certificate is signed by a private CA, set `realm.caCert` to the PEM certificate of that CA,
+  for example with `--set-file realm.caCert=ca.pem`.
+
 ## Usage
 
 To use this chart, ensure your Kubernetes cluster has the PanFS CSI driver installed. You can then create a StorageClass resource that uses the CSI driver.
@@ -246,5 +256,8 @@ The driver passes the following parameters to the realm when it creates a volume
 | parameters."panfs.csi.vdura.com/uperm" | string |  | User permissions |
 | parameters."panfs.csi.vdura.com/gperm" | string |  | Group permissions |
 | parameters."panfs.csi.vdura.com/operm" | string | `"all"` | Other permissions |
+
+The driver rejects the parameters `description`, `encryption` and `recovery` of earlier driver versions.
+Use `recoverypriority` in place of `recovery`. Volume encryption is not supported.
 
 

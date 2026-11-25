@@ -24,6 +24,10 @@ The PanFS CSI driver consists of three primary components that may require updat
 - **KMM (Kernel Module Management)**: Manages kernel modules required for PanFS functionality on worker nodes
 - **PanFS StorageClass**: Backend PanFS Realm configuration and authentication credentials
 
+> **Upgrading from 1.2.x or earlier:** this driver version talks to the realm through PanAPI, not SSH.
+> The StorageClass and its Secret must be created again.
+> Read [Migration from the SSH Backend to PanAPI](#migration-from-the-ssh-backend-to-panapi) first.
+
 ## Table of Contents
 
 1. [Pre-Upgrade Requirements](#1-pre-upgrade-requirements)
@@ -330,6 +334,36 @@ lsmod | grep panfs
 - [ ] All target nodes have successfully loaded the `panfs` module
 - [ ] KMM module status shows `availableNumber` equals `desiredNumber`
 - [ ] No KMM-related errors in logs (Worker Node events)
+
+### Migration from the SSH Backend to PanAPI
+
+Driver versions up to 1.2.6 sent `pancli` commands to the realm over SSH.
+Later versions call PanAPI with a service account token. Do these steps once, when you leave 1.2.x:
+
+1. **Prepare the realm.** Create a PanAPI service account and its token, make sure that a storageset is assigned to
+   its tenant, and attach the worker nodes to the network of the tenant.
+   See [PanFS Realm Requirements](../README.md#panfs-realm-requirements).
+2. **Create the Secret again.** The keys are `api` and `token`, with an optional `ca_cert`.
+   The keys of the SSH backend (address, user, password, private key, KMIP configuration) are not read any more.
+   A Secret without `api` and `token` is refused.
+3. **Create the StorageClass again.** A StorageClass is immutable, so delete it and create it from the new template.
+   Remove the parameters `description` and `encryption`, and rename `recovery` to `recoverypriority`: the driver
+   rejects the old ones. `user` and `group` accept numeric ids only. `storageset` is optional, and can be an id or a name.
+4. **Upgrade the driver** as described in this guide.
+
+What to expect after the migration:
+
+| Topic                    | Behavior                                                                                           |
+|:-------------------------|:---------------------------------------------------------------------------------------------------|
+| Existing volumes         | A PV of an earlier version keeps the volume name as its volume handle. The driver finds it by name |
+| Mount address of old PVs | They carry no mount address, so the node mounts them from the host of the PanAPI address           |
+| Volume ID of new volumes | The PanAPI volume id (a number), not the volume name                                               |
+| Encrypted volumes        | Not supported. The driver no longer passes a KMIP configuration to the mount                       |
+| Helm value               | `kmm.encryptionSupport` defaults to `false`                                                        |
+| Makefile variables       | `REALM_API`, `REALM_TOKEN`, `REALM_CA_CERT`, `STORAGESET` replace the SSH variables                |
+
+The Secret of an existing volume is referenced from its PV. Keep the Secret name and namespace the same when you
+create it again, so that existing PVs find the new keys.
 
 ### 3.3 StorageClass Update
 

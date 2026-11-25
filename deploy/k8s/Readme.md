@@ -68,6 +68,11 @@ Apply the selected manifest:
 kubectl apply -f <selected-storageclass-manifest>.yaml
 ```
 
+`<REALM_API>` is the PanAPI address of the realm and `<REALM_TOKEN>` is a PanAPI service account token.
+For the permissions of the token and the network requirements, see
+[PanFS Realm Requirements](../../README.md#panfs-realm-requirements).
+If the realm certificate is signed by a private CA, add the key `ca_cert` with the PEM certificate of that CA to the Secret.
+
 ## 3. Example: Creating a PersistentVolumeClaim (PVC)
 
 After deploying the StorageClass, you can create PVCs referencing your StorageClass. Example:
