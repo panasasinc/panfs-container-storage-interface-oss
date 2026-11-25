@@ -20,6 +20,7 @@ stringData:
 
   # PanAPI service account token
   token: "dummy-token"
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -102,6 +103,7 @@ rules:
   - apiGroups: [""] 
     resources: ["secrets"]
     verbs: ["get", "list"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
