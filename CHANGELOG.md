@@ -12,7 +12,7 @@ This file covers every release published in this repository, starting with 1.2.1
 Versions 1.0.0 to 1.2.0 were released before the driver became open source;
 the [compatibility matrix](README.md#compatibility) lists them, but this repository has no history for them.
 
-## [Unreleased]
+## [2.0.0] - Unreleased
 
 ### Changed
 

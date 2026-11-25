@@ -65,7 +65,7 @@ else
 SET_STORAGECLASS_DEFAULT := false
 endif
 
-CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
+CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
 TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
 
 ## [Build Driver and DFC Images]

@@ -487,7 +487,7 @@ spec: # csi-panfs-node
       initContainers:
         # Init container to enable PanFS mount helper
         - name: get-plugin-bin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
           imagePullPolicy: IfNotPresent
           command: ["cp", "/panfs-csi", "/var/panfs/"]
           volumeMounts:
@@ -696,7 +696,7 @@ spec: # csi-panfs-controller
       containers:
         # Main PanFS CSI plugin container
         - name: csi-panfs-plugin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
           imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"

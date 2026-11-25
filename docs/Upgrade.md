@@ -252,7 +252,7 @@ Update the settings in the deployment manifest according to your cluster specifi
 
 - `<KERNEL_VERSION>` - Worker Node kernel version, should correspond to PANFS_KMM_IMAGE, e.g., `4.18.0-553.el8_10.x86_64`
 - `<PANFS_KMM_IMAGE>` - PanFS KMM module image, e.g., `<your private registry>/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.0.a-1860775.2`
-- `<PANFS_CSI_DRIVER_IMAGE>` - PanFS CSI Driver image, e.g., `<your private registry>/panfs-csi-driver:1.2.6`
+- `<PANFS_CSI_DRIVER_IMAGE>` - PanFS CSI Driver image, e.g., `<your private registry>/panfs-csi-driver:2.0.0`
 - `<IMAGE_PULL_SECRET_NAME>` - Image pull secret for fetching PanFS CSI Driver images from your private registry
 
 Review other settings relevant to your Kubernetes infrastructure, such as:
