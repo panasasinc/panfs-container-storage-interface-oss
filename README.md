@@ -431,8 +431,9 @@ helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
 ```
 
 With an `https://` address, the operator and the node pods check the certificate of the realm. For a certificate
-that is signed by a private CA, add `--set-file realm.caCert=ca.pem`. For a test realm whose certificate cannot be
-verified at all, the `TenantNetwork` shows the phase `Error` with the reason, and you can switch the check off:
+that is signed by a private CA, add `--set-file realm.caCert=ca.pem`. For a realm whose certificate cannot be
+verified at all, for example because it has no subject alternative name, the `TenantNetwork` shows the phase `Error`
+with the reason and a hint. Switch the check off then:
 
 ```bash
 helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
@@ -444,8 +445,9 @@ helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
     --set nodeSelector.<LABEL_KEY>=<LABEL_VALUE>
 ```
 
-> **Warning:** with `realm.insecureSkipTLSVerify=true` the connection is still encrypted, but a host that poses
-> as the realm can read the token. Do not use it in production; see
+> **Note:** with `realm.insecureSkipTLSVerify=true` the connection is still encrypted, but the identity of the realm
+> is not checked: a host on the network that poses as the realm can read the token. Use it when the network
+> between the cluster and the realm is trusted; see
 > [Realm with a certificate that the cluster does not trust](./charts/tenant/Readme.md#realm-with-a-certificate-that-the-cluster-does-not-trust).
 
 The requirements (Calico setting, namespace, token permissions), the VXLAN and VLAN segment types, the status

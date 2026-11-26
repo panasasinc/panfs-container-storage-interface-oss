@@ -113,7 +113,7 @@ helm upgrade --install acme ./ \
 If the certificate cannot be verified at all, for example because it has no subject alternative name,
 the `TenantNetwork` shows the phase `Error` with a message like
 `x509: certificate relies on legacy Common Name field, use SANs instead`.
-For a test realm you can switch the check off:
+The CA certificate does not help then. Switch the check off:
 
 ```bash
 helm upgrade --install acme ./ \
@@ -125,9 +125,10 @@ helm upgrade --install acme ./ \
     --set nodeSelector.storage-network=acme
 ```
 
-> **Warning:** with `realm.insecureSkipTLSVerify=true` the connection is still encrypted, but a host that poses
-> as the realm can read the token. The operator and the node pods log a warning on every start.
-> Do not use it in production; give the realm a certificate that can be verified.
+> **Note:** with `realm.insecureSkipTLSVerify=true` the connection is still encrypted, but the identity of the realm
+> is not checked: a host on the network that poses as the realm can read the token. The operator and the node pods
+> log a warning about it on every start. Use it when the network between the cluster and the realm is trusted.
+> A realm certificate that names the address of the realm as a subject alternative name removes the need for it.
 
 #### Keeping the token out of the Helm values
 
@@ -214,6 +215,6 @@ The command returns before that is finished; `kubectl -n acme get tenantnetwork`
 | nodeSelector | object | `{}` | Labels that select the nodes of the tenant. Without them, all nodes of the cluster are put on the tenant network. |
 | realm.api | string | `""` | PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL. |
 | realm.caCert | string | `""` | Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store. |
-| realm.insecureSkipTLSVerify | bool | `false` | Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified: a host that poses as the realm can then read the token. Prefer `realm.caCert`. |
+| realm.insecureSkipTLSVerify | bool | `false` | Do not verify the realm certificate. Use it for a realm whose certificate cannot be verified, for example because it has no subject alternative name. The connection stays encrypted, but the identity of the realm is not checked: a host that poses as the realm can read the token. Prefer `realm.caCert` where it works. |
 | realm.token | string | `""` | PanAPI service account token of the tenant |
 | vlanParentInterface | string | `""` | Only for a realm that places subnets on VLAN segments: the interface of the nodes that carries the VLAN. Leave it empty to use the default of the operator: the interface with the underlay address of the node. |

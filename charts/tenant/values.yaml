@@ -20,8 +20,9 @@ realm:
   token: ""
   # -- Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store.
   caCert: ""
-  # -- Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified:
-  # a host that poses as the realm can then read the token. Prefer `realm.caCert`.
+  # -- Do not verify the realm certificate. Use it for a realm whose certificate cannot be verified, for example
+  # because it has no subject alternative name. The connection stays encrypted, but the identity of the realm
+  # is not checked: a host that poses as the realm can read the token. Prefer `realm.caCert` where it works.
   insecureSkipTLSVerify: false
 
 # -- Name of an existing Secret in the release namespace with the keys `api` and `token`, and optionally `ca_cert`.

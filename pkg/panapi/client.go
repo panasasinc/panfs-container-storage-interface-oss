@@ -213,9 +213,10 @@ func certificateHint(err error) string {
 		return ""
 	}
 	keys := utils.RealmConnectionContext
-	return fmt.Sprintf(". Hint: the certificate of the realm cannot be verified. If a private CA signed it, add the "+
-		"certificate of that CA to the realm credentials Secret as the key %q. For a test realm only, add the key %q "+
-		"with the value \"true\" to that Secret to switch the check off",
+	return fmt.Sprintf(". Hint: the certificate of the realm cannot be verified. If a private CA signed it and it "+
+		"names the address of the realm, add the certificate of that CA to the realm credentials Secret as the key %q. "+
+		"Otherwise add the key %q with the value \"true\" to that Secret: the connection stays encrypted, "+
+		"but the identity of the realm is not checked",
 		keys.CACert, keys.InsecureSkipTLSVerify)
 }
 
