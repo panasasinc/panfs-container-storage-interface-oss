@@ -55,7 +55,16 @@ Two node labels are involved:
 | `panfs.vdura.com/tenant-network=<namespace>` | The node pod | The network of the tenant works on this node |
 
 The value of the second label is the namespace of the `TenantNetwork`. It is the label for placing workloads,
-and the status of the resource shows it as `Ready Label`.
+and the status of the resource shows it as `managedTopology`, with its key and its value:
+
+```bash
+kubectl -n acme get tenantnetwork acme-network -o jsonpath='{.status.managedTopology}'
+```
+
+```text
+{"key":"panfs.vdura.com/tenant-network","value":"acme"}
+```
+
 Without `nodeSelector`, the pods run on all nodes of the cluster, the control plane nodes included:
 
 ```yaml
@@ -282,7 +291,9 @@ Status:
       Overlay IP:  192.168.0.58
       State:       NotReady
   Phase:          Pending
-  Ready Label:    panfs.vdura.com/tenant-network=acme
+  Managed Topology:
+    Key:    panfs.vdura.com/tenant-network
+    Value:  acme
   Tenant:         acme
 Events:
   Type     Reason               From                           Message

@@ -135,7 +135,7 @@ func TestOperatorCreatesTheDaemonSetOfTheTenant(t *testing.T) {
 	_, status = stored(t, o)
 	assert.Equal(t, TenantNetworkStatus{
 		Phase: PhaseReady, Tenant: "acme", DaemonSet: testObject, DesiredNodes: 3, ReadyNodes: 3,
-		ReadyLabel: ReadyLabelKey + "=" + testNamespace,
+		ManagedTopology: &Topology{Key: ReadyLabelKey, Value: testNamespace},
 	}, status)
 }
 

@@ -87,6 +87,12 @@ type TenantNetworkSpec struct {
 	DetachOnRemoval *bool   `json:"detachOnRemoval,omitempty"`
 }
 
+// Topology is a node label as a key and a value.
+type Topology struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 // NodeStatus is the state of one node of the tenant.
 type NodeStatus struct {
 	// State is Ready or NotReady.
@@ -112,9 +118,10 @@ type TenantNetworkStatus struct {
 	DesiredNodes       int64  `json:"desiredNodes"`
 	ReadyNodes         int64  `json:"readyNodes"`
 	ObservedGeneration int64  `json:"observedGeneration,omitempty"`
-	// ReadyLabel is the label that the pods set on a node where the network of the tenant works:
-	// panfs.vdura.com/tenant-network=<namespace of the resource>.
-	ReadyLabel string `json:"readyLabel,omitempty"`
+	// ManagedTopology is the node label that the pods set on a node where the network of the tenant works:
+	// the key panfs.vdura.com/tenant-network and, as its value, the namespace of the resource.
+	// A StorageClass uses it in allowedTopologies, and a workload in its node selector.
+	ManagedTopology *Topology `json:"managedTopology,omitempty"`
 
 	// Interface is the name of the tenant interface on the nodes, once a node reported it.
 	Interface string `json:"interface,omitempty"`
@@ -256,7 +263,7 @@ func (o *Operator) reconcile(ctx context.Context, item *unstructured.Unstructure
 			status.Tenant = last.Tenant
 		}
 		if status.DaemonSet == "" {
-			status.DaemonSet, status.ReadyLabel = last.DaemonSet, last.ReadyLabel
+			status.DaemonSet, status.ManagedTopology = last.DaemonSet, last.ManagedTopology
 		}
 		o.eventOnce(ctx, item, "state", EventTypeError, reasonOf(err), upperFirst(err.Error()))
 	} else {
@@ -338,7 +345,7 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 	if o.claims != nil {
 		o.claims[tenant] = namespace + "/" + name
 	}
-	status.ReadyLabel = ReadyLabelKey + "=" + namespace
+	status.ManagedTopology = &Topology{Key: ReadyLabelKey, Value: namespace}
 	// An empty selector selects every node.
 	if _, err := labels.ValidatedSelectorFromSet(spec.NodeSelector); err != nil {
 		return status, withReason(ReasonInvalidSpec, fmt.Errorf("the node selector in spec.nodeSelector is not valid: %w", err))

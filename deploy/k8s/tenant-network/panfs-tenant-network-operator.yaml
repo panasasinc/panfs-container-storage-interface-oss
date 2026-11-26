@@ -52,9 +52,13 @@ spec:
         - name: Phase
           type: string
           jsonPath: .status.phase
-        - name: Ready-Label
+        - name: Topology-Key
           type: string
-          jsonPath: .status.readyLabel
+          jsonPath: .status.managedTopology.key
+          priority: 1
+        - name: Topology-Value
+          type: string
+          jsonPath: .status.managedTopology.value
           priority: 1
         - name: Message
           type: string
@@ -119,11 +123,19 @@ spec:
                 tenant:
                   description: Name of the tenant the token belongs to.
                   type: string
-                readyLabel:
+                managedTopology:
                   description: >-
-                    The label that the pods set on a node where the network of the tenant works:
-                    panfs.vdura.com/tenant-network=<namespace of this resource>. Use it to place workloads.
-                  type: string
+                    The node label that the pods set on a node where the network of the tenant works.
+                    Use it in allowedTopologies of a StorageClass and in the node selector of a workload.
+                  type: object
+                  required: ["key", "value"]
+                  properties:
+                    key:
+                      description: Key of the label; panfs.vdura.com/tenant-network.
+                      type: string
+                    value:
+                      description: Value of the label; the namespace of this resource.
+                      type: string
                 daemonSet:
                   description: Name of the DaemonSet the operator created in this namespace.
                   type: string
