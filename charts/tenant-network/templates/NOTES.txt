@@ -20,8 +20,6 @@ Next steps for a tenant:
 
    Without nodeSelector, all nodes of the cluster are put on the tenant network.
 
-   A PanFS StorageClass release with the value `tenant=<TENANT>` does this step for you.
-
 3. Check the result:
 
    kubectl get tenantnetworks -A

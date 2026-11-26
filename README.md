@@ -358,9 +358,6 @@ kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
 
 A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`: the value is the namespace of the `TenantNetwork`.
 
-With Helm, step 3 is the value `tenant` of the [StorageClass chart](./charts/storageclass/Readme.md#tenant-network):
-it creates the `TenantNetwork`, and it restricts the StorageClass to the ready nodes.
-
 The requirements (Calico setting, namespace, token permissions), the Helm installation, and the way to keep workloads
 on the ready nodes are described in the [operator documentation](./charts/tenant-network/Readme.md).
 

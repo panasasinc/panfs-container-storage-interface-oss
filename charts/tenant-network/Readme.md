@@ -213,8 +213,8 @@ spec:
 EOF
 ```
 
-With Helm, the [PanFS StorageClass chart](../storageclass/Readme.md#tenant-network) does this step for you:
-with its value `tenant` it creates the Secret and the `TenantNetwork`.
+The Secret of a [PanFS StorageClass](../storageclass/Readme.md) release has the keys that the operator needs.
+To use it, create the `TenantNetwork` in the namespace of that release and name its Secret; the Secret has the name of the release.
 
 Fields of `spec`:
 
@@ -298,7 +298,7 @@ kubectl -n <NAMESPACE> logs -l panfs.vdura.com/tenant-network-name=<NAME> --tail
 ### 5. Place workloads on the ready nodes
 
 The ready label is `panfs.vdura.com/tenant-network=<NAMESPACE>`, with the namespace of the `TenantNetwork` as its value.
-A StorageClass release with the value `tenant` already carries this block. In a StorageClass that you write yourself, add:
+Add this block to the StorageClass of the tenant. With the PanFS StorageClass chart, it is the value `allowedTopologies`:
 
 ```yaml
 allowedTopologies:
@@ -330,8 +330,7 @@ A node without the label gets no pod, and nothing on it changes.
 
 ### Removing the network of a tenant
 
-Remove the workloads that use volumes of the tenant first. Then delete the `TenantNetwork`,
-or uninstall the StorageClass release that created it:
+Remove the workloads that use volumes of the tenant first. Then delete the `TenantNetwork`:
 
 ```bash
 kubectl -n <NAMESPACE> delete tenantnetwork <NAME>

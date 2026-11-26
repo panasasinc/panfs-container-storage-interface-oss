@@ -44,9 +44,6 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
   reports the segment type of the subnet. The status of the resource lists the nodes,
   and the operator and the pods report changes as events on it.
   See the [operator documentation](charts/tenant-network/Readme.md).
-- StorageClass chart: the value `tenant`. It creates the `TenantNetwork` of the tenant, and it adds `allowedTopologies`
-  with the node label `panfs.vdura.com/tenant-network=<release namespace>` to the StorageClass.
-  `tenantNetwork.create` switches the resource off.
 - The `Makefile` targets `build-tenant-network-image` and `manifest-tenant-network`.
 - The controller reads the mount address (`rmlist`) of the tenant network from PanAPI and passes it to the node.
   The node mounts `panfs://<first address>/<volume>` with the mount option `rmlist=(...)`.

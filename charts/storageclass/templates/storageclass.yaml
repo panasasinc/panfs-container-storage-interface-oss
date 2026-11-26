@@ -80,16 +80,7 @@ mountOptions: []
 
 {{- if .Values.allowedTopologies }}
 
-# Restrict volume provisioning to specific nodes or zones based on node labels
+# Topology constraints for volume provisioning to specific nodes
 allowedTopologies:
 {{- toYaml .Values.allowedTopologies | nindent 2 }}
-{{- else if .Values.tenant }}
-
-# Provision volumes only for the nodes where the network of the tenant works.
-# The PanFS Tenant Network sets this label on a node; its value is the namespace of the TenantNetwork.
-allowedTopologies:
-  - matchLabelExpressions:
-      - key: panfs.vdura.com/tenant-network
-        values:
-          - {{ .Release.Namespace | quote }}
 {{- end }}

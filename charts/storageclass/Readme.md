@@ -39,8 +39,8 @@ The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource
 - The token needs these permissions for its own tenant: read the tenant and its storageset assignments;
   list, read, create, update and delete volumes; list the subnets and read the mount recipe of a subnet.
 - The worker nodes must be attached to the network of the tenant. The driver does not attach them;
-  the [PanFS Tenant Network operator](../tenant-network/Readme.md) does. Set the value `tenant` of this chart to use it;
-  see [Tenant network](#tenant-network).
+  the [PanFS Tenant Network operator](../tenant-network/Readme.md) does. Its documentation shows the `allowedTopologies`
+  value that keeps new volumes on the nodes where the tenant network works.
 - If the realm certificate is signed by a private CA, set `realm.caCert` to the PEM certificate of that CA,
   for example with `--set-file realm.caCert=ca.pem`. For a self-signed certificate, use that certificate itself.
 - For a test realm whose certificate cannot be verified, set `realm.insecureSkipTLSVerify=true`.
@@ -237,53 +237,12 @@ helm uninstall <STORAGE_CLASS_NAME> \
     --namespace=<NAMESPACE>
 ```
 
-## Tenant network
-
-A volume of a tenant is reachable only from the network of that tenant.
-When the [PanFS Tenant Network operator](../tenant-network/Readme.md) runs in the cluster, one value connects this chart to it:
-
-```bash
-# The nodes that may use volumes of the tenant
-kubectl label node <NODE_NAME> panfs.vdura.com/tenant=<TENANT>
-
-helm upgrade --install csi-panfs-storage-class ./ \
-    --namespace csi-panfs-storage-class \
-    --create-namespace \
-    --set realm.api=<PANAPI_ADDRESS> \
-    --set realm.token=<TOKEN> \
-    --set tenant=<TENANT>
-```
-
-With `tenant` set, the chart does two more things:
-
-- It creates a `TenantNetwork` resource that names the Secret of this release and selects the nodes with the label
-  `panfs.vdura.com/tenant=<TENANT>`. The operator then puts these nodes on the network of the tenant, and it sets
-  the node label `panfs.vdura.com/tenant-network=<namespace of this release>` on each node where the network works.
-- It adds `allowedTopologies` with that node label to the StorageClass, so a new volume is provisioned only for a pod
-  on a ready node. A value in `allowedTopologies` replaces this block.
-
-A namespace holds one `TenantNetwork`. For a second StorageClass of the same tenant in the same namespace,
-set `tenantNetwork.create` to `false` in the second release: it keeps the topology block and uses the network of the first.
-
-Check the result:
-
-```bash
-kubectl get tenantnetworks -A
-kubectl -n csi-panfs-storage-class describe tenantnetwork csi-panfs-storage-class
-```
-
-Set `tenantNetwork.create` to `false` to keep the topology block without the `TenantNetwork` resource,
-for example when the cluster has no operator and you attach the nodes in another way.
-
-When you uninstall the release, the `TenantNetwork` is deleted with it, and the nodes are taken off the tenant network.
-Remove the workloads that use volumes of the tenant first.
-
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | allowVolumeExpansion | bool | `true` | Allow expansion of provisioned volumes |
-| allowedTopologies | object | `{}` | Allowed topologies for volume provisioning This can be used to restrict volume provisioning to specific nodes or zones based on node labels. Uncomment and modify the example below as needed. If left empty, the topology of `tenant` is used; without `tenant`, no topology constraints will be applied. |
+| allowedTopologies | object | `{}` | Allowed topologies for volume provisioning This can be used to restrict volume provisioning to specific nodes or zones based on node labels. Uncomment and modify the example below as needed. If left empty, no topology constraints will be applied. |
 | csiPanFSDriver.namespace | string | `"csi-panfs"` | Namespace where the PanFS CSI driver is deployed |
 | mountOptions | list | `[]` |  |
 | parameters | object | `{...}` | Storage class parameters. All of them are optional; a parameter with an empty value is left out. |
@@ -292,8 +251,6 @@ Remove the workloads that use volumes of the tenant first.
 | realm.insecureSkipTLSVerify | bool | `false` | Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified: a host that poses as the realm can then read the token. Prefer `realm.caCert`. |
 | realm.token | string | `""` | PanAPI service account token. Its tenant must have a storageset assigned. |
 | setAsDefaultStorageClass | bool | `false` | Whether to set this storage class as the default for the cluster |
-| tenant | string | `""` | Name of the PanFS tenant that the token of this StorageClass belongs to. When it is set, the chart creates a `TenantNetwork` resource that puts the nodes with the label `panfs.vdura.com/tenant=<tenant>` on the network of the tenant, and it restricts volume provisioning to the nodes where that network works (node label `panfs.vdura.com/tenant-network=<release namespace>`). Leave it empty when the nodes reach the realm without a tenant network. |
-| tenantNetwork.create | bool | `true` | Create the `TenantNetwork` resource when `tenant` is set. It needs the PanFS Tenant Network operator (chart `panfs-tenant-network`) in the cluster. Set it to `false` when you manage the tenant network yourself. |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |
 | volumeReclaimPolicy | string | `Delete` | Default reclaim policy for volumes |
 
