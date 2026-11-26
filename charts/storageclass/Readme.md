@@ -40,7 +40,9 @@ The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource
   list, read, create, update and delete volumes; list the subnets and read the mount recipe of a subnet.
 - The worker nodes must be attached to the network of the tenant. The driver does not attach them.
 - If the realm certificate is signed by a private CA, set `realm.caCert` to the PEM certificate of that CA,
-  for example with `--set-file realm.caCert=ca.pem`.
+  for example with `--set-file realm.caCert=ca.pem`. For a self-signed certificate, use that certificate itself.
+- For a test realm whose certificate cannot be verified, set `realm.insecureSkipTLSVerify=true`.
+  The driver then does not verify the realm certificate, so a host that poses as the realm can read the token.
 
 ## Usage
 
@@ -244,6 +246,7 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | parameters | object | `{...}` | Storage class parameters. All of them are optional; a parameter with an empty value is left out. |
 | realm.api | string | `""` | PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL. The nodes mount volumes from the host of this address, unless PanAPI names another mount address for the tenant. |
 | realm.caCert | string | `""` | Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store. |
+| realm.insecureSkipTLSVerify | bool | `false` | Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified: a host that poses as the realm can then read the token. Prefer `realm.caCert`. |
 | realm.token | string | `""` | PanAPI service account token. Its tenant must have a storageset assigned. |
 | setAsDefaultStorageClass | bool | `false` | Whether to set this storage class as the default for the cluster |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |

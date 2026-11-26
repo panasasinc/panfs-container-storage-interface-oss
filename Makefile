@@ -50,6 +50,7 @@ help:
 	@printf "    REALM_API                                PanAPI address of the PanFS realm (e.g., "panfs.example.com" or "https://panfs.example.com").\n"
 	@printf "    REALM_TOKEN                              PanAPI service account token.\n"
 	@printf "    REALM_CA_CERT                            Optional PEM certificate of the CA that signed the realm certificate.\n"
+	@printf "    REALM_INSECURE_SKIP_TLS_VERIFY           Set to true to skip the verification of the realm certificate (test realms only).\n"
 	@printf "    STORAGESET                               Optional id or name of the storageset that holds new volumes (default: the first one of the tenant).\n\n"
 	@printf "  $(BOLD)$(GREEN)[Storage Class Settings]$(RESET)\n"
 	@printf "    STORAGE_CLASS_NAME                       Name of the storage class to deploy (default: $(STORAGE_CLASS_NAME)).\n"
@@ -280,6 +281,7 @@ deploy-storageclass-with-helm:
 		--set realm.api="${REALM_API}" \
 		--set realm.token="${REALM_TOKEN}" \
 		--set-string realm.caCert="$(REALM_CA_CERT)" \
+		--set realm.insecureSkipTLSVerify=$(or $(REALM_INSECURE_SKIP_TLS_VERIFY),false) \
 		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=$(STORAGESET)' \
 		--wait
 	@printf "$(GREEN)Successfully deployed PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)'$(RESET)\n\n"

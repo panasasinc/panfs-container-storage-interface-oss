@@ -72,11 +72,13 @@ func (c VolumeParametersData) GetSCKey(k string) string {
 
 // RealmConnectionContext holds supported realm connection context parameters
 var RealmConnectionContext = struct {
-	API    string
-	Token  string
-	CACert string
+	API                   string
+	Token                 string
+	CACert                string
+	InsecureSkipTLSVerify string
 }{
-	API:    "api",
-	Token:  "token",
-	CACert: "ca_cert",
+	API:                   "api",
+	Token:                 "token",
+	CACert:                "ca_cert",
+	InsecureSkipTLSVerify: "insecure_skip_tls_verify",
 }

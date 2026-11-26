@@ -326,6 +326,9 @@ kubectl get secret -n $NAMESPACE $SECRET_NAME
 
   The required permissions are listed in [PanFS Realm Requirements](../README.md#panfs-realm-requirements).
 
+  A certificate error can also mean that the certificate does not name the address in `api`.
+  For a test realm, the Secret key `insecure_skip_tls_verify: "true"` turns the verification off.
+
 - **The volume is created, but the mount fails**:
 
   A volume of a tenant is reachable only from the network of that tenant.

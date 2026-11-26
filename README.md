@@ -276,7 +276,10 @@ Edit [deploy/k8s/storage-class/template-secret-in-driver-ns.yaml](deploy/k8s/sto
   * `<STORAGESET>`: The id or the name of the storageset that holds the new volumes. Remove the line to use the first storageset that is assigned to the tenant.
 
 If the realm certificate is signed by a private CA, add the key `ca_cert` with the PEM certificate of that CA to the Secret.
-Without it, the driver uses the system trust store.
+Without it, the driver uses the system trust store. For a self-signed certificate, `ca_cert` is that certificate itself.
+If the certificate cannot be verified at all, for example a self-signed certificate that does not name the realm address,
+add the key `insecure_skip_tls_verify` with the value `"true"`. The driver then does not verify the realm certificate,
+so a host that poses as the realm can read the token. Use it for test realms only.
 
 ##### 3.2 Setting the Default StorageClass
 

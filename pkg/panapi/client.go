@@ -55,20 +55,28 @@ var llog klog.Logger = klog.NewKlogr()
 // The realm address and the credentials come from the secrets of each call, so one Client serves many realms.
 type Client struct {
 	mu sync.Mutex
-	// httpClients caches one HTTP client per CA certificate, so connections are reused.
-	httpClients map[string]*http.Client
+	// httpClients caches one HTTP client per TLS configuration, so connections are reused.
+	httpClients map[tlsSettings]*http.Client
 }
 
 // NewClient returns a Client ready for use.
 func NewClient() *Client {
-	return &Client{httpClients: make(map[string]*http.Client)}
+	return &Client{httpClients: make(map[tlsSettings]*http.Client)}
 }
 
 // endpoint is where and how to reach one realm.
 type endpoint struct {
 	baseURL string
 	token   string
-	caCert  string
+	tls     tlsSettings
+}
+
+// tlsSettings is how the certificate of a realm is verified.
+type tlsSettings struct {
+	// caCert is the PEM certificate to trust; empty means the system trust store.
+	caCert string
+	// skipVerify turns the verification of the realm certificate off.
+	skipVerify bool
 }
 
 // APIURL returns the PanAPI base URL a StorageClass secret names in its api key.
@@ -149,23 +157,39 @@ func endpointFromSecrets(secrets map[string]string) (endpoint, error) {
 			"host", parsed.Host)
 	}
 
-	return endpoint{baseURL: parsed.String(), token: token, caCert: secrets[keys.CACert]}, nil
+	settings := tlsSettings{caCert: secrets[keys.CACert]}
+	if value := secrets[keys.InsecureSkipTLSVerify]; value != "" {
+		settings.skipVerify, err = strconv.ParseBool(value)
+		if err != nil {
+			return endpoint{}, fmt.Errorf("%w: %s in secrets must be true or false",
+				ErrorInvalidArgument, keys.InsecureSkipTLSVerify)
+		}
+	}
+
+	return endpoint{baseURL: parsed.String(), token: token, tls: settings}, nil
 }
 
-// httpClient returns the cached HTTP client for a CA certificate, creating it on first use.
-// An empty certificate means the system trust store.
-func (c *Client) httpClient(caCert string) (*http.Client, error) {
+// httpClient returns the cached HTTP client for the TLS settings, creating it on first use.
+// Without a CA certificate the system trust store is used. With skipVerify the realm certificate
+// is not verified at all, and the CA certificate is not read.
+func (c *Client) httpClient(settings tlsSettings) (*http.Client, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
-	if hc, ok := c.httpClients[caCert]; ok {
+	if hc, ok := c.httpClients[settings]; ok {
 		return hc, nil
 	}
 
 	transport := http.DefaultTransport.(*http.Transport).Clone()
-	if caCert != "" {
+	switch {
+	case settings.skipVerify:
+		llog.Info("WARNING: the PanAPI certificate is not verified; the API token can be read by a host that poses as the realm",
+			"key", utils.RealmConnectionContext.InsecureSkipTLSVerify)
+		// The administrator asked for it in the secret, for a realm whose certificate cannot be verified.
+		transport.TLSClientConfig = &tls.Config{InsecureSkipVerify: true, MinVersion: tls.VersionTLS12} //nolint:gosec
+	case settings.caCert != "":
 		pool := x509.NewCertPool()
-		if !pool.AppendCertsFromPEM([]byte(caCert)) {
+		if !pool.AppendCertsFromPEM([]byte(settings.caCert)) {
 			return nil, fmt.Errorf("%w: %s holds no PEM certificate",
 				ErrorInvalidArgument, utils.RealmConnectionContext.CACert)
 		}
@@ -173,7 +197,7 @@ func (c *Client) httpClient(caCert string) (*http.Client, error) {
 	}
 
 	hc := &http.Client{Transport: transport}
-	c.httpClients[caCert] = hc
+	c.httpClients[settings] = hc
 	return hc, nil
 }
 
@@ -184,7 +208,7 @@ func (c *Client) do(ctx context.Context, secrets map[string]string, method, path
 		return err
 	}
 
-	hc, err := c.httpClient(ep.caCert)
+	hc, err := c.httpClient(ep.tls)
 	if err != nil {
 		return err
 	}

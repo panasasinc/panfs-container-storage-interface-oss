@@ -39,6 +39,8 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
   Without a mount address, it mounts from the host of the `api` address.
 - Static provisioning by name: `volumeHandle` of a PersistentVolume is the name of a volume, or a path inside it.
   The optional volume attribute `panfs.csi.vdura.com/rmlist` sets its mount address.
+- The optional Secret key `insecure_skip_tls_verify` (chart value `realm.insecureSkipTLSVerify`, `Makefile` variable
+  `REALM_INSECURE_SKIP_TLS_VERIFY`) turns the verification of the realm certificate off, for test realms.
 - The token permissions and the network requirements are documented in the [README](README.md#panfs-realm-requirements).
 
 ### Removed

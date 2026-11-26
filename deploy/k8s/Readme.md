@@ -72,6 +72,9 @@ kubectl apply -f <selected-storageclass-manifest>.yaml
 For the permissions of the token and the network requirements, see
 [PanFS Realm Requirements](../../README.md#panfs-realm-requirements).
 If the realm certificate is signed by a private CA, add the key `ca_cert` with the PEM certificate of that CA to the Secret.
+If the certificate cannot be verified at all, for example a self-signed certificate that does not name the realm address,
+add the key `insecure_skip_tls_verify` with the value `"true"`. The driver then does not verify the realm certificate,
+so a host that poses as the realm can read the token. Use it for test realms only.
 
 ## 3. Example: Creating a PersistentVolumeClaim (PVC)
 

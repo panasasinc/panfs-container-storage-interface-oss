@@ -36,6 +36,9 @@ realm:
   token: ""
   # -- Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store.
   caCert: ""
+  # -- Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified:
+  # a host that poses as the realm can then read the token. Prefer `realm.caCert`.
+  insecureSkipTLSVerify: false
 
 # -- Whether to set this storage class as the default for the cluster
 setAsDefaultStorageClass: false

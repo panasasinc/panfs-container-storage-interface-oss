@@ -678,6 +678,27 @@ func TestTLS(t *testing.T) {
 			t.Errorf("GetVolumeByName() error = %v, want ErrorUnavailable for an untrusted certificate", err)
 		}
 	})
+	t.Run("unknown certificate is accepted with insecure_skip_tls_verify", func(t *testing.T) {
+		s := secrets("")
+		s[utils.RealmConnectionContext.InsecureSkipTLSVerify] = "true"
+		if _, err := NewClient().GetVolumeByName(t.Context(), "home", s); err != nil {
+			t.Errorf("GetVolumeByName() error = %v, want success without verification", err)
+		}
+	})
+	t.Run("insecure_skip_tls_verify=false keeps the verification", func(t *testing.T) {
+		s := secrets("")
+		s[utils.RealmConnectionContext.InsecureSkipTLSVerify] = "false"
+		if _, err := NewClient().GetVolumeByName(t.Context(), "home", s); !errors.Is(err, ErrorUnavailable) {
+			t.Errorf("GetVolumeByName() error = %v, want ErrorUnavailable for an untrusted certificate", err)
+		}
+	})
+	t.Run("insecure_skip_tls_verify that is not a boolean", func(t *testing.T) {
+		s := secrets(caCert)
+		s[utils.RealmConnectionContext.InsecureSkipTLSVerify] = "maybe"
+		if _, err := NewClient().GetVolumeByName(t.Context(), "home", s); !errors.Is(err, ErrorInvalidArgument) {
+			t.Errorf("GetVolumeByName() error = %v, want ErrorInvalidArgument", err)
+		}
+	})
 	t.Run("ca_cert that is not PEM", func(t *testing.T) {
 		if _, err := NewClient().GetVolumeByName(t.Context(), "home", secrets("not a certificate")); !errors.Is(err, ErrorInvalidArgument) {
 			t.Errorf("GetVolumeByName() error = %v, want ErrorInvalidArgument", err)
