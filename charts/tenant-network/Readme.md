@@ -38,7 +38,7 @@ metadata:
 spec:
   secretName: acme-credentials
   nodeSelector:
-    panfs.vdura.com/tenant: acme
+    storage-network: acme
 ```
 
 For every `TenantNetwork` the operator does the following:
@@ -84,7 +84,7 @@ the interface and the attachment stay, so mounted volumes keep working.
 ### Resources Created by the Helm Chart
 
 - The `CustomResourceDefinition` of `TenantNetwork` (`tenantnetworks.panfs.vdura.com`).
-- A `Deployment` with one pod: the operator.
+- A `Deployment` with one pod: the operator. With the release name of this guide it is `panfs-tenant-network-operator`.
 - A `ServiceAccount`, a `ClusterRole` and a `ClusterRoleBinding` for the operator.
 - A `ClusterRole` for the node pods: read a node and patch its labels.
 
@@ -159,7 +159,7 @@ can make the operator use a Secret of that namespace.
 Once per cluster:
 
 ```bash
-helm upgrade --install panfs-tenant-network ./ \
+helm upgrade --install panfs-tenant-network-operator ./ \
     --namespace panfs-tenant-network \
     --create-namespace \
     --wait
@@ -176,7 +176,7 @@ imagePullSecrets:
 ```
 
 ```bash
-helm upgrade --install panfs-tenant-network ./ \
+helm upgrade --install panfs-tenant-network-operator ./ \
     --namespace panfs-tenant-network \
     --create-namespace \
     --values overrides.yaml \
@@ -185,10 +185,10 @@ helm upgrade --install panfs-tenant-network ./ \
 
 ### 2. Label the nodes of the tenant
 
-Any label works; the `TenantNetwork` selects the nodes by it. This guide uses `panfs.vdura.com/tenant`:
+Any label works; the `TenantNetwork` selects the nodes by it. Skip this step to use all nodes of the cluster:
 
 ```bash
-kubectl label node <NODE_NAME> panfs.vdura.com/tenant=<TENANT>
+kubectl label node <NODE_NAME> <LABEL_KEY>=<LABEL_VALUE>
 ```
 
 ### 3. Create the Secret and the TenantNetwork of the tenant
@@ -209,7 +209,7 @@ metadata:
 spec:
   secretName: <SECRET_NAME>
   nodeSelector:
-    panfs.vdura.com/tenant: <TENANT>
+    <LABEL_KEY>: <LABEL_VALUE>
 EOF
 ```
 
@@ -352,7 +352,7 @@ kubectl -n <NAMESPACE> delete tenantnetwork <NAME>
 Delete every `TenantNetwork` first, while the operator runs. Then:
 
 ```bash
-helm uninstall panfs-tenant-network --namespace panfs-tenant-network
+helm uninstall panfs-tenant-network-operator --namespace panfs-tenant-network
 kubectl delete crd tenantnetworks.panfs.vdura.com
 ```
 

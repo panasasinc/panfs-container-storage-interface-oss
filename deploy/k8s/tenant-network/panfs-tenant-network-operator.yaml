@@ -165,10 +165,10 @@ spec:
 apiVersion: v1
 kind: ServiceAccount
 metadata:
-  name: panfs-tenant-network
+  name: panfs-tenant-network-operator
   namespace: panfs-tenant-network
   labels:
-    app: panfs-tenant-network
+    app: panfs-tenant-network-operator
     product: com.vdura.csi.panfs
 
 ---
@@ -180,9 +180,9 @@ metadata:
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: panfs-tenant-network-panfs-tenant-network-node
+  name: panfs-tenant-network-panfs-tenant-network-operator-node
   labels:
-    app: panfs-tenant-network
+    app: panfs-tenant-network-operator
     product: com.vdura.csi.panfs
 rules:
   - apiGroups: [""]
@@ -197,9 +197,9 @@ rules:
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: panfs-tenant-network-panfs-tenant-network
+  name: panfs-tenant-network-panfs-tenant-network-operator
   labels:
-    app: panfs-tenant-network
+    app: panfs-tenant-network-operator
     product: com.vdura.csi.panfs
 rules:
   # Read the TenantNetworks, hold them with a finalizer, and report their status
@@ -244,7 +244,7 @@ rules:
   # Allow binding the ClusterRole of the node pods, and nothing else
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterroles"]
-    resourceNames: ["panfs-tenant-network-panfs-tenant-network-node"]
+    resourceNames: ["panfs-tenant-network-panfs-tenant-network-operator-node"]
     verbs: ["bind"]
 
 ---
@@ -255,31 +255,32 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: panfs-tenant-network-panfs-tenant-network
+  name: panfs-tenant-network-panfs-tenant-network-operator
   labels:
-    app: panfs-tenant-network
+    app: panfs-tenant-network-operator
     product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
-    name: panfs-tenant-network
+    name: panfs-tenant-network-operator
     namespace: panfs-tenant-network
 roleRef:
   kind: ClusterRole
-  name: panfs-tenant-network-panfs-tenant-network
+  name: panfs-tenant-network-panfs-tenant-network-operator
   apiGroup: rbac.authorization.k8s.io
 
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# The PanFS Tenant Network operator: it creates one DaemonSet of node pods for every TenantNetwork
+# Deployment of the PanFS Tenant Network operator: one pod that watches the TenantNetwork resources.
+# The operator itself creates the node pods later, as one DaemonSet per TenantNetwork, in the namespace of that resource.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: panfs-tenant-network
+  name: panfs-tenant-network-operator
   namespace: panfs-tenant-network
   labels:
-    app: panfs-tenant-network
+    app: panfs-tenant-network-operator
     product: com.vdura.csi.panfs
 spec:
   replicas: 1
@@ -290,16 +291,16 @@ spec:
 
   selector:
     matchLabels:
-      app: panfs-tenant-network
+      app: panfs-tenant-network-operator
 
   template:
     metadata:
       labels:
-        app: panfs-tenant-network
+        app: panfs-tenant-network-operator
         product: com.vdura.csi.panfs
 
     spec:
-      serviceAccountName: panfs-tenant-network
+      serviceAccountName: panfs-tenant-network-operator
 
       containers:
         - name: operator
@@ -311,7 +312,7 @@ spec:
             - "--resync=15s"
             - "--node-image-pull-policy=IfNotPresent"
             - "--node-image-pull-secrets="
-            - "--node-cluster-role=panfs-tenant-network-panfs-tenant-network-node"
+            - "--node-cluster-role=panfs-tenant-network-panfs-tenant-network-operator-node"
             - "--node-priority-class="
             - "--interval=30s"
             - "--firewalld-zone=trusted"

@@ -16,7 +16,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# The PanFS Tenant Network operator: it creates one DaemonSet of node pods for every TenantNetwork
+# Deployment of the PanFS Tenant Network operator: one pod that watches the TenantNetwork resources.
+# The operator itself creates the node pods later, as one DaemonSet per TenantNetwork, in the namespace of that resource.
 apiVersion: apps/v1
 kind: Deployment
 metadata:

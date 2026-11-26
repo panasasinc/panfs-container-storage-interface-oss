@@ -2,9 +2,9 @@ The PanFS Tenant Network operator is installed in namespace {{ .Release.Namespac
 
 Next steps for a tenant:
 
-1. Label the nodes of the tenant:
+1. Label the nodes of the tenant, with a label of your choice:
 
-   kubectl label node <NODE_NAME> panfs.vdura.com/tenant=<TENANT>
+   kubectl label node <NODE_NAME> <LABEL_KEY>=<LABEL_VALUE>
 
 2. Create a TenantNetwork in the namespace of the Secret that holds the PanAPI address and the token of the tenant:
 
@@ -16,7 +16,7 @@ Next steps for a tenant:
    spec:
      secretName: <SECRET_NAME>
      nodeSelector:
-       panfs.vdura.com/tenant: <TENANT>
+       <LABEL_KEY>: <LABEL_VALUE>
 
    Without nodeSelector, all nodes of the cluster are put on the tenant network.
 
