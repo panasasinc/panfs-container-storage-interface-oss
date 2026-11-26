@@ -430,6 +430,24 @@ helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
     --set nodeSelector.<LABEL_KEY>=<LABEL_VALUE>
 ```
 
+With an `https://` address, the operator and the node pods check the certificate of the realm. For a certificate
+that is signed by a private CA, add `--set-file realm.caCert=ca.pem`. For a test realm whose certificate cannot be
+verified at all, the `TenantNetwork` shows the phase `Error` with the reason, and you can switch the check off:
+
+```bash
+helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
+    --namespace <TENANT_NAMESPACE> \
+    --create-namespace \
+    --set realm.api=https://<PANAPI_ADDRESS> \
+    --set realm.token=<TOKEN> \
+    --set realm.insecureSkipTLSVerify=true \
+    --set nodeSelector.<LABEL_KEY>=<LABEL_VALUE>
+```
+
+> **Warning:** with `realm.insecureSkipTLSVerify=true` the connection is still encrypted, but a host that poses
+> as the realm can read the token. Do not use it in production; see
+> [Realm with a certificate that the cluster does not trust](./charts/tenant/Readme.md#realm-with-a-certificate-that-the-cluster-does-not-trust).
+
 The requirements (Calico setting, namespace, token permissions), the VXLAN and VLAN segment types, the status
 and the events are described in the [operator documentation](./charts/tenant-network-operator/Readme.md).
 
