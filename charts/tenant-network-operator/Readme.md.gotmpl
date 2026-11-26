@@ -111,10 +111,13 @@ The operator does not create the Secret.
 - **Tenant namespace:** the namespace of a `TenantNetwork` must allow pods that use the host network and a `hostPath` volume
   (Pod Security level `privileged`). The namespace of the operator has no such need.
 - **One node, one tenant:** a node can be on the network of one tenant only, so a node must match the `nodeSelector`
-  of one `TenantNetwork` only. The operator does not check this.
-- **One `TenantNetwork` per tenant and per namespace:** the operator serves a tenant through the oldest `TenantNetwork`
-  of that tenant, and a namespace holds one `TenantNetwork`, because its name is the value of the ready label.
-  The operator reports an error on every other one.
+  of one `TenantNetwork` only. The operator does not check this. Two resources that select the same node,
+  for example two without a `nodeSelector`, overwrite the ready label of each other on that node.
+- **The interface name is reserved:** the tenant interface is `vxlan<VNI>` or `vlan<VLAN id>`. A node must not
+  have another interface with that name: the node pod would change it to match the tenant, or remove it.
+- **One `TenantNetwork` per tenant and per namespace:** a namespace holds one `TenantNetwork`, because its name
+  is the value of the ready label, and a tenant is served by one `TenantNetwork`. The one that runs its node pods
+  keeps the tenant; without a running one, the oldest gets it. The operator reports an error on every other one.
 - **Calico:** with `IP_AUTODETECTION_METHOD` left at its default, Calico can move a node to its new tenant address,
   and the BGP sessions between the nodes then fail. Pin Calico to the node address before you label the first node:
 
@@ -145,12 +148,25 @@ its interface is built, but no director answers, and the node stays `NotReady`.
 > **Note:** VLAN segments are covered by unit tests and by a check of the interface commands on a node.
 > They are not yet validated against a realm that uses VLAN segments.
 
-### Access of the operator to Secrets
+### Security
 
-The operator must read the Secret of every `TenantNetwork`, in any namespace, so its `ClusterRole` allows `get` on Secrets
-in the whole cluster. It cannot list Secrets, and it reads only the Secrets that a `TenantNetwork` names.
-Consider this when several teams share the cluster: who may create a `TenantNetwork` in a namespace
-can make the operator use a Secret of that namespace.
+Treat the operator and the node pods as trusted, cluster-wide components. Who may create a `TenantNetwork`
+in a namespace gets their effect on the selected nodes.
+
+- **The node pods are equal to root on their node.** The container is not marked privileged, and it drops all
+  capabilities except `NET_ADMIN` and `NET_RAW`. But it uses the host network, it runs as root, and it reaches
+  the system D-Bus of the node to set the firewalld zone; root on that bus can ask systemd to run commands.
+  This is why the namespace of a `TenantNetwork` needs the Pod Security level `privileged`.
+- **The node pods can change any node.** Their ServiceAccount may read and patch every node of the cluster,
+  not only its own, because Kubernetes cannot limit this permission to one node or to one label.
+- **The operator reads Secrets in every namespace.** Its `ClusterRole` allows `get` on Secrets in the whole
+  cluster, because a `TenantNetwork` can be in any namespace. It cannot list Secrets, and it reads only the Secrets
+  that a `TenantNetwork` names. Who may create a `TenantNetwork` in a namespace can make the operator use
+  a Secret of that namespace.
+- **The operator creates workloads in every namespace.** It may create DaemonSets, ServiceAccounts, Roles and
+  RoleBindings wherever a `TenantNetwork` is, and it may create and delete ClusterRoleBindings.
+- **The firewalld zone `trusted` opens the node to the tenant network.** Every port of the node is then reachable
+  from the tenant subnet. Use another zone with `firewalldZone` to narrow this.
 
 ## Usage
 
@@ -345,6 +361,11 @@ kubectl -n <NAMESPACE> delete tenantnetwork <NAME>
 The delete waits until the operator has removed the DaemonSet and every pod has cleaned up its node:
 the ready label, the tenant interface, and the attachment in the realm are gone afterwards.
 
+Delete the `TenantNetwork` before you delete its namespace or its Secret. When the whole namespace is deleted
+at once, the pods can lose their permissions before they have cleaned up; the ready label, the interface
+and the attachment of a node can then stay behind. A node is detached only when its pod can see for certain
+that the node left the tenant.
+
 To keep the interfaces and the attachments, set `detachOnRemoval` to `false` before you delete:
 
 ```bash
@@ -365,7 +386,9 @@ kubectl delete crd tenantnetworks.panfs.vdura.com
 Helm does not remove or upgrade a `CustomResourceDefinition`, so the last command is yours.
 After an upgrade of the chart, apply the new definition by hand: `kubectl apply -f crds/tenantnetwork.yaml`.
 
-Without the operator, the existing node pods keep working, but a `TenantNetwork` cannot be deleted: it waits for the operator.
+Do not uninstall the operator while a `TenantNetwork` exists. The uninstall removes the `ClusterRole` of the node pods,
+so the pods can no longer set or remove the ready label; the interfaces and the attachments stay as they are.
+A `TenantNetwork` also cannot be deleted then: it waits for the operator.
 If the operator is gone for good, clean up by hand:
 
 ```bash
