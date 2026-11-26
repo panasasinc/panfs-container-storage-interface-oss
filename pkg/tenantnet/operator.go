@@ -473,6 +473,9 @@ func (o *Operator) remove(ctx context.Context, item *unstructured.Unstructured, 
 		if err := o.cleanNode(ctx, &left.Items[i], true, true); err != nil {
 			return err
 		}
+		// The log too: in a namespace that is being deleted, the event cannot be written.
+		log.Info("removed a label that the pod of the node left behind", "node", left.Items[i].Name,
+			"label", ReadyLabelKey+"="+namespace)
 		o.events(item).Event(ctx, corev1.EventTypeNormal, ReasonNodeLabelRemoved, fmt.Sprintf(
 			"Node %s: its pod left the label %s=%s behind; the operator removed it",
 			left.Items[i].Name, ReadyLabelKey, namespace))
