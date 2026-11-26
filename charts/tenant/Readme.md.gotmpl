@@ -103,6 +103,25 @@ helm upgrade --install acme ./ \
     --set existingSecret=acme-credentials
 ```
 
+Another way is to use the chart only as a template and apply its output yourself. Helm then stores nothing,
+because there is no release:
+
+```bash
+kubectl create namespace acme
+
+helm template acme ./ \
+    --namespace acme \
+    --api-versions panfs.vdura.com/v1alpha1/TenantNetwork \
+    --set realm.api=<PANAPI_ADDRESS> \
+    --set realm.token=<TOKEN> | kubectl apply -f -
+```
+
+`--api-versions` is needed because `helm template` does not ask the cluster; see
+[Rendering the chart without a cluster](#rendering-the-chart-without-a-cluster). So the check for the operator
+does not run here: without the operator, `kubectl apply` refuses the `TenantNetwork` itself.
+`helm list`, `helm upgrade` and `helm uninstall` do not know this tenant. To change it, run the command again;
+to remove it, send the same output to `kubectl delete -f -`.
+
 ### 2. Check the result
 
 ```bash
