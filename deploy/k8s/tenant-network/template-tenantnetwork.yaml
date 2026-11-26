@@ -1,0 +1,20 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Ask the PanFS Tenant Network operator to put the nodes of one tenant on the tenant network.
+# The operator reads the tenant from the token in the Secret, and it runs a pod on every node that nodeSelector selects.
+# A pod sets the label panfs.vdura.com/tenant-network=<TENANT_NAMESPACE> on its node when the network works.
+#
+# A PanFS StorageClass Helm release with the value `tenant` creates the Secret and this resource for you.
+apiVersion: panfs.vdura.com/v1alpha1
+kind: TenantNetwork
+metadata:
+  name: <NAME>
+  namespace: <TENANT_NAMESPACE>
+spec:
+  # Secret in the same namespace with the keys api and token: PanAPI address and token of the tenant
+  secretName: <SECRET_NAME>
+
+  # The nodes of the tenant. Remove nodeSelector to use all nodes of the cluster.
+  nodeSelector:
+    panfs.vdura.com/tenant: <TENANT>
