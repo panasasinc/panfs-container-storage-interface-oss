@@ -13,7 +13,7 @@ For more details on specific topics, refer to the following documents:
 |:---------|:------------|
 | [Overview](./docs/Overview.md) | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow |
 | [Usage Guide](./docs/Usage-Guide.md) | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples |
-| [Tenant Network](./charts/tenant-network/Readme.md) | Putting worker nodes on the network of a PanFS tenant, and marking the nodes that are ready |
+| [Tenant Network](./charts/tenant-network-operator/Readme.md) | Putting worker nodes on the network of a PanFS tenant, and marking the nodes that are ready |
 | [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
 | [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
 | [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
@@ -160,7 +160,7 @@ The driver talks to the realm through PanAPI. It does not use SSH.
 - **Tenant network**: A volume of a tenant is reachable only from the network of that tenant.
   Every worker node must be attached to that network before it mounts a volume.
   The driver finds the mount address of the network, but it does not attach the nodes.
-  The [PanFS Tenant Network operator](./charts/tenant-network/Readme.md) attaches the nodes that you label for the tenant,
+  The [PanFS Tenant Network operator](./charts/tenant-network-operator/Readme.md) attaches the nodes that you label for the tenant,
   and it marks the nodes that are ready; see [Tenant network](#4-put-the-nodes-on-the-tenant-network).
   It needs these permissions too: list, read, create and delete attachments of a subnet.
 
@@ -358,8 +358,11 @@ kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
 
 A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`: the value is the namespace of the `TenantNetwork`.
 
+With Helm, step 3 is one release of the [PanFS Tenant chart](./charts/tenant/Readme.md), which creates the Secret
+and the `TenantNetwork`.
+
 The requirements (Calico setting, namespace, token permissions), the Helm installation, and the way to keep workloads
-on the ready nodes are described in the [operator documentation](./charts/tenant-network/Readme.md).
+on the ready nodes are described in the [operator documentation](./charts/tenant-network-operator/Readme.md).
 
 ## Deploying Workloads
 

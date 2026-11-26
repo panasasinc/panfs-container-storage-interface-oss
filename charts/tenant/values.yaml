@@ -1,0 +1,56 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# PanFS Realm API (PanAPI) connection of the tenant
+realm:
+  # -- PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL.
+  api: ""
+  # -- PanAPI service account token of the tenant
+  token: ""
+  # -- Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store.
+  caCert: ""
+  # -- Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified:
+  # a host that poses as the realm can then read the token. Prefer `realm.caCert`.
+  insecureSkipTLSVerify: false
+
+# -- Name of an existing Secret in the release namespace with the keys `api` and `token`, and optionally `ca_cert`.
+# When it is set, the chart creates no Secret and `realm` is not used. Use it to keep the token out of the Helm values.
+existingSecret: ""
+
+# -- Labels that select the nodes of the tenant. Without them, all nodes of the cluster are put on the tenant network.
+nodeSelector: {}
+  # storage-network: acme
+
+# -- Only for a realm that places subnets on VLAN segments: the interface of the nodes that carries the VLAN.
+# Leave it empty to use the default of the operator: the interface with the underlay address of the node.
+vlanParentInterface: ""
+
+# -- Time between two checks of the tenant network on a node, for example `30s`.
+# Leave it empty to use the default of the operator.
+interval: ""
+
+# -- firewalld zone of the tenant interface on nodes that run firewalld; an empty string leaves firewalld alone.
+# Leave it unset (`null`) to use the default of the operator.
+# @default -- `null`
+firewalldZone:
+
+# -- Whether a pod removes the tenant interface and detaches its node from the subnet when the node leaves the tenant.
+# Leave it unset (`null`) to use the default of the operator.
+# @default -- `null`
+detachOnRemoval:
+
+# -- Stop the install when the PanFS Tenant Network operator is not installed in the cluster.
+# Set it to `false` for tools that render the chart without a cluster and cannot pass
+# `--api-versions panfs.vdura.com/v1alpha1/TenantNetwork`, for example `helm lint`.
+checkOperator: true

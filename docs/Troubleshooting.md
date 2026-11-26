@@ -340,7 +340,7 @@ kubectl get secret -n $NAMESPACE $SECRET_NAME
   kubectl debug node/<node-name> -it --image=nicolaka/netshoot -- ping -c 3 <mount-address>
   ```
   - If the address does not answer, attach the node to the network of the tenant. The driver does not do this;
-    the [PanFS Tenant Network operator](../charts/tenant-network/Readme.md) does.
+    the [PanFS Tenant Network operator](../charts/tenant-network-operator/Readme.md) does.
     With the operator, check the resource of the tenant; its status lists the nodes, and its events say what happened:
     ```bash
     kubectl get tenantnetworks -A -o wide

@@ -1,0 +1,69 @@
+{{/*
+  # Copyright 2025 VDURA Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+*/}}
+{{- /*
+  A TenantNetwork can be created only when the PanFS Tenant Network operator has installed its resource definition.
+  Stop here with a clear message, before anything is created. "helm template" has no cluster: pass
+  --api-versions panfs.vdura.com/v1alpha1/TenantNetwork there. "helm lint" cannot take that flag: set checkOperator=false.
+*/}}
+{{- if and .Values.checkOperator (not (.Capabilities.APIVersions.Has "panfs.vdura.com/v1alpha1/TenantNetwork")) }}
+{{- fail "The PanFS Tenant Network operator is not installed in this cluster: the resource kind TenantNetwork (panfs.vdura.com/v1alpha1) is unknown. Install the chart panfs-tenant-network-operator first. To render the chart without a cluster, pass --api-versions panfs.vdura.com/v1alpha1/TenantNetwork or set checkOperator=false." }}
+{{- end }}
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Ask the PanFS Tenant Network operator to put the nodes of the tenant on the tenant network.
+# The operator reads the tenant from the token in the Secret, and it runs a pod on every selected node.
+# A pod sets the label panfs.vdura.com/tenant-network={{ .Release.Namespace }} on its node when the network works.
+apiVersion: panfs.vdura.com/v1alpha1
+kind: TenantNetwork
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+spec:
+  # Secret with the PanAPI address and the token of the tenant
+  realmSecretName: {{ .Values.existingSecret | default .Release.Name }}
+  {{- if .Values.nodeSelector }}
+
+  # The nodes of the tenant
+  nodeSelector:
+    {{- toYaml .Values.nodeSelector | nindent 4 }}
+  {{- else }}
+
+  # No nodeSelector: all nodes of the cluster
+  {{- end }}
+  {{- if .Values.vlanParentInterface }}
+
+  # Interface of the nodes that carries the VLAN, on a VLAN segment
+  vlanParentInterface: {{ .Values.vlanParentInterface | quote }}
+  {{- end }}
+  {{- if .Values.interval }}
+
+  # Time between two checks of the tenant network on a node
+  interval: {{ .Values.interval | quote }}
+  {{- end }}
+  {{- if not (kindIs "invalid" .Values.firewalldZone) }}
+
+  # firewalld zone of the tenant interface; an empty string leaves firewalld alone
+  firewalldZone: {{ .Values.firewalldZone | quote }}
+  {{- end }}
+  {{- if not (kindIs "invalid" .Values.detachOnRemoval) }}
+
+  # Whether a node that leaves the tenant is detached from the subnet
+  detachOnRemoval: {{ .Values.detachOnRemoval }}
+  {{- end }}

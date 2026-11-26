@@ -158,4 +158,4 @@ The delete waits until every pod has cleaned up its node:
 kubectl delete -f tenant-network/template-tenantnetwork.yaml
 ```
 
-The requirements and the details are in the [operator documentation](../../charts/tenant-network/Readme.md).
+The requirements and the details are in the [operator documentation](../../charts/tenant-network-operator/Readme.md).

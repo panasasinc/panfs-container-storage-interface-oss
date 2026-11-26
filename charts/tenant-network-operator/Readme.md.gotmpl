@@ -14,7 +14,7 @@
   # limitations under the License.
 -->
 
-# panfs-tenant-network
+# panfs-tenant-network-operator
 
 {{ template "chart.description" . }}
 
@@ -213,7 +213,10 @@ spec:
 EOF
 ```
 
-The Secret of a [PanFS StorageClass](../storageclass/Readme.md) release has the keys that the operator needs.
+With Helm, the [PanFS Tenant chart](../tenant/Readme.md) does this step in one release: it creates the Secret
+and the `TenantNetwork`, and it checks first that this operator is installed.
+
+The Secret of a [PanFS StorageClass](../storageclass/Readme.md) release has the keys that the operator needs too.
 To use it, create the `TenantNetwork` in the namespace of that release and name its Secret; the Secret has the name of the release.
 
 Fields of `spec`:

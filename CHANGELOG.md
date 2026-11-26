@@ -34,7 +34,7 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 
 ### Added
 
-- PanFS Tenant Network operator: the new chart `charts/tenant-network`, the manifests in `deploy/k8s/tenant-network`,
+- PanFS Tenant Network operator: the new chart `charts/tenant-network-operator`, the manifests in `deploy/k8s/tenant-network`,
   and the image `panfs-tenant-network`. Install it once per cluster. A `TenantNetwork` resource names the Secret
   of a tenant and selects its nodes; the operator reads the tenant of the token from PanAPI and runs a pod on every
   selected node. A pod attaches its node to the subnet of the tenant through PanAPI, builds the tenant interface,
@@ -43,7 +43,9 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
   the pod removes the interface and detaches the node. The pod builds a VXLAN or a VLAN interface, as the realm
   reports the segment type of the subnet. The status of the resource lists the nodes,
   and the operator and the pods report changes as events on it.
-  See the [operator documentation](charts/tenant-network/Readme.md).
+  See the [operator documentation](charts/tenant-network-operator/Readme.md).
+- PanFS Tenant chart (`charts/tenant`): one Helm release per tenant with the Secret of the realm connection
+  and the `TenantNetwork`. It checks that the PanFS Tenant Network operator is installed before it creates anything.
 - The `Makefile` targets `build-tenant-network-image` and `manifest-tenant-network`.
 - The controller reads the mount address (`rmlist`) of the tenant network from PanAPI and passes it to the node.
   The node mounts `panfs://<first address>/<volume>` with the mount option `rmlist=(...)`.

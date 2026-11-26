@@ -426,7 +426,7 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 manifest-tenant-network: ## Generate manifests for the PanFS Tenant Network
 	@printf "$(BOLD)Generating manifests for the PanFS Tenant Network...$(RESET)\n"
 	@mkdir -p deploy/k8s/tenant-network/
-	helm template panfs-tenant-network-operator charts/tenant-network --include-crds \
+	helm template panfs-tenant-network-operator charts/tenant-network-operator --include-crds \
 		--namespace panfs-tenant-network | \
 		grep -v '^# Source:' > deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
 	@printf "$(GREEN)Successfully generated manifests for the PanFS Tenant Network$(RESET)\n\n"

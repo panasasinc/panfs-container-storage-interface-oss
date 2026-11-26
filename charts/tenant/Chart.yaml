@@ -14,7 +14,7 @@
 
 # Chart.yaml
 apiVersion: v2
-name: panfs-tenant-network
-description: PanFS Tenant Network Chart
+name: panfs-tenant
+description: PanFS Tenant Chart
 version: "2.0.0"
 appVersion: "2.0.0"

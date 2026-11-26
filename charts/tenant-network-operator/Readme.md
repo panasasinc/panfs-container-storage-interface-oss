@@ -14,9 +14,9 @@
   # limitations under the License.
 -->
 
-# panfs-tenant-network
+# panfs-tenant-network-operator
 
-PanFS Tenant Network Chart
+PanFS Tenant Network Operator Chart
 
 ![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![AppVersion: 2.0.0](https://img.shields.io/badge/AppVersion-2.0.0-informational?style=flat-square)
 
@@ -213,7 +213,10 @@ spec:
 EOF
 ```
 
-The Secret of a [PanFS StorageClass](../storageclass/Readme.md) release has the keys that the operator needs.
+With Helm, the [PanFS Tenant chart](../tenant/Readme.md) does this step in one release: it creates the Secret
+and the `TenantNetwork`, and it checks first that this operator is installed.
+
+The Secret of a [PanFS StorageClass](../storageclass/Readme.md) release has the keys that the operator needs too.
 To use it, create the `TenantNetwork` in the namespace of that release and name its Secret; the Secret has the name of the release.
 
 Fields of `spec`:
