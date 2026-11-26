@@ -93,6 +93,42 @@ helm upgrade --install acme ./ \
     --values overrides.yaml
 ```
 
+#### Realm with a certificate that the cluster does not trust
+
+When `realm.api` is an `https://` address, the operator and the node pods check the certificate of the realm.
+The check needs two things: the issuer must be trusted, and the certificate must name the address of the realm
+as a subject alternative name.
+
+If the certificate is signed by a private CA, give the chart the certificate of that CA:
+
+```bash
+helm upgrade --install acme ./ \
+    --namespace acme \
+    --create-namespace \
+    --set realm.api=https://<PANAPI_ADDRESS> \
+    --set realm.token=<TOKEN> \
+    --set-file realm.caCert=ca.pem
+```
+
+If the certificate cannot be verified at all, for example because it has no subject alternative name,
+the `TenantNetwork` shows the phase `Error` with a message like
+`x509: certificate relies on legacy Common Name field, use SANs instead`.
+For a test realm you can switch the check off:
+
+```bash
+helm upgrade --install acme ./ \
+    --namespace acme \
+    --create-namespace \
+    --set realm.api=https://<PANAPI_ADDRESS> \
+    --set realm.token=<TOKEN> \
+    --set realm.insecureSkipTLSVerify=true \
+    --set nodeSelector.storage-network=acme
+```
+
+> **Warning:** with `realm.insecureSkipTLSVerify=true` the connection is still encrypted, but a host that poses
+> as the realm can read the token. The operator and the node pods log a warning on every start.
+> Do not use it in production; give the realm a certificate that can be verified.
+
 #### Keeping the token out of the Helm values
 
 Helm stores the values of a release in the cluster. To keep the token out of them, create the Secret yourself
