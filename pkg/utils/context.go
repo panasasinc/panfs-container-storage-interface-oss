@@ -21,29 +21,43 @@ import (
 // VendorPrefix for PanFS CSI Driver
 const VendorPrefix = "panfs.csi.vdura.com/"
 
-// VolumeParametersData defines structure for volume parameters data
-type VolumeParametersData map[string]string
+// VolumeNameContextKey is the volume context key that carries the volume name from the controller to the node.
+// The CSI volume ID is the PanAPI volume id, while the node mounts the volume by name.
+const VolumeNameContextKey = VendorPrefix + "volume-name"
 
-// VolumeParameters holds supported volume provisioning context parameters
+// MountAddressContextKey is the volume context key that carries the rmlist: the addresses the node mounts the
+// volume from. The controller reads it from PanAPI (the mount recipe of the tenant subnet) when it creates
+// the volume. The node mounts from the first address and passes the list as the rmlist mount option.
+// Without the key, the node mounts from the host of the PanAPI address.
+const MountAddressContextKey = VendorPrefix + "rmlist"
+
+// VolumeParametersData is the set of known StorageClass parameter names, without the vendor prefix.
+type VolumeParametersData map[string]struct{}
+
+// VolumeParameters holds the known StorageClass parameters.
+// It also lists the parameters of earlier driver versions that the driver now rejects,
+// so that a request carrying one of them gets a clear error.
 var VolumeParameters = VolumeParametersData{
-	"description": `description "%s"`,
-	"storageset":  `storageset "%s"`,
-	"recovery":    "recoverypriority %s",
-	"efsa":        "efsa %s",
-	"volservice":  "volservice %s",
-	"layout":      "layout %s",
-	"maxwidth":    "maxwidth %s",
-	"stripeunit":  "stripeunit %s",
-	"rgwidth":     "rgwidth %s",
-	"rgdepth":     "rgdepth %s",
-	"user":        `user "%s"`,
-	"group":       `group "%s"`,
-	"uperm":       "uperm %s",
-	"gperm":       "gperm %s",
-	"operm":       "operm %s",
-	"encryption":  "encryption %s",
-	"soft":        "soft %v", // softQuotaGB
-	"hard":        "hard %v", // hardQuotaGB
+	// storageset is the id or the name of the storageset that holds new volumes; it is optional.
+	"storageset":       {},
+	"recoverypriority": {},
+	"efsa":             {},
+	"volservice":       {},
+	"layout":           {},
+	"maxwidth":         {},
+	"stripeunit":       {},
+	"rgwidth":          {},
+	"rgdepth":          {},
+	"user":             {},
+	"group":            {},
+	"uperm":            {},
+	"gperm":            {},
+	"operm":            {},
+
+	// Rejected parameters of earlier driver versions.
+	"description": {},
+	"recovery":    {},
+	"encryption":  {},
 }
 
 // GetSCKey retrieves the storage class parameter key for a given context parameter key
@@ -56,28 +70,15 @@ func (c VolumeParametersData) GetSCKey(k string) string {
 	return ""
 }
 
-// GetFmt retrieves the formatting string for a given context parameter key
-func (c VolumeParametersData) GetFmt(k string) string {
-	short := strings.TrimPrefix(c.GetSCKey(k), VendorPrefix)
-	if value, ok := c[short]; ok {
-		return value
-	}
-	return ""
-}
-
 // RealmConnectionContext holds supported realm connection context parameters
 var RealmConnectionContext = struct {
-	RealmAddress         string
-	Username             string
-	Password             string
-	PrivateKey           string
-	PrivateKeyPassphrase string
-	KMIPConfigData       string
+	API                   string
+	Token                 string
+	CACert                string
+	InsecureSkipTLSVerify string
 }{
-	RealmAddress:         "realm_ip",
-	Username:             "user",
-	Password:             "password",
-	PrivateKey:           "private_key",
-	PrivateKeyPassphrase: "private_key_passphrase",
-	KMIPConfigData:       "kmip_config_data",
+	API:                   "api",
+	Token:                 "token",
+	CACert:                "ca_cert",
+	InsecureSkipTLSVerify: "insecure_skip_tls_verify",
 }

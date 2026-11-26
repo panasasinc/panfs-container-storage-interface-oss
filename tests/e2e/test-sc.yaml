@@ -12,3 +12,7 @@ parameters:
   csi.storage.k8s.io/node-publish-secret-namespace: csi-panfs-storage-class
   csi.storage.k8s.io/provisioner-secret-name: csi-panfs-storage-class
   csi.storage.k8s.io/provisioner-secret-namespace: csi-panfs-storage-class
+
+  # Storageset that holds the test volumes: its id or its name.
+  # Remove the line to use the first storageset that is assigned to the tenant of the service account token.
+  panfs.csi.vdura.com/storageset: "1"

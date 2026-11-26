@@ -18,19 +18,31 @@
 
 PanFS Realm Storage Class Chart
 
-![Version: 1.2.6](https://img.shields.io/badge/Version-1.2.6-informational?style=flat-square) ![AppVersion: 1.2.6](https://img.shields.io/badge/AppVersion-1.2.6-informational?style=flat-square)
+![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![AppVersion: 2.0.0](https://img.shields.io/badge/AppVersion-2.0.0-informational?style=flat-square)
 
 ## What PanFS CSI StorageClass is
 
-The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource that leverages the PanFS Container Storage Interface (CSI) driver to provision and manage persistent storage volumes on a PanFS backend. The chart enables you to configure parameters such as the PanFS realm endpoint, authentication credentials, and volume options.
+The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource that leverages the PanFS Container Storage Interface (CSI) driver to provision and manage persistent storage volumes on a PanFS backend. The chart enables you to configure parameters such as the PanFS realm API address, the service account token, and volume options.
 
 > **Note:** Installation into the `default` namespace is not permitted. You must specify a non-default namespace using the `--namespace <namespace>` option during installation.
 
 ### Resources Created by the Helm Chart
 
 - A `StorageClass` resource that uses the PanFS CSI driver to provision and manage persistent storage volumes on a PanFS backend.
-- A `Secret` resource containing PanFS realm credentials (address, username, password, and private key).
+- A `Secret` resource containing the PanFS realm API address and the service account token.
 - If the PanFS realm credentials secret resides in a different namespace than the PanFS CSI driver, the chart creates a `Role` and `RoleBinding` to allow the CSI driver to access the secret.
+
+## Requirements on the PanFS realm
+
+- `realm.api` is the PanAPI address of the realm, and `realm.token` is the token of a PanAPI service account.
+- A storageset must be assigned to the tenant of the token.
+- The token needs these permissions for its own tenant: read the tenant and its storageset assignments;
+  list, read, create, update and delete volumes; list the subnets and read the mount recipe of a subnet.
+- The worker nodes must be attached to the network of the tenant. The driver does not attach them.
+- If the realm certificate is signed by a private CA, set `realm.caCert` to the PEM certificate of that CA,
+  for example with `--set-file realm.caCert=ca.pem`. For a self-signed certificate, use that certificate itself.
+- For a test realm whose certificate cannot be verified, set `realm.insecureSkipTLSVerify=true`.
+  The driver then does not verify the realm certificate, so a host that poses as the realm can read the token.
 
 ## Usage
 
@@ -49,9 +61,9 @@ PANFS_CSI_DRIVER_NAMESPACE="$(kubectl get csidrivers.storage.k8s.io com.vdura.cs
 # Installing chart into PanFS CSI Driver namespace
 helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --namespace "${PANFS_CSI_DRIVER_NAMESPACE}" \
-    --set realm.address=panfs-realm.example.com \
-    --set realm.username=username \
-    --set realm.password=password
+    --set realm.api=panfs-realm.example.com \
+    --set realm.token="<service account token>" \
+    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1'
 ```
 
 > Note: The `--create-namespace` flag is not required when installing in an existing namespace.
@@ -62,9 +74,11 @@ You can also use a YAML file to provide the necessary overrides. Below is an exa
 ```yaml
 # overrides.yaml
 realm:
-  address: "panfs-realm.example.com"
-  username: "username"
-  password: "password"
+  api: "panfs-realm.example.com"
+  token: "<service account token>"
+
+parameters:
+  panfs.csi.vdura.com/storageset: "1"
 ```
 
 Install the chart using the overrides file:
@@ -86,9 +100,9 @@ helm upgrade --install <STORAGE_CLASS_NAME> ./ \
     --namespace <REALM_SECRET_NAMESPACE> \
     --create-namespace \
     --set setAsDefaultStorageClass="true" \
-    --set realm.address="panfs-realm.example.com" \
-    --set realm.username="username" \
-    --set realm.password="password" \
+    --set realm.api="panfs-realm.example.com" \
+    --set realm.token="<service account token>" \
+    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1' \
     --set csiPanFSDriver.namespace="${PANFS_CSI_DRIVER_NAMESPACE}"
 ```
 
@@ -104,9 +118,11 @@ You can also use a YAML file to provide the necessary overrides. Below is an exa
 ```yaml
 # overrides.yaml
 realm:
-  address: "panfs-realm.example.com"
-  username: "username"
-  password: "password"
+  api: "panfs-realm.example.com"
+  token: "<service account token>"
+
+parameters:
+  panfs.csi.vdura.com/storageset: "1"
 
 setAsDefaultStorageClass: "true"
 
@@ -196,9 +212,7 @@ If you encounter errors when creating or running workload Pods, follow these ste
   # Checking the secret content
   # If you installed the chart in a dedicated namespace, the secret name, its namespace, and the StorageClass name will match the chart release name.
   # If you installed the chart in the same namespace as the CSI driver, the secret name and StorageClass name will match the chart release name, and the secret will reside in the CSI driver's namespace.
-  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.realm_ip}' | base64 -d
-  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.user}' | base64 -d
-  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.password}' | base64 -d
+  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.api}' | base64 -d
   ```
 - Check the logs of the CSI driver:
   - For controller issues (volume provisioning), review the controller logs:
@@ -229,36 +243,36 @@ helm uninstall <STORAGE_CLASS_NAME> \
 | allowedTopologies | object | `{}` | Allowed topologies for volume provisioning This can be used to restrict volume provisioning to specific nodes or zones based on node labels. Uncomment and modify the example below as needed. If left empty, no topology constraints will be applied. |
 | csiPanFSDriver.namespace | string | `"csi-panfs"` | Namespace where the PanFS CSI driver is deployed |
 | mountOptions | list | `[]` |  |
-| parameters | object | `{...}` | Optional storage class parameters |
-| realm.address | string | `""` | Endpoint address for the backend PanFS realm |
-| realm.kmipConfigData | string | `""` | KMIP configuration data for volume encryption key management |
-| realm.password | string | `""` | Password for the PanFS backend realm |
-| realm.privateKey | string | `""` | Private key for the PanFS backend realm |
-| realm.privateKeyPassphrase | string | `""` | Private Key Passphrase |
-| realm.username | string | `""` | Username for the PanFS backend realm |
+| parameters | object | `{...}` | Storage class parameters. All of them are optional; a parameter with an empty value is left out. |
+| realm.api | string | `""` | PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL. The nodes mount volumes from the host of this address, unless PanAPI names another mount address for the tenant. |
+| realm.caCert | string | `""` | Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store. |
+| realm.insecureSkipTLSVerify | bool | `false` | Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified: a host that poses as the realm can then read the token. Prefer `realm.caCert`. |
+| realm.token | string | `""` | PanAPI service account token. Its tenant must have a storageset assigned. |
 | setAsDefaultStorageClass | bool | `false` | Whether to set this storage class as the default for the cluster |
 | volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |
 | volumeReclaimPolicy | string | `Delete` | Default reclaim policy for volumes |
 
-### PanFS Specific Volume Parameters (see PanCLI User Guide for the details)
+### PanFS Specific Volume Parameters
 
-Refer to the PanCLI User Guide for details on the following parameters:
+The driver passes the following parameters to the realm when it creates a volume:
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| parameters."panfs.csi.vdura.com/storageset" | string | `"Set 1"` | Name of the storageset to use for realm volumes |
+| parameters."panfs.csi.vdura.com/storageset" | string | `""` | Storageset that holds the volumes: its id (a number) or its name. Optional: without it, the first storageset assigned to the tenant is used |
 | parameters."panfs.csi.vdura.com/recoverypriority" | string | `"50"` | Recovery priority for the realm volumes |
 | parameters."panfs.csi.vdura.com/efsa" | string | `"retry"` | EFSA volume mode |
-| parameters."panfs.csi.vdura.com/layout" | string | `"raid10+"` | Default layout for the realm volumes |
+| parameters."panfs.csi.vdura.com/layout" | string | `"raid6+"` | Default layout for the realm volumes |
 | parameters."panfs.csi.vdura.com/maxwidth" | int | 3 | Maximum number of storages to stripe over |
 | parameters."panfs.csi.vdura.com/stripeunit" | string | `"64k"` | Stripe unit for the realm volumes |
 | parameters."panfs.csi.vdura.com/rgwidth" | int | 3 | Number of storage nodes to stripe over in a single RAID group |
 | parameters."panfs.csi.vdura.com/rgdepth" | int | 2 | Number of stripes written to a RAID parity group before advancing to the next parity group |
 | parameters."panfs.csi.vdura.com/volservice" | string |  | Volume service id for the realm volumes |
-| parameters."panfs.csi.vdura.com/description" | string |  | Description for the realm volumes |
-| parameters."panfs.csi.vdura.com/user" | string |  | User name or ID |
-| parameters."panfs.csi.vdura.com/group" | string |  | Group name or ID |
+| parameters."panfs.csi.vdura.com/user" | string |  | Numeric id of the owner user |
+| parameters."panfs.csi.vdura.com/group" | string |  | Numeric id of the owner group |
 | parameters."panfs.csi.vdura.com/uperm" | string |  | User permissions |
 | parameters."panfs.csi.vdura.com/gperm" | string |  | Group permissions |
 | parameters."panfs.csi.vdura.com/operm" | string | `"all"` | Other permissions |
+
+The driver rejects the parameters `description`, `encryption` and `recovery` of earlier driver versions.
+Use `recoverypriority` in place of `recovery`. Volume encryption is not supported.
 

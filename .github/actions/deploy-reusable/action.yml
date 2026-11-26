@@ -39,17 +39,17 @@ inputs:
     description: Git ref to clone
     required: true
     type: string
-  realm_user:
-    description: Realm user for authentication
+  realm_api:
+    description: PanAPI address of the PanFS realm
     required: true
     type: string
-  realm_address:
-    description: Realm address for authentication
+  realm_token:
+    description: PanAPI service account token
     required: true
     type: string
-  realm_password:
-    description: Realm password for authentication
-    required: true
+  storageset:
+    description: Id or name of the storageset that holds new volumes (default, the first one of the tenant)
+    default: ""
     type: string
   kubectl_version:
     description: Version of kubectl to install (if not already present)
@@ -64,9 +64,8 @@ runs:
       shell: bash
       run: |
         echo "::group::Masking secrets"
-        echo "::add-mask::${{ inputs.realm_user }}"
-        echo "::add-mask::${{ inputs.realm_address }}"
-        echo "::add-mask::${{ inputs.realm_password }}"
+        echo "::add-mask::${{ inputs.realm_api }}"
+        echo "::add-mask::${{ inputs.realm_token }}"
         echo "::endgroup::"
 
     - name: Checkout
@@ -120,15 +119,13 @@ runs:
     - name: Deploy Storage Class
       if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'storageclass' }}
       env:
-        REALM_USER: ${{ inputs.realm_user }}
+        STORAGESET: ${{ inputs.storageset }}
         REGISTRY_CREDS_FILE: gcr-pull-secret.json
-        REALM_PRIVATE_KEY: ""
-        REALM_PRIVATE_KEY_PASSPHRASE: ""
         USE_HELM: "${{ inputs.driver-installation-type == 'helm' }}"
       shell: bash
       run: |
         echo "::group::Installing PanFS CSI Driver and Storage Class"
-        export REALM_ADDRESS="${{ inputs.realm_address }}"
-        export REALM_PASSWORD="${{ inputs.realm_password }}"
+        export REALM_API="${{ inputs.realm_api }}"
+        export REALM_TOKEN="${{ inputs.realm_token }}"
         make deploy-storageclass
         echo "::endgroup::"

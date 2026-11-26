@@ -19,66 +19,79 @@ import (
 	"testing"
 
 	"github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 )
 
 // TestValidateVolumeCapacity tests the validateVolumeCapacity function.
 // It verifies correct error handling for various capacity and quota scenarios.
 func TestValidateVolumeCapacity(t *testing.T) {
+	const gb = int64(1) << 30
+	volume := func(soft, hard int64) *panapi.Volume {
+		return &panapi.Volume{SoftQuotaBytes: &soft, HardQuotaBytes: &hard}
+	}
+
 	tests := []struct {
+		name     string
 		capacity *csi.CapacityRange
-		vol      *utils.Volume
+		vol      *panapi.Volume
 		wantErr  bool
 	}{
-		// Test case 1: required bytes exceeds soft quota bytes
+		{"required exceeds soft quota", &csi.CapacityRange{RequiredBytes: 51 * gb}, volume(50*gb, 0), true},
+		{"required exceeds soft quota by one byte", &csi.CapacityRange{RequiredBytes: 50*gb + 1}, volume(50*gb, 0), true},
+		{"required equals soft quota", &csi.CapacityRange{RequiredBytes: 50 * gb}, volume(50*gb, 0), false},
+		{"required below soft quota", &csi.CapacityRange{RequiredBytes: 49 * gb}, volume(50*gb, 0), false},
+		{"limit differs from hard quota", &csi.CapacityRange{LimitBytes: 100}, volume(0, 50*gb), true},
+		{"limit equals hard quota", &csi.CapacityRange{LimitBytes: 50 * gb}, volume(0, 50*gb), false},
+		{"no capacity range", nil, volume(50*gb, 100*gb), false},
+		{"volume without quotas", &csi.CapacityRange{}, &panapi.Volume{}, false},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			err := validateVolumeCapacity(tt.capacity, tt.vol)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("validateVolumeCapacity(%v, %+v) error = %v, wantErr %v", tt.capacity, tt.vol, err, tt.wantErr)
+			}
+		})
+	}
+}
+
+// TestValidateSecrets tests validateNodeSecrets and validateControllerSecrets.
+func TestValidateSecrets(t *testing.T) {
+	keys := utils.RealmConnectionContext
+
+	tests := []struct {
+		name              string
+		secrets           map[string]string
+		wantNodeErr       bool
+		wantControllerErr bool
+	}{
+		{"nil secrets", nil, true, true},
+		{"empty secrets", map[string]string{}, true, true},
+		{"realm only", map[string]string{keys.API: "realm"}, false, true},
+		{"empty realm", map[string]string{keys.API: "", keys.Token: "token"}, true, true},
+		{"realm and token", map[string]string{keys.API: "realm", keys.Token: "token"}, false, false},
+		{"empty token", map[string]string{keys.API: "realm", keys.Token: ""}, false, true},
 		{
-			capacity: &csi.CapacityRange{RequiredBytes: 51 * utils.GBToBytes(1)},
-			vol:      &utils.Volume{Soft: 50},
-			wantErr:  true,
-		},
-		// Test case 2: required bytes equal to soft quota bytes
-		{
-			capacity: &csi.CapacityRange{RequiredBytes: 50 * utils.GBToBytes(1)},
-			vol:      &utils.Volume{Soft: 50},
-			wantErr:  false,
-		},
-		// Test case 3: required bytes less then soft quota bytes
-		{
-			capacity: &csi.CapacityRange{RequiredBytes: 49 * utils.GBToBytes(1)},
-			vol:      &utils.Volume{Soft: 50},
-			wantErr:  false,
-		},
-		// Test case 4: limit bytes not equal to hard quota bytes
-		{
-			capacity: &csi.CapacityRange{LimitBytes: 100},
-			vol:      &utils.Volume{Hard: 50},
-			wantErr:  true,
-		},
-		// Test case 5: required and soft bytes match
-		{
-			capacity: &csi.CapacityRange{RequiredBytes: 53687091200},
-			vol:      &utils.Volume{Soft: 50},
-			wantErr:  false,
-		},
-		// Test case 6: limit and hard bytes match
-		{
-			capacity: &csi.CapacityRange{LimitBytes: 53687091200},
-			vol:      &utils.Volume{Hard: 50},
-			wantErr:  false,
-		},
-		// Test case 7: capacity range is nil
-		{
-			capacity: nil,
-			vol:      &utils.Volume{Soft: 50, Hard: 100},
-			wantErr:  false,
+			"all PanAPI keys",
+			map[string]string{
+				keys.API: "https://realm:8443", keys.Token: "token",
+				keys.CACert: "pem",
+			},
+			false, false,
 		},
 	}
 
-	for i, tt := range tests {
-		err := validateVolumeCapacity(tt.capacity, tt.vol)
-		if (err != nil) != tt.wantErr {
-			t.Errorf("Test case %d: unexpected error status, got %v, wantErr %v", i+1, err, tt.wantErr)
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if err := validateNodeSecrets(tt.secrets); (err != nil) != tt.wantNodeErr {
+				t.Errorf("validateNodeSecrets(%v) error = %v, wantErr %v", tt.secrets, err, tt.wantNodeErr)
+			}
+			if err := validateControllerSecrets(tt.secrets); (err != nil) != tt.wantControllerErr {
+				t.Errorf("validateControllerSecrets(%v) error = %v, wantErr %v", tt.secrets, err, tt.wantControllerErr)
+			}
+		})
 	}
 }
 
@@ -163,7 +176,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			err: fmt.Errorf("required_bytes (10) should not be greater than limit_bytes (1)"),
 		},
 		{
-			name: "empty storageset parameter",
+			name: "storageset parameter is the id 0",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -171,10 +184,10 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeParameters.GetSCKey("storageset"): "",
+					panapi.StoragesetParameter: "0",
 				},
 			},
-			err: fmt.Errorf("%s must be provided", utils.VolumeParameters.GetSCKey("storageset")),
+			err: fmt.Errorf("parameter %s: 0 is not a storageset id", panapi.StoragesetParameter),
 		},
 		{
 			name: "empty volservice parameter",
@@ -388,7 +401,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			err: fmt.Errorf("%s must be one of: %v", utils.VolumeParameters.GetSCKey("operm"), permList),
 		},
 		{
-			name: "invalid encryption parameter",
+			name: "encryption parameter is not supported",
 			request: &csi.CreateVolumeRequest{
 				Name: "test",
 				CapacityRange: &csi.CapacityRange{
@@ -396,10 +409,11 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				},
 				VolumeCapabilities: []*csi.VolumeCapability{{}},
 				Parameters: map[string]string{
-					utils.VolumeParameters.GetSCKey("encryption"): "invalid",
+					utils.VolumeParameters.GetSCKey("encryption"): "off",
 				},
 			},
-			err: fmt.Errorf("%s must be 'on' or 'off'", utils.VolumeParameters.GetSCKey("encryption")),
+			err: fmt.Errorf("parameter %s is not supported; PanAPI has no encryption setting for a volume",
+				utils.VolumeParameters.GetSCKey("encryption")),
 		},
 		{
 			name: "volume content source not supported",
@@ -444,6 +458,25 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 		})
 	}
 
+	// The storageset parameter is optional, and a value that is not a number is a name.
+	for name, parameters := range map[string]map[string]string{
+		"no storageset parameter":      nil,
+		"storageset parameter by name": {panapi.StoragesetParameter: "Set 1"},
+		"storageset parameter by id":   {panapi.StoragesetParameter: "1"},
+	} {
+		t.Run(name, func(t *testing.T) {
+			err := validateCreateVolumeRequest(&csi.CreateVolumeRequest{
+				Name:               "test",
+				CapacityRange:      &csi.CapacityRange{RequiredBytes: 10},
+				VolumeCapabilities: []*csi.VolumeCapability{{}},
+				Parameters:         parameters,
+			})
+			if err != nil {
+				t.Errorf("unexpected error: %v", err)
+			}
+		})
+	}
+
 	t.Run("valid request", func(t *testing.T) {
 		req := &csi.CreateVolumeRequest{
 			Name: "test",
@@ -453,7 +486,7 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 			},
 			VolumeCapabilities: []*csi.VolumeCapability{{}},
 			Parameters: map[string]string{
-				utils.VolumeParameters.GetSCKey("storageset"): "Set 1",
+				panapi.StoragesetParameter:                    "1",
 				utils.VolumeParameters.GetSCKey("volservice"): "vol_service_id",
 				utils.VolumeParameters.GetSCKey("layout"):     "raid10+",
 				utils.VolumeParameters.GetSCKey("maxwidth"):   "3",
@@ -467,9 +500,8 @@ func TestValidateCreateVolumeRequest(t *testing.T) {
 				utils.VolumeParameters.GetSCKey("operm"):      "none",
 			},
 			Secrets: map[string]string{
-				utils.RealmConnectionContext.RealmAddress: "10.11.12.13",
-				utils.RealmConnectionContext.Username:     "dummy",
-				utils.RealmConnectionContext.Password:     "dummy",
+				utils.RealmConnectionContext.API:   "10.11.12.13",
+				utils.RealmConnectionContext.Token: "dummy",
 			},
 		}
 

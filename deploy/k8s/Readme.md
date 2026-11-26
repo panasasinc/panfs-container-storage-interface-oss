@@ -42,10 +42,10 @@ Choose the manifest that matches your namespace and topology requirements:
     - Set the same name for storage class, secret name and its namespace
   - Creates a Secret with PanFS Realm credentials in the provided namespace
     - Replace these placeholders with your actual credentials:
-      - `<REALM_ADDRESS>`
-      - `<REALM_USERNAME>`
-      - `<REALM_PASSWORD>`
-      - (add any other required fields)
+      - `<REALM_API>`
+      - `<REALM_TOKEN>`
+    - Replace `<STORAGESET>` with the id or the name of the storageset, or remove the line
+      to use the first storageset that is assigned to the tenant
   - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
   - Configures Role and RoleBinding to allow the CSI Driver ServiceAccount to read the Secret
     - Update namespace or permissions if needed (`<CSI_NAMESPACE>`)
@@ -56,10 +56,10 @@ Choose the manifest that matches your namespace and topology requirements:
   - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class`)
   - Creates a Secret (same name as StorageClass) with PanFS Realm credentials in the `csi-panfs` namespace
     - Replace these placeholders with your actual credentials:
-      - `<REALM_ADDRESS>`
-      - `<REALM_USERNAME>`
-      - `<REALM_PASSWORD>`
-      - (add any other required fields)
+      - `<REALM_API>`
+      - `<REALM_TOKEN>`
+    - Replace `<STORAGESET>` with the id or the name of the storageset, or remove the line
+      to use the first storageset that is assigned to the tenant
   - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
   - Update namespace or permissions if your CSI Driver namespace differs
 
@@ -68,31 +68,15 @@ Apply the selected manifest:
 kubectl apply -f <selected-storageclass-manifest>.yaml
 ```
 
-## 3. Optional: Enabling End-to-End Volume Encryption
+`<REALM_API>` is the PanAPI address of the realm and `<REALM_TOKEN>` is a PanAPI service account token.
+For the permissions of the token and the network requirements, see
+[PanFS Realm Requirements](../../README.md#panfs-realm-requirements).
+If the realm certificate is signed by a private CA, add the key `ca_cert` with the PEM certificate of that CA to the Secret.
+If the certificate cannot be verified at all, for example a self-signed certificate that does not name the realm address,
+add the key `insecure_skip_tls_verify` with the value `"true"`. The driver then does not verify the realm certificate,
+so a host that poses as the realm can read the token. Use it for test realms only.
 
-To enable transparent, end-to-end volume encryption using a KMIP provider:
-
-1.  **Enable Encryption in StorageClass**: Set the parameter below to `"on"` in the StorageClass manifest:
-    ```yaml
-    kind: StorageClass
-    parameters:
-      panfs.csi.vdura.com/encryption: "on" # Enables encryption for volumes
-    ```
-2.  **Configure KMIP Client**: The KMIP client configuration file content must be placed in the Secret under the `kmip_config_data` key as a YAML multi-line string:
-    ```yaml
-    kind: Secret
-    stringData:
-      kmip_config_data: |-
-        # Insert the full KMIP client configuration file content here.
-        # This typically includes server addresses, port, and client TLS/PKI settings.
-    ```
-3. Make sure the KMM module is configured to load the `libwolfssl` kernel module. Verify with:
-    ```bash
-    kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
-    ["panfs","libwolfssl"]
-    ```
-
-## 4. Example: Creating a PersistentVolumeClaim (PVC)
+## 3. Example: Creating a PersistentVolumeClaim (PVC)
 
 After deploying the StorageClass, you can create PVCs referencing your StorageClass. Example:
 
@@ -115,7 +99,7 @@ Apply with:
 kubectl apply -f <your-pvc-manifest>.yaml
 ```
 
-## 5. Additional Notes
+## 4. Additional Notes
 
 - Review all comments in the manifests for guidance on configuration and permissions.
 - Ensure that any referenced ServiceAccounts, Roles, and RoleBindings are created and configured as described.

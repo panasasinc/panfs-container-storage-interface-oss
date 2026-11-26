@@ -41,14 +41,15 @@ func publishRequestWithAccessMode(mode csi.VolumeCapability_AccessMode_Mode, tar
 			},
 			AccessMode: &csi.VolumeCapability_AccessMode{Mode: mode},
 		},
-		Secrets: defaultSecrets,
+		Secrets:       defaultSecrets,
+		VolumeContext: map[string]string{utils.VolumeNameContextKey: validVolumeName},
 	}
 }
 
 // TestNodePublishVolumeSingleNodeSingleWriter tests that a SINGLE_NODE_SINGLE_WRITER volume
 // can be published at one target path only.
 func TestNodePublishVolumeSingleNodeSingleWriter(t *testing.T) {
-	source := fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.RealmAddress], validVolumeName)
+	source := fmt.Sprintf("panfs://%s/%s", defaultSecrets[utils.RealmConnectionContext.API], validVolumeName)
 	otherTargetPath := "/tmp/publish/other_path"
 	singleWriter := csi.VolumeCapability_AccessMode_SINGLE_NODE_SINGLE_WRITER
 

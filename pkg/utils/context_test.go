@@ -42,32 +42,10 @@ func TestGetSCKey(t *testing.T) {
 	}
 }
 
-// TestGetFmt tests that known parameters resolve to their pancli format string.
-func TestGetFmt(t *testing.T) {
-	testCases := []struct {
-		name     string
-		key      string
-		expected string
-	}{
-		{"short key", "layout", "layout %s"},
-		{"prefixed key", VendorPrefix + "storageset", `storageset "%s"`},
-		{"key that differs from the pancli option", "recovery", "recoverypriority %s"},
-		{"quota key", "soft", "soft %v"},
-		{"unknown key", "nosuchparam", ""},
-		{"empty key", "", ""},
-	}
-
-	for _, testCase := range testCases {
-		t.Run(testCase.name, func(t *testing.T) {
-			assert.Equal(t, testCase.expected, VolumeParameters.GetFmt(testCase.key))
-		})
-	}
-}
-
-// TestVolumeParametersResolve tests that every known parameter resolves in both lookups.
+// TestVolumeParametersResolve tests that every known parameter resolves with and without the vendor prefix.
 func TestVolumeParametersResolve(t *testing.T) {
-	for key, format := range VolumeParameters {
+	for key := range VolumeParameters {
 		assert.Equal(t, VendorPrefix+key, VolumeParameters.GetSCKey(key))
-		assert.Equal(t, format, VolumeParameters.GetFmt(VendorPrefix+key))
+		assert.Equal(t, VendorPrefix+key, VolumeParameters.GetSCKey(VendorPrefix+key))
 	}
 }

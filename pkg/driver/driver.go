@@ -28,8 +28,7 @@ import (
 	"time"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
-	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -44,11 +43,18 @@ import (
 
 // StorageProviderClient defines an interface for managing volumes with a storage provider.
 type StorageProviderClient interface {
-	CreateVolume(volumeName string, params pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error)
-	DeleteVolume(volID string, secret map[string]string) error
-	ExpandVolume(volumeName string, targetSize int64, secret map[string]string) error
-	ListVolumes(secret map[string]string) (*utils.VolumeList, error)
-	GetVolume(volumeName string, secret map[string]string) (*utils.Volume, error)
+	// CreateVolume creates a volume; it returns panapi.ErrorAlreadyExist on a conflict.
+	CreateVolume(ctx context.Context, params panapi.CreateVolumeParams, secrets map[string]string) (*panapi.Volume, error)
+	// DeleteVolume deletes a volume by CSI volume ID; it returns panapi.ErrorNotFound when it does not exist.
+	DeleteVolume(ctx context.Context, volumeID string, secrets map[string]string) error
+	// ExpandVolume raises the quota of a volume, addressed by CSI volume ID, to targetSize bytes.
+	ExpandVolume(ctx context.Context, volumeID string, targetSize int64, secrets map[string]string) error
+	// GetVolume returns a volume by CSI volume ID.
+	GetVolume(ctx context.Context, volumeID string, secrets map[string]string) (*panapi.Volume, error)
+	// GetVolumeByName returns a volume by name; CreateVolume needs it to be idempotent by name.
+	GetVolumeByName(ctx context.Context, volumeName string, secrets map[string]string) (*panapi.Volume, error)
+	// GetMountAddress returns the address the nodes mount volumes from, or "" when it is the PanAPI host.
+	GetMountAddress(ctx context.Context, secrets map[string]string) (string, error)
 }
 
 // PanMounter defines the interface for mounting and unmounting PanFS volumes.
@@ -72,8 +78,6 @@ type Driver struct {
 	panfs      StorageProviderClient
 	kubeClient *kubernetes.Clientset
 
-	tempFileFactory TempFileFactory
-
 	csi.UnimplementedIdentityServer
 	csi.UnimplementedControllerServer
 	csi.UnimplementedNodeServer
@@ -93,38 +97,6 @@ const (
 
 // nodeLabelUpdateTimeout bounds the node label removal that runs during shutdown.
 const nodeLabelUpdateTimeout = 10 * time.Second
-
-// FileWriter defines an interface for writing to files.
-type FileWriter interface {
-	Write([]byte) (int, error)
-	Close() error
-	Name() string
-}
-
-// TempFileFactory defines an interface for creating temporary files.
-type TempFileFactory interface {
-	CreateTemp(dir, pattern string) (FileWriter, error)
-}
-
-// osTempFileFactory is an implementation of TempFileFactory using the os package.
-type osTempFileFactory struct{}
-
-// CreateTemp creates a temporary file in the specified directory with the given pattern.
-func (f *osTempFileFactory) CreateTemp(dir, pattern string) (FileWriter, error) {
-	file, err := os.CreateTemp(dir, pattern)
-	if err != nil {
-		return nil, err
-	}
-	return &osFileWrapper{file}, nil
-}
-
-// osFileWrapper wraps an *os.File to implement the FileWriter interface.
-type osFileWrapper struct {
-	*os.File
-}
-
-// Name returns the name of the file.
-func (w *osFileWrapper) Name() string { return w.File.Name() }
 
 // CreateDriver initializes a new Driver instance with the provided configuration and dependencies.
 //
@@ -175,15 +147,14 @@ func CreateDriver(
 	}
 
 	return &Driver{
-		Version:         version,
-		Name:            driverName,
-		endpoint:        endpoint,
-		mounterV2:       mounterV2,
-		log:             log,
-		host:            host,
-		panfs:           panfs,
-		kubeClient:      kubeClient,
-		tempFileFactory: &osTempFileFactory{},
+		Version:    version,
+		Name:       driverName,
+		endpoint:   endpoint,
+		mounterV2:  mounterV2,
+		log:        log,
+		host:       host,
+		panfs:      panfs,
+		kubeClient: kubeClient,
 	}
 }
 

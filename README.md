@@ -14,7 +14,6 @@ For more details on specific topics, refer to the following documents:
 | [Overview](./docs/Overview.md) | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow |
 | [Usage Guide](./docs/Usage-Guide.md) | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples |
 | [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
-| [Encryption](./docs/Encryption.md) | Enabling End-to-End Encryption (E2EE) for volumes with a KMIP key management server |
 | [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
 | [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
 | [Troubleshooting](./docs/Troubleshooting.md) | Diagnosing and resolving common issues: installation, volume mounting, KMM, authentication, and networking |
@@ -35,6 +34,7 @@ For more details on specific topics, refer to the following documents:
     * [Software Requirements](#software-requirements)
     * [System Requirements](#system-requirements)
     * [Access Requirements](#access-requirements)
+    * [PanFS Realm Requirements](#panfs-realm-requirements)
   * [CSI Driver Installation - Quick Start](#csi-driver-installation---quick-start)
     * [1. Ensure dependencies are installed](#1-ensure-dependencies-are-installed)
     * [2. Deploy CSI driver with KMM Module](#2-deploy-csi-driver-with-kmm-module)
@@ -82,15 +82,18 @@ The driver exposes advanced PanFS features through CSI:
 
   * **Volume Quota Management**: Supports configurable **soft and hard quotas** for PanFS volumes.
   * **Multiple Volume Layouts**: Provisioning support for various PanFS layouts (e.g., `raid6+`, `raid5+`, `raid10+`).
-  * **End-to-End Encryption**: Supports transparent volume encryption using an external **KMIP** provider (see [Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)).
-  * **Robust Operation**: Includes extensive parameter validation, unit conversion (e.g., GB/bytes), and mapping of PanFS CLI errors to CSI-compliant error codes.
+  * **Robust Operation**: Includes extensive parameter validation, unit conversion (e.g., GB/bytes), and mapping of PanAPI errors to CSI-compliant error codes.
+  * **Static Provisioning**: A PersistentVolume can name an existing PanFS volume, or a directory inside it.
+
+The driver manages volumes through **PanAPI**, the REST API of the PanFS realm, with a service account token.
+Volume encryption is not supported with PanAPI.
 
 ### PanFS mount options
 The PanFS CSI driver supports custom mount options for PanFS volumes. You can specify mount options in the PersistentVolume manifest using the `mountOptions` field. This allows you to customize the mount behavior according to your requirements.
 
 #### Storage class customization (e.g. volume create parameters)
 The PanFS CSI driver supports custom parameters for volume creation in the StorageClass manifest. You can specify parameters such as `storageset`, `layout`, etc., to customize the behavior of the created volumes.
-For a full list of supported parameters, refer to the official PanFS documentation for volume creation corresponding to your PanFS version and CSI PanFS driver version.
+For the full list of supported parameters, see [PanFS Specific Volume Parameters](./charts/storageclass/Readme.md#panfs-specific-volume-parameters).
 
 ## Compatibility
 
@@ -108,6 +111,7 @@ This matrix defines the supported versions of Kubernetes and the CSI Specificati
 | **1.2.4**         | 1.30.1+            | 1.11.0           |
 | **1.2.5**         | 1.30.1+            | 1.11.0           |
 | **1.2.6**         | 1.30.1+            | 1.14.0           |
+| **2.0.0**         | 1.30.1+            | 1.14.0           |
 
 ## Getting started
 
@@ -132,7 +136,28 @@ This matrix defines the supported versions of Kubernetes and the CSI Specificati
 #### Access Requirements
 
 - **Container Registry Access**: Credentials for pulling/pushing driver images
-- **PanFS Realm Access**: Valid credentials and network connectivity to PanFS backend
+- **PanFS Realm Access**: A PanAPI service account token and network connectivity to the PanFS realm
+  (see [PanFS Realm Requirements](#panfs-realm-requirements))
+
+#### PanFS Realm Requirements
+
+The driver talks to the realm through PanAPI. It does not use SSH.
+
+- **PanAPI address**: The CSI controller must reach PanAPI over HTTPS (or HTTP, when the address starts with `http://`).
+- **Service account token**: A token of a PanAPI service account. The driver works inside the tenant of this token.
+- **Storageset**: At least one storageset must be assigned to the tenant.
+- **Token permissions**, all for its own tenant:
+
+  | Permission                                         | Used for                                          |
+  |:---------------------------------------------------|:--------------------------------------------------|
+  | Read the tenant and its storageset assignments     | Choosing the storageset of a new volume           |
+  | List, read, create, update and delete volumes      | Volume provisioning, expansion and deletion       |
+  | List subnets, read the mount recipe of a subnet    | Finding the address that the nodes mount from     |
+
+  When the token may not read the subnets, the volume is still created, and the nodes mount from the host of the PanAPI address.
+- **Tenant network**: A volume of a tenant is reachable only from the network of that tenant.
+  Every worker node must be attached to that network before it mounts a volume.
+  The driver finds the mount address of the network, but it does not attach the nodes.
 
 ### CSI Driver Installation - Quick Start
 
@@ -245,11 +270,16 @@ The StorageClass defines the provisioned volume properties and provides PanFS Re
 Edit [deploy/k8s/storage-class/template-secret-in-driver-ns.yaml](deploy/k8s/storage-class/template-secret-in-driver-ns.yaml) to replace the following placeholders with your PanFS Realm details.
 
   * `<STORAGE_CLASS_NAME>`: The desired name for your StorageClass (e.g., `csi-panfs-storage-class`).
-  * `<REALM_ADDRESS>`: The PanFS backend address (e.g., `panfs.example.com`).
-  * **Credentials**: Provide one of the following sets of authentication data:
-      * `<REALM_USERNAME>` and `<REALM_PASSWORD>` (for user/password authentication)
-      * `<REALM_PRIVATE_KEY>` and `<REALM_PRIVATE_KEY_PASSPHRASE>` (for key-based authentication)
-  * `<KMIP_CONFIG_DATA>`: KMIP server connection details for volume encryption (if used).
+  * `<REALM_API>`: The PanAPI address of the PanFS realm: a host name (HTTPS is used) or a full `https://` or `http://` URL
+    (e.g., `panfs.example.com`).
+  * `<REALM_TOKEN>`: The PanAPI service account token. See [PanFS Realm Requirements](#panfs-realm-requirements) for its permissions.
+  * `<STORAGESET>`: The id or the name of the storageset that holds the new volumes. Remove the line to use the first storageset that is assigned to the tenant.
+
+If the realm certificate is signed by a private CA, add the key `ca_cert` with the PEM certificate of that CA to the Secret.
+Without it, the driver uses the system trust store. For a self-signed certificate, `ca_cert` is that certificate itself.
+If the certificate cannot be verified at all, for example a self-signed certificate that does not name the realm address,
+add the key `insecure_skip_tls_verify` with the value `"true"`. The driver then does not verify the realm certificate,
+so a host that poses as the realm can read the token. Use it for test realms only.
 
 ##### 3.2 Setting the Default StorageClass
 
@@ -261,31 +291,7 @@ metadata:
     storageclass.kubernetes.io/is-default-class: "true"
 ```
 
-##### 3.3 Optional: Enabling End-to-End Volume Encryption
-
-To enable transparent, end-to-end volume encryption using a KMIP provider:
-
-1.  **Enable Encryption in StorageClass**: Set the parameter below to `"on"` in the StorageClass manifest:
-    ```yaml
-    kind: StorageClass
-    parameters:
-      panfs.csi.vdura.com/encryption: "on" # Enables encryption for volumes
-    ```
-2.  **Configure KMIP Client**: The KMIP client configuration file content must be placed in the Secret under the `kmip_config_data` key as a YAML multi-line string:
-    ```yaml
-    kind: Secret
-    stringData:
-      kmip_config_data: |-
-        # Insert the full KMIP client configuration file content here.
-        # This typically includes server addresses, port, and client TLS/PKI settings.
-    ```
-3. Make sure the KMM module is configured to load the `libwolfssl` kernel module. Verify with:
-    ```bash
-    kubectl get module panfs -n csi-panfs -o jsonpath='{.spec.moduleLoader.container.modprobe.modulesLoadingOrder}'
-    ["panfs","libwolfssl"]
-    ```
-
-##### 3.4 Deployment and Validation
+##### 3.3 Deployment and Validation
 
 **Deploy PanFS Storage Class:**
 

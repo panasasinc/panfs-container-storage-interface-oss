@@ -27,21 +27,18 @@ allowedTopologies: {}
   #     values:
   #       - "true"
 
-# PanFS Realm Endpoint Configuration
+# PanFS Realm API (PanAPI) connection
 realm:
-  # -- Endpoint address for the backend PanFS realm
-  address: ""
-  # -- Username for the PanFS backend realm
-  username: ""
-  # -- Password for the PanFS backend realm
-  password: ""
-  # -- Private key for the PanFS backend realm
-  privateKey: ""
-  # -- Private Key Passphrase
-  privateKeyPassphrase: ""
-
-  # -- KMIP configuration data for volume encryption key management
-  kmipConfigData: ""
+  # -- PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL.
+  # The nodes mount volumes from the host of this address, unless PanAPI names another mount address for the tenant.
+  api: ""
+  # -- PanAPI service account token. Its tenant must have a storageset assigned.
+  token: ""
+  # -- Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store.
+  caCert: ""
+  # -- Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified:
+  # a host that poses as the realm can then read the token. Prefer `realm.caCert`.
+  insecureSkipTLSVerify: false
 
 # -- Whether to set this storage class as the default for the cluster
 setAsDefaultStorageClass: false
@@ -56,10 +53,13 @@ volumeReclaimPolicy: Delete # Options: Retain, Delete
 # -- Default volume binding mode
 volumeBindingMode: WaitForFirstConsumer # Options: Immediate, WaitForFirstConsumer
 
-# -- Optional storage class parameters
+# -- Storage class parameters. All of them are optional; a parameter with an empty value is left out.
 # @default -- `{...}`
 parameters:
-  panfs.csi.vdura.com/storageset: "Set 1"
+  # Storageset that holds new volumes: its id (a number) or its name.
+  # Without it, the first storageset that is assigned to the tenant is used.
+  panfs.csi.vdura.com/storageset: ""
+
   panfs.csi.vdura.com/recoverypriority: "50"
   panfs.csi.vdura.com/efsa: "retry"
   panfs.csi.vdura.com/layout: "raid6+"
@@ -71,17 +71,12 @@ parameters:
   panfs.csi.vdura.com/operm: "all"
 
   # panfs.csi.vdura.com/volservice: "volserviceid"
-  panfs.csi.vdura.com/description: "PanFS CSI Storage Class"
 
-  # panfs.csi.vdura.com/user: username
-  # panfs.csi.vdura.com/group: groupname
+  # Owner user and group: numeric ids only
+  # panfs.csi.vdura.com/user: "1001"
+  # panfs.csi.vdura.com/group: "100"
   # panfs.csi.vdura.com/uperm: "all"
   # panfs.csi.vdura.com/gperm: "write-execute"
   # panfs.csi.vdura.com/operm: "read-write"
-
-  # Enable/Disable E2EE for volumes created with this StorageClass
-  # Set to "on" to enable encryption, "off" to disable encryption
-  # If enabled, please ensure that KMIP server connection details are provided in the Secret used
-  panfs.csi.vdura.com/encryption: "off"
 
 mountOptions: []

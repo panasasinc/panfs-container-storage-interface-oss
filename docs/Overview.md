@@ -35,6 +35,8 @@ The PanFS CSI Driver consists of two primary components, orchestrated to handle 
 - **Controller Service** (Deployment):
   - Runs as a highly available deployment with multiple replicas for fault tolerance.
   - Manages cluster-wide operations: provisioning, attaching, detaching, and resizing PanFS volumes.
+  - Calls **PanAPI**, the REST API of the PanFS realm, over HTTP(S). It authenticates with the service account token
+    from the StorageClass Secret. Only the controller calls PanAPI.
   - Runs the **PanFS CSI Plugin**, which implements PanFS-specific logic, alongside sidecar containers:
     - **CSI Provisioner**: Handles volume creation.
     - **CSI Attacher**: Manages volume attachment to nodes.
@@ -44,7 +46,8 @@ The PanFS CSI Driver consists of two primary components, orchestrated to handle 
   - Runs on every cluster node to handle local volume operations (mounting/unmounting).
   - Includes:
     - **CSI Node Driver Registrar**: Registers the driver with Kubernetes.
-    - **PanFS CSI Plugin**: Interacts with the PanFS storage backend and local kernel, often in privileged mode for file system operations.
+    - **PanFS CSI Plugin**: Mounts and unmounts PanFS volumes on the node, in privileged mode for file system operations.
+      It does not call PanAPI: the volume name and the mount address come from the controller in the volume context.
 
 - **Kernel Module Management (KMM)**:
   - Optional integration to dynamically load the PanFS kernel module on nodes, ensuring compatibility with the storage backend.
@@ -79,7 +82,7 @@ graph LR
         CPPC[**csi-panfs-plugin**]
     end
 
-    Controller -->|Realm Volumes Mgmt| PanFS[(PanFS Storage)]
+    Controller -->|PanAPI: Volumes Mgmt| PanFS[(PanFS Storage)]
     Node -->|Mount Volume| Host[(Host, Pod, Container)]
     KMM -->|Load Kernel Module| OS[(Linux Kernel)]
 
@@ -98,9 +101,12 @@ graph LR
 
 ## Operational Workflow
 
-1. **Provisioning**: A PersistentVolumeClaim (PVC) referencing a PanFS StorageClass triggers the controller to create a PanFS volume.
+1. **Provisioning**: A PersistentVolumeClaim (PVC) referencing a PanFS StorageClass triggers the controller to create a PanFS volume through PanAPI.
+   The CSI volume ID is the PanAPI volume id. The controller also reads the mount address (`rmlist`) of the tenant network from PanAPI,
+   and passes it to the node, with the volume name, in the volume context.
 2. **Attachment**: The controller and node services coordinate to attach the volume to the target node when a workload is scheduled.
-3. **Mounting**: The node service mounts the volume into the pod with appropriate permissions and security context.
+3. **Mounting**: The node service mounts `panfs://<mount address>/<volume name>` into the pod with appropriate permissions and security context.
+   Without a mount address in the volume context, it mounts from the host of the PanAPI address in the Secret.
 4. **Lifecycle Management**: Supports dynamic resizing and volume deletion.
 5. **Kernel Module Handling**: If enabled, KMM ensures the PanFS kernel module is loaded on nodes before mounting.
 
@@ -111,7 +117,7 @@ graph LR
 - **Security**: RBAC, SELinux, and privileged mode for secure operations
 - **Flexibility**: Optional KMM for dynamic kernel module management
 - **Kubernetes-Native**: Fully compatible with Kubernetes storage APIs
-- **Multi-Realm Support**: Connect to multiple PanFS realms within a single CSI driver instance
+- **Multi-Realm Support**: Connect to multiple PanFS realms within a single CSI driver instance; each StorageClass has its own PanAPI address and token
 
 ---
 

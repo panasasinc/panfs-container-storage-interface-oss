@@ -24,6 +24,10 @@ The PanFS CSI driver consists of three primary components that may require updat
 - **KMM (Kernel Module Management)**: Manages kernel modules required for PanFS functionality on worker nodes
 - **PanFS StorageClass**: Backend PanFS Realm configuration and authentication credentials
 
+> **Upgrading from 1.2.x or earlier:** this driver version talks to the realm through PanAPI, not SSH.
+> The StorageClass and its Secret must be created again.
+> Read [Migration from the SSH Backend to PanAPI](#migration-from-the-ssh-backend-to-panapi) first.
+
 ## Table of Contents
 
 1. [Pre-Upgrade Requirements](#1-pre-upgrade-requirements)
@@ -248,7 +252,7 @@ Update the settings in the deployment manifest according to your cluster specifi
 
 - `<KERNEL_VERSION>` - Worker Node kernel version, should correspond to PANFS_KMM_IMAGE, e.g., `4.18.0-553.el8_10.x86_64`
 - `<PANFS_KMM_IMAGE>` - PanFS KMM module image, e.g., `<your private registry>/panfs-dfc-kmm:4.18.0-553.el8_10.x86_64-11.1.0.a-1860775.2`
-- `<PANFS_CSI_DRIVER_IMAGE>` - PanFS CSI Driver image, e.g., `<your private registry>/panfs-csi-driver:1.2.6`
+- `<PANFS_CSI_DRIVER_IMAGE>` - PanFS CSI Driver image, e.g., `<your private registry>/panfs-csi-driver:2.0.0`
 - `<IMAGE_PULL_SECRET_NAME>` - Image pull secret for fetching PanFS CSI Driver images from your private registry
 
 Review other settings relevant to your Kubernetes infrastructure, such as:
@@ -331,6 +335,36 @@ lsmod | grep panfs
 - [ ] KMM module status shows `availableNumber` equals `desiredNumber`
 - [ ] No KMM-related errors in logs (Worker Node events)
 
+### Migration from the SSH Backend to PanAPI
+
+Driver versions up to 1.2.6 sent `pancli` commands to the realm over SSH.
+Later versions call PanAPI with a service account token. Do these steps once, when you leave 1.2.x:
+
+1. **Prepare the realm.** Create a PanAPI service account and its token, make sure that a storageset is assigned to
+   its tenant, and attach the worker nodes to the network of the tenant.
+   See [PanFS Realm Requirements](../README.md#panfs-realm-requirements).
+2. **Create the Secret again.** The keys are `api` and `token`, with an optional `ca_cert`.
+   The keys of the SSH backend (address, user, password, private key, KMIP configuration) are not read any more.
+   A Secret without `api` and `token` is refused.
+3. **Create the StorageClass again.** A StorageClass is immutable, so delete it and create it from the new template.
+   Remove the parameters `description` and `encryption`, and rename `recovery` to `recoverypriority`: the driver
+   rejects the old ones. `user` and `group` accept numeric ids only. `storageset` is optional, and can be an id or a name.
+4. **Upgrade the driver** as described in this guide.
+
+What to expect after the migration:
+
+| Topic                    | Behavior                                                                                           |
+|:-------------------------|:---------------------------------------------------------------------------------------------------|
+| Existing volumes         | A PV of an earlier version keeps the volume name as its volume handle. The driver finds it by name |
+| Mount address of old PVs | They carry no mount address, so the node mounts them from the host of the PanAPI address           |
+| Volume ID of new volumes | The PanAPI volume id (a number), not the volume name                                               |
+| Encrypted volumes        | Not supported. The driver no longer passes a KMIP configuration to the mount                       |
+| Helm value               | `kmm.encryptionSupport` defaults to `false`                                                        |
+| Makefile variables       | `REALM_API`, `REALM_TOKEN`, `REALM_CA_CERT`, `STORAGESET` replace the SSH variables                |
+
+The Secret of an existing volume is referenced from its PV. Keep the Secret name and namespace the same when you
+create it again, so that existing PVs find the new keys.
+
 ### 3.3 StorageClass Update
 
 #### 3.3.1 Update StorageClass Manifest
@@ -349,11 +383,9 @@ StorageClass is not a namespaced resource, but a Namespace with the same name is
 
 | Parameter | Description | Example |
 |-----------|-------------|---------|
-| `<REALM_ADDRESS>` | PanFS backend server address | `panfs.example.com` |
-| `<REALM_USERNAME>` | PanFS Realm service account | `admin` |
-| `<REALM_PASSWORD>` | Authentication password | `your-secure-password` |
-| `<REALM_PRIVATE_KEY>` | Private key for key-based auth | Leave empty if not using |
-| `<REALM_PRIVATE_KEY_PASSPHRASE>` | Passphrase for encrypted keys | Leave empty if no encryption |
+| `<REALM_API>` | PanAPI address of the PanFS realm | `panfs.example.com` |
+| `<REALM_TOKEN>` | PanAPI service account token | `your-service-account-token` |
+| `<STORAGESET>` | Id or name of the storageset that holds new volumes (optional) | `1` |
 
 #### Configuration of PV Binding Mode and Reclaim Policy
 
@@ -631,8 +663,7 @@ SECRET_NAME=$(kubectl get sc <SC_NAME> -o jsonpath="{.parameters.csi\.storage\.k
 
 # Verify secret exists and check credentials
 kubectl get secret -n $NAMESPACE $SECRET_NAME
-kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.realm_ip}' | base64 -d
-kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.user}' | base64 -d
+kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.api}' | base64 -d
 
 # Test connectivity from a node
 kubectl run test-connectivity --image=busybox --rm -it -- ping <realm-ip>

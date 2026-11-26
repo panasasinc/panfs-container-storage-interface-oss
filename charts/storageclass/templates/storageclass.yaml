@@ -55,15 +55,11 @@ parameters:
   csi.storage.k8s.io/controller-expand-secret-name: *secretName
   csi.storage.k8s.io/controller-expand-secret-namespace: *secretNamespace
 
-  # Specific parameters for volumes (to be) created in the PanFS Realm
+  # Specific parameters for volumes (to be) created in the PanFS Realm.
+  # panfs.csi.vdura.com/storageset is the id or the name of the storageset that holds the volumes;
+  # without it, the first storageset that is assigned to the tenant is used.
   {{- range $k, $v := .Values.parameters }}
-  {{- if eq $k "panfs.csi.vdura.com/encryption" }}
-  
-  # Enable/Disable E2EE for volumes created with this StorageClass
-  # Set to "on" to enable encryption, "off" to disable encryption
-  # If enabled, please ensure that KMIP server connection details are provided in the Secret used by this StorageClass
-  {{ $k }}: {{ $v | quote }}
-  {{else }}
+  {{- if ne (toString $v) "" }}
   {{ $k }}: {{ $v | quote }}
   {{- end }}
   {{- end }}

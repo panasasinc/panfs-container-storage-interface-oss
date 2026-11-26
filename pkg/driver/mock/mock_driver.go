@@ -10,10 +10,10 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
-	pancli "github.com/panasasinc/panfs-container-storage-interface-oss/pkg/pancli"
-	utils "github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
+	panapi "github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	gomock "go.uber.org/mock/gomock"
 )
 
@@ -42,76 +42,91 @@ func (m *MockStorageProviderClient) EXPECT() *MockStorageProviderClientMockRecor
 }
 
 // CreateVolume mocks base method.
-func (m *MockStorageProviderClient) CreateVolume(volumeName string, params pancli.VolumeCreateParams, secret map[string]string) (*utils.Volume, error) {
+func (m *MockStorageProviderClient) CreateVolume(ctx context.Context, params panapi.CreateVolumeParams, secrets map[string]string) (*panapi.Volume, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "CreateVolume", volumeName, params, secret)
-	ret0, _ := ret[0].(*utils.Volume)
+	ret := m.ctrl.Call(m, "CreateVolume", ctx, params, secrets)
+	ret0, _ := ret[0].(*panapi.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // CreateVolume indicates an expected call of CreateVolume.
-func (mr *MockStorageProviderClientMockRecorder) CreateVolume(volumeName, params, secret any) *gomock.Call {
+func (mr *MockStorageProviderClientMockRecorder) CreateVolume(ctx, params, secrets any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).CreateVolume), volumeName, params, secret)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).CreateVolume), ctx, params, secrets)
 }
 
 // DeleteVolume mocks base method.
-func (m *MockStorageProviderClient) DeleteVolume(volID string, secret map[string]string) error {
+func (m *MockStorageProviderClient) DeleteVolume(ctx context.Context, volumeID string, secrets map[string]string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "DeleteVolume", volID, secret)
+	ret := m.ctrl.Call(m, "DeleteVolume", ctx, volumeID, secrets)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // DeleteVolume indicates an expected call of DeleteVolume.
-func (mr *MockStorageProviderClientMockRecorder) DeleteVolume(volID, secret any) *gomock.Call {
+func (mr *MockStorageProviderClientMockRecorder) DeleteVolume(ctx, volumeID, secrets any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).DeleteVolume), volID, secret)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).DeleteVolume), ctx, volumeID, secrets)
 }
 
 // ExpandVolume mocks base method.
-func (m *MockStorageProviderClient) ExpandVolume(volumeName string, targetSize int64, secret map[string]string) error {
+func (m *MockStorageProviderClient) ExpandVolume(ctx context.Context, volumeID string, targetSize int64, secrets map[string]string) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ExpandVolume", volumeName, targetSize, secret)
+	ret := m.ctrl.Call(m, "ExpandVolume", ctx, volumeID, targetSize, secrets)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
 // ExpandVolume indicates an expected call of ExpandVolume.
-func (mr *MockStorageProviderClientMockRecorder) ExpandVolume(volumeName, targetSize, secret any) *gomock.Call {
+func (mr *MockStorageProviderClientMockRecorder) ExpandVolume(ctx, volumeID, targetSize, secrets any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpandVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).ExpandVolume), volumeName, targetSize, secret)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExpandVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).ExpandVolume), ctx, volumeID, targetSize, secrets)
+}
+
+// GetMountAddress mocks base method.
+func (m *MockStorageProviderClient) GetMountAddress(ctx context.Context, secrets map[string]string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMountAddress", ctx, secrets)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMountAddress indicates an expected call of GetMountAddress.
+func (mr *MockStorageProviderClientMockRecorder) GetMountAddress(ctx, secrets any) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMountAddress", reflect.TypeOf((*MockStorageProviderClient)(nil).GetMountAddress), ctx, secrets)
 }
 
 // GetVolume mocks base method.
-func (m *MockStorageProviderClient) GetVolume(volumeName string, secret map[string]string) (*utils.Volume, error) {
+func (m *MockStorageProviderClient) GetVolume(ctx context.Context, volumeID string, secrets map[string]string) (*panapi.Volume, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetVolume", volumeName, secret)
-	ret0, _ := ret[0].(*utils.Volume)
+	ret := m.ctrl.Call(m, "GetVolume", ctx, volumeID, secrets)
+	ret0, _ := ret[0].(*panapi.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetVolume indicates an expected call of GetVolume.
-func (mr *MockStorageProviderClientMockRecorder) GetVolume(volumeName, secret any) *gomock.Call {
+func (mr *MockStorageProviderClientMockRecorder) GetVolume(ctx, volumeID, secrets any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).GetVolume), volumeName, secret)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolume", reflect.TypeOf((*MockStorageProviderClient)(nil).GetVolume), ctx, volumeID, secrets)
 }
 
-// ListVolumes mocks base method.
-func (m *MockStorageProviderClient) ListVolumes(secret map[string]string) (*utils.VolumeList, error) {
+// GetVolumeByName mocks base method.
+func (m *MockStorageProviderClient) GetVolumeByName(ctx context.Context, volumeName string, secrets map[string]string) (*panapi.Volume, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ListVolumes", secret)
-	ret0, _ := ret[0].(*utils.VolumeList)
+	ret := m.ctrl.Call(m, "GetVolumeByName", ctx, volumeName, secrets)
+	ret0, _ := ret[0].(*panapi.Volume)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
-// ListVolumes indicates an expected call of ListVolumes.
-func (mr *MockStorageProviderClientMockRecorder) ListVolumes(secret any) *gomock.Call {
+// GetVolumeByName indicates an expected call of GetVolumeByName.
+func (mr *MockStorageProviderClientMockRecorder) GetVolumeByName(ctx, volumeName, secrets any) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListVolumes", reflect.TypeOf((*MockStorageProviderClient)(nil).ListVolumes), secret)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVolumeByName", reflect.TypeOf((*MockStorageProviderClient)(nil).GetVolumeByName), ctx, volumeName, secrets)
 }
 
 // MockPanMounter is a mock of PanMounter interface.

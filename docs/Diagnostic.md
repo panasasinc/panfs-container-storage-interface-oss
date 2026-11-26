@@ -276,8 +276,7 @@ echo "Secret: $SECRET_NAME in namespace: $NAMESPACE"
 kubectl get secret -n $NAMESPACE $SECRET_NAME
 
 # Check credential values (SENSITIVE - handle carefully)
-kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.realm_ip}' | base64 -d
-kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.user}' | base64 -d
+kubectl get secret -n $NAMESPACE $SECRET_NAME -o jsonpath='{.data.api}' | base64 -d
 
 # Check CSI Driver logs for auth errors
 kubectl logs -n csi-panfs -l app=csi-panfs-controller --all-containers | grep -i "auth\|cert\|credential" | tail -50
@@ -400,7 +399,7 @@ done
 
 ## Important Notes
 
-1. **Security**: Be careful when collecting secret information. Never share decoded passwords or SSH keys.
+1. **Security**: Be careful when collecting secret information. Never share decoded tokens.
 
 2. **Node Access**: Some commands require node debugging access. Ensure you have appropriate permissions.
 

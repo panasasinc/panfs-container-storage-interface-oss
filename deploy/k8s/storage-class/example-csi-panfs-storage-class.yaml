@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Secret for the PanFS Storage Class (Realm Address, Username, Password, Private Key, and Passphrase)
+# Secret for the PanFS Storage Class (PanAPI address and service account token)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -13,29 +13,14 @@ metadata:
     product: com.vdura.csi.panfs
 type: Opaque
 stringData:
-  # Realm address, username, password, and/or private key for the PanFS backend
-  # These values are used by the CSI driver to connect to the PanFS backend
+  # PanAPI address of the PanFS realm: a host (HTTPS is used) or a full https:// or http:// URL.
+  # The CSI controller calls PanAPI at this address. The nodes mount volumes from its host,
+  # unless PanAPI names another mount address for the tenant.
+  api: "panfs-dummy.com"
 
-  # PanFS Realm Endpoint (IP Address or DNS Name)
-  realm_ip: panfs-dummy.com
+  # PanAPI service account token
+  token: "dummy-token"
 
-  # PanFS Realm username, its password, private key, and private key passphrase (if configured)
-  user: dummy-user
-
-  # Leave empty if not using password
-  password: "dummy-password"
-
-  # Leave empty if not using private key
-  private_key:
-
-  # Leave empty if not using private key passphrase
-  private_key_passphrase:
-
-  # KMIP server connection details for volume encryption
-  # If E2E encryption is required, these values are used by the CSI driver to connect to the KMIP server,
-  #   make sure that parameter `panfs.csi.vdura.com/encryption` is set to "on" in the StorageClass parameters
-  # Otherwise, these values can be left empty
-  kmip_config_data:
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -79,22 +64,17 @@ parameters:
   csi.storage.k8s.io/controller-expand-secret-name: *secretName
   csi.storage.k8s.io/controller-expand-secret-namespace: *secretNamespace
 
-  # Specific parameters for volumes (to be) created in the PanFS Realm
-  panfs.csi.vdura.com/description: "PanFS CSI Storage Class"
+  # Specific parameters for volumes (to be) created in the PanFS Realm.
+  # panfs.csi.vdura.com/storageset is the id or the name of the storageset that holds the volumes;
+  # without it, the first storageset that is assigned to the tenant is used.
   panfs.csi.vdura.com/efsa: "retry"
-  
-  # Enable/Disable E2EE for volumes created with this StorageClass
-  # Set to "on" to enable encryption, "off" to disable encryption
-  # If enabled, please ensure that KMIP server connection details are provided in the Secret used by this StorageClass
-  panfs.csi.vdura.com/encryption: "off"
-  
   panfs.csi.vdura.com/layout: "raid6+"
   panfs.csi.vdura.com/maxwidth: "3"
   panfs.csi.vdura.com/operm: "all"
   panfs.csi.vdura.com/recoverypriority: "50"
   panfs.csi.vdura.com/rgdepth: "2"
   panfs.csi.vdura.com/rgwidth: "3"
-  panfs.csi.vdura.com/storageset: "Set 1"
+  panfs.csi.vdura.com/storageset: "1"
   panfs.csi.vdura.com/stripeunit: "64k"
 
 # No custom mount options specified; using defaults
@@ -123,6 +103,7 @@ rules:
   - apiGroups: [""] 
     resources: ["secrets"]
     verbs: ["get", "list"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.

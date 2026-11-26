@@ -29,6 +29,7 @@ metadata:
   labels:
     app: csi-panfs-controller
     product: com.vdura.csi.panfs
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -42,6 +43,7 @@ metadata:
   labels:
     app: csi-panfs-node
     product: com.vdura.csi.panfs
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -90,6 +92,7 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments"]
     verbs: ["get", "list", "watch"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -123,6 +126,7 @@ rules:
   - apiGroups: ["storage.k8s.io"]
     resources: ["volumeattachments/status"]
     verbs: ["patch"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -161,6 +165,7 @@ rules:
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["list", "watch", "create", "update", "patch"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -183,6 +188,7 @@ rules:
   - apiGroups: [""]
     resources: ["nodes"]
     verbs: ["get", "list", "watch", "update", "patch"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -204,6 +210,7 @@ roleRef:
   kind: ClusterRole
   name: csi-panfs-controller-provisioner
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -225,6 +232,7 @@ roleRef:
   kind: ClusterRole
   name: csi-panfs-controller-attacher
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -285,6 +293,7 @@ rules:
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get", "list"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -319,6 +328,7 @@ rules:
   - apiGroups: ["apps"]
     resources: ["replicasets"]
     verbs: ["get"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -338,6 +348,7 @@ rules:
   - apiGroups: ["coordination.k8s.io"]
     resources: ["leases"]
     verbs: ["get", "watch", "list", "delete", "update", "create"]
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -360,6 +371,7 @@ roleRef:
   kind: Role
   name: csi-panfs-controller-secret-reader
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -382,6 +394,7 @@ roleRef:
   kind: Role
   name: csi-panfs-controller-provisioner
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -404,6 +417,7 @@ roleRef:
   kind: Role
   name: csi-panfs-controller-attacher
   apiGroup: rbac.authorization.k8s.io
+
 ---
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
@@ -472,7 +486,7 @@ spec: # csi-panfs-node
       initContainers:
         # Init container to enable PanFS mount helper
         - name: get-plugin-bin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
           imagePullPolicy: IfNotPresent
           command: ["cp", "/panfs-csi", "/var/panfs/"]
           volumeMounts:
@@ -681,7 +695,7 @@ spec: # csi-panfs-controller
       containers:
         # Main PanFS CSI plugin container
         - name: csi-panfs-plugin
-          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
+          image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
           imagePullPolicy: Always
           args:
             - "--endpoint=$(CSI_ENDPOINT)"
@@ -908,11 +922,11 @@ spec:
       modprobe:
         moduleName: panfs
 
-        # Encryption support requires loading the libwolfssl module.
-        # If encryption is not needed, comment out the modulesLoadingOrder below.
-        modulesLoadingOrder:
-          - panfs
-          - libwolfssl
+        # If encryption support is required, load the libwolfssl module before panfs.
+        # To enable encryption, uncomment and set modulesLoadingOrder as shown below.
+        # modulesLoadingOrder:
+        #  - panfs
+        #  - libwolfssl
 
       imagePullPolicy: Always
 

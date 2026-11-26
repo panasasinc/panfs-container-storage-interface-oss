@@ -17,10 +17,11 @@ package driver
 import (
 	"context"
 	"fmt"
-	"os"
 	"path/filepath"
+	"strings"
 
 	csi "github.com/container-storage-interface/spec/lib/go/csi"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/utils"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -34,13 +35,6 @@ const (
 var (
 	// IsNodeLabelSet tracks whether the node label has been set to avoid redundant updates.
 	IsNodeLabelSet = false
-)
-
-// Mockable OS functions
-var (
-	osMkdirAll = os.MkdirAll
-	osChmod    = os.Chmod
-	osRemove   = os.Remove
 )
 
 // NodeStageVolume handles the CSI NodeStageVolume request.
@@ -116,7 +110,7 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 	}
 
 	secrets := in.GetSecrets()
-	if err := validateReqSecrets(secrets); err != nil {
+	if err := validateNodeSecrets(secrets); err != nil {
 		llog.Error(err, InvalidRequestSecretsErrorStr)
 		return nil, status.Error(codes.InvalidArgument, InvalidRequestSecretsErrorStr)
 	}
@@ -149,54 +143,39 @@ func (d *Driver) NodePublishVolume(ctx context.Context, in *csi.NodePublishVolum
 		mountOptions = append(mountOptions, "ro")
 	}
 
-	if encryptionVal, ok := in.VolumeContext[utils.VolumeParameters.GetSCKey("encryption")]; ok && encryptionVal != "none" && encryptionVal != "" {
-		// Create a temporary KMIP Config file
-		if err := osMkdirAll("/var/tmp/kmip/", 0o700); err != nil {
-			llog.Error(err, "failed to create temp directory for KMIP config file")
-			return nil, status.Error(codes.Internal, "Failed to create temp directory for KMIP config file: "+err.Error())
+	// The mount needs the volume name. For a volume the driver created, the CSI volume ID is the PanAPI
+	// volume id and the controller puts the name in the volume context. A statically provisioned volume
+	// has no such context: its CSI volume ID is the volume name, or a path inside a volume.
+	volumeName := in.GetVolumeContext()[utils.VolumeNameContextKey]
+	if volumeName == "" {
+		if _, isID := panapi.ParseVolumeID(volumeID); isID {
+			llog.Error(fmt.Errorf("volume context has no %s", utils.VolumeNameContextKey), InvalidRequestErrorStr)
+			return nil, status.Error(codes.InvalidArgument,
+				"Volume id "+volumeID+" needs the volume name in the volume context key "+utils.VolumeNameContextKey+
+					"; for a statically provisioned volume, use the volume name as the volume handle")
 		}
-
-		kmipConfigFile, err := d.tempFileFactory.CreateTemp("/var/tmp/kmip/", "config_*.conf")
-		if err != nil {
-			llog.Error(err, "failed to create temporary KMIP config file for mounting")
-			return nil, status.Error(codes.Internal, "Failed to create KMIP config file: "+err.Error())
-		}
-
-		// Cleanup the temp file after mount operation, checking errors
-		defer func() {
-			if err := kmipConfigFile.Close(); err != nil {
-				llog.Error(err, "failed to close KMIP config file")
-			}
-		}()
-
-		defer func() {
-			if err := osRemove(kmipConfigFile.Name()); err != nil {
-				llog.Error(err, "failed to remove KMIP config file")
-			}
-		}()
-
-		// Set file permissions to 0700
-		err = osChmod(kmipConfigFile.Name(), 0o600)
-		if err != nil {
-			llog.Error(err, "failed to set '0700' permissions on KMIP config file")
-			return nil, status.Error(codes.Internal, "Failed to set '0700' permissions on KMIP config file: "+err.Error())
-		}
-
-		if in.Secrets[utils.RealmConnectionContext.KMIPConfigData] == "" {
-			llog.Error(fmt.Errorf("%s key is empty", utils.RealmConnectionContext.KMIPConfigData), "KMIP secret must be provided for encrypted volumes")
-			return nil, status.Error(codes.InvalidArgument, "KMIP secret must be provided for encrypted volumes")
-		}
-
-		data := []byte(in.Secrets[utils.RealmConnectionContext.KMIPConfigData])
-		if _, err := kmipConfigFile.Write(data); err != nil {
-			llog.Error(err, "failed to write KMIP config data to temporary file")
-			return nil, status.Error(codes.Internal, "Failed to write KMIP config data to temporary file: "+err.Error())
-		}
-
-		mountOptions = append(mountOptions, fmt.Sprintf("kmip-config-file=%s", kmipConfigFile.Name()))
+		volumeName = strings.TrimPrefix(volumeID, "/")
 	}
 
-	source := fmt.Sprintf("panfs://%s/%s", in.GetSecrets()[utils.RealmConnectionContext.RealmAddress], volumeID)
+	// The controller puts the rmlist of the tenant subnet in the volume context. The node mounts from its
+	// first address and passes the whole list to the client: mount -t panfs -o "rmlist=(a,b)" panfs://a/<volume>.
+	// Without an rmlist, it mounts from the host of the PanAPI address in the secret.
+	var mountAddress string
+	var err error
+	if rmlist, ok := in.GetVolumeContext()[utils.MountAddressContextKey]; ok {
+		var rmlistOption string
+		if mountAddress, rmlistOption, err = panapi.MountSource(rmlist); err == nil {
+			mountOptions = append(mountOptions, rmlistOption)
+		}
+	} else {
+		mountAddress, err = panapi.APIHost(in.GetSecrets())
+	}
+	if err != nil {
+		llog.Error(err, InvalidRequestErrorStr)
+		return nil, status.Error(codes.InvalidArgument, err.Error())
+	}
+
+	source := fmt.Sprintf("panfs://%s/%s", mountAddress, volumeName)
 
 	// A SINGLE_NODE_SINGLE_WRITER volume can be published at one target path only. Publishing it
 	// again at the same path is idempotent; a different path must be rejected.

@@ -47,12 +47,11 @@ help:
 	@printf "    USE_HELM                                 Use Helm for deployment (true) or manifest (false) (default: $(USE_HELM)).\n"
 	@printf "    IMAGE_PULL_SECRET_NAME                   Name of the image pull secret for the registry (default: $(IMAGE_PULL_SECRET_NAME)).\n\n"
 	@printf "  $(BOLD)$(GREEN)[Realm Settings]$(RESET)\n"
-	@printf "    REALM_ADDRESS                            Address of the PanFS realm (e.g., "panfs.example.com").\n"
-	@printf "    REALM_USER                               Username for the PanFS realm.\n"
-	@printf "    REALM_PASSWORD                           Password for the PanFS realm.\n"
-	@printf "    REALM_PRIVATE_KEY                        Private key for the PanFS realm.\n"
-	@printf "    REALM_PRIVATE_KEY_PASSPHRASE             Passphrase for the PanFS realm private key.\n"
-	@printf "    KMIP_CONFIG_DATA                         KMIP configuration data for volume encryption.\n\n"
+	@printf "    REALM_API                                PanAPI address of the PanFS realm (e.g., "panfs.example.com" or "https://panfs.example.com").\n"
+	@printf "    REALM_TOKEN                              PanAPI service account token.\n"
+	@printf "    REALM_CA_CERT                            Optional PEM certificate of the CA that signed the realm certificate.\n"
+	@printf "    REALM_INSECURE_SKIP_TLS_VERIFY           Set to true to skip the verification of the realm certificate (test realms only).\n"
+	@printf "    STORAGESET                               Optional id or name of the storageset that holds new volumes (default: the first one of the tenant).\n\n"
 	@printf "  $(BOLD)$(GREEN)[Storage Class Settings]$(RESET)\n"
 	@printf "    STORAGE_CLASS_NAME                       Name of the storage class to deploy (default: $(STORAGE_CLASS_NAME)).\n"
 	@printf "    SET_STORAGECLASS_DEFAULT                 Boolean indicating if the storage class is set as default (default: true if STORAGE_CLASS_NAME is $(STORAGE_CLASS_NAME)).\n\n"
@@ -67,7 +66,7 @@ else
 SET_STORAGECLASS_DEFAULT := false
 endif
 
-CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:1.2.6
+CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
 TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
 
 ## [Build Driver and DFC Images]
@@ -257,11 +256,11 @@ deploy-storageclass-info: ## Display information about the PanFS CSI Storage Cla
 	@printf "  %-25s "%s"\n" "STORAGE_CLASS_NAME:" "$(shell [ -n '$(STORAGE_CLASS_NAME)' ] && echo $(STORAGE_CLASS_NAME) || echo "$(RED)unknown$(RESET)")"
 	@printf "  %-25s "%s"\n" "SET_STORAGECLASS_DEFAULT:" "$(shell [ -n '$(SET_STORAGECLASS_DEFAULT)' ] && echo $(SET_STORAGECLASS_DEFAULT) || echo "$(RED)unknown$(RESET)")"
 	@printf "\n$(BOLD)PanFS Realm credentials defined through environment variables:$(RESET)\n"
-	@printf "  %-25s "%s"\n" "REALM_ADDRESS:" "$(shell [ -n '$(REALM_ADDRESS)' ] && echo $(REALM_ADDRESS) || echo "$(RED)unknown$(RESET)")"
-	@printf "  %-25s "%s"\n" "REALM_USER:" "$(shell [ -n '$(REALM_USER)' ] && echo $(REALM_USER) || echo "$(RED)unknown$(RESET)")"
-	@printf "  %-25s "%s"\n" "REALM_PASSWORD:" "$(shell [ -n '$(REALM_PASSWORD)' ] && echo "*****" || echo "$(RED)unknown$(RESET)")"
+	@printf "  %-25s "%s"\n" "REALM_API:" "$(shell [ -n '$(REALM_API)' ] && echo $(REALM_API) || echo "$(RED)unknown$(RESET)")"
+	@printf "  %-25s "%s"\n" "REALM_TOKEN:" "$(shell [ -n '$(REALM_TOKEN)' ] && echo "*****" || echo "$(RED)unknown$(RESET)")"
+	@printf "  %-25s "%s"\n" "STORAGESET:" "$(shell [ -n '$(STORAGESET)' ] && echo '$(STORAGESET)' || echo "(the first storageset of the tenant)")"
 
-	@if [ -z "$(REALM_ADDRESS)" ] || [ -z "$(REALM_USER)" ] || [ -z "$(REALM_PASSWORD)" ]; then \
+	@if [ -z "$(REALM_API)" ] || [ -z "$(REALM_TOKEN)" ]; then \
 		printf '\nPlease set the above environment variables before deploying the storage class.\n'; \
 		exit 1; \
 	fi
@@ -279,12 +278,11 @@ deploy-storageclass-with-helm:
 		--create-namespace \
 		--set csiPanFSDriver.namespace="csi-panfs" \
 		--set setAsDefaultStorageClass=$(SET_STORAGECLASS_DEFAULT) \
-		--set realm.address="${REALM_ADDRESS}" \
-		--set realm.username="${REALM_USER}" \
-		--set realm.password="${REALM_PASSWORD}" \
-		--set realm.privateKey="$(REALM_PRIVATE_KEY)" \
-		--set realm.privateKeyPassphrase="$(REALM_PRIVATE_KEY_PASSPHRASE)" \
-		--set realm.kmipConfigData="$(KMIP_CONFIG_DATA)" \
+		--set realm.api="${REALM_API}" \
+		--set realm.token="${REALM_TOKEN}" \
+		--set-string realm.caCert="$(REALM_CA_CERT)" \
+		--set realm.insecureSkipTLSVerify=$(or $(REALM_INSECURE_SKIP_TLS_VERIFY),false) \
+		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=$(STORAGESET)' \
 		--wait
 	@printf "$(GREEN)Successfully deployed PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)'$(RESET)\n\n"
 
@@ -292,12 +290,9 @@ deploy-storageclass-with-helm:
 deploy-storageclass-with-manifest:
 	@printf "$(BOLD)Deploying PanFS CSI Storage Class using manifest file...$(RESET)\n"
 	@export STORAGE_CLASS_NAME=$(STORAGE_CLASS_NAME); \
-	export REALM_ADDRESS=$(REALM_ADDRESS); \
-	export REALM_USERNAME=$(REALM_USER); \
-	export REALM_PASSWORD=$(REALM_PASSWORD); \
-	export REALM_PRIVATE_KEY="$(REALM_PRIVATE_KEY)"; \
-	export REALM_PRIVATE_KEY_PASSPHRASE="$(REALM_PRIVATE_KEY_PASSPHRASE)"; \
-	export KMIP_CONFIG_DATA="$(KMIP_CONFIG_DATA)"; \
+	export REALM_API=$(REALM_API); \
+	export REALM_TOKEN=$(REALM_TOKEN); \
+	export STORAGESET='$(STORAGESET)'; \
 	export CSI_CONTROLLER_SA=csi-panfs-controller; \
 	export CSI_NAMESPACE=csi-panfs; \
 	kubectl create namespace $(STORAGE_CLASS_NAME) --dry-run=client -o yaml | kubectl apply -f -; \
@@ -386,33 +381,25 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		--namespace csi-panfs-storage-class \
 		--set csiPanFSDriver.namespace="csi-panfs" \
 		--set setAsDefaultStorageClass=false \
-		--set realm.address="panfs-dummy.com" \
-		--set realm.username="dummy-user" \
-		--set realm.password="dummy-password" \
-		--set realm.privateKey="" \
-		--set realm.privateKeyPassphrase="" | \
+		--set realm.api="panfs-dummy.com" \
+		--set realm.token="dummy-token" \
+		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1' | \
 		grep -v '^# Source:' > deploy/k8s/storage-class/example-csi-panfs-storage-class.yaml
 	helm template csi-panfs-storage-class charts/storageclass \
 		--namespace csi-panfs-storage-class \
 		--set csiPanFSDriver.namespace="<CSI_NAMESPACE>" \
 		--set setAsDefaultStorageClass=false \
-		--set realm.address="<REALM_ADDRESS>" \
-		--set realm.username="<REALM_USERNAME>" \
-		--set realm.password="<REALM_PASSWORD>" \
-		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
-		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" \
-		--set realm.kmipConfigData="<KMIP_CONFIG_DATA>" | \
+		--set realm.api="<REALM_API>" \
+		--set realm.token="<REALM_TOKEN>" \
+		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=<STORAGESET>' | \
 		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
 		grep -v '^# Source:' > deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml
 	helm template csi-panfs-storage-class-name charts/storageclass \
 		--namespace csi-panfs \
 		--set setAsDefaultStorageClass=false \
-		--set realm.address="<REALM_ADDRESS>" \
-		--set realm.username="<REALM_USERNAME>" \
-		--set realm.password="<REALM_PASSWORD>" \
-		--set realm.privateKey="<REALM_PRIVATE_KEY>" \
-		--set realm.privateKeyPassphrase="<REALM_PRIVATE_KEY_PASSPHRASE>" \
-		--set realm.kmipConfigData="<KMIP_CONFIG_DATA>" | \
+		--set realm.api="<REALM_API>" \
+		--set realm.token="<REALM_TOKEN>" \
+		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=<STORAGESET>' | \
 		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
 		grep -v '^# Source:' | \
 		sed 's|csi-panfs|<CSI_NAMESPACE>|' > deploy/k8s/storage-class/template-secret-in-driver-ns.yaml

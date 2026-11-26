@@ -18,7 +18,7 @@ metadata:
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
-# Secret for the PanFS Storage Class (Realm Address, Username, Password, Private Key, and Passphrase)
+# Secret for the PanFS Storage Class (PanAPI address and service account token)
 apiVersion: v1
 kind: Secret
 metadata:
@@ -26,23 +26,12 @@ metadata:
   namespace: csi-panfs-storage-class
 type: Opaque
 stringData:
-  # Realm address, username, password, and/or private key for the PanFS backend
-  # These values are used by the CSI driver to connect to the PanFS backend
+  # PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used),
+  # or a full https:// or http:// URL. The nodes mount volumes from the host of this address.
+  api: panfs-realm.example.com
 
-  # PanFS Realm Endpoint (IP Address or DNS Name)
-  realm_ip: panfs-realm.example.com
-
-  # PanFS Realm username, its password, private key, and private key passphrase (if configured)
-  user: <REALM_USERNAME>
-
-  # Leave empty if not using password
-  password: "<REALM_PASSWORD>"
-
-  # Leave empty if not using private key
-  private_key: 
-
-  # Leave empty if not using private key passphrase
-  private_key_passphrase: 
+  # PanAPI service account token. Its tenant must have a storageset assigned.
+  token: "<REALM_TOKEN>"
 ---
 # Copyright 2025 VDURA Inc.
 #
@@ -92,8 +81,9 @@ parameters:
   csi.storage.k8s.io/controller-expand-secret-namespace: *secretNamespace
 
   # Specific parameters for volumes (to be) created in the PanFS Realm
-  panfs.csi.vdura.com/storageset: "Set 1"
-  panfs.csi.vdura.com/description: "PanFS CSI Storage Class"
+  # Storageset that holds the volumes created with this StorageClass: its id (a number) or its name.
+  # Remove the line to use the first storageset that is assigned to the tenant.
+  panfs.csi.vdura.com/storageset: "1"
   panfs.csi.vdura.com/efsa: "retry"
   panfs.csi.vdura.com/layout: "raid6+"
   panfs.csi.vdura.com/maxwidth: "3"

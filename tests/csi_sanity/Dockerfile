@@ -26,7 +26,7 @@ RUN go install -v github.com/kubernetes-csi/csi-test/v5/cmd/csi-sanity@v5.6.0
 
 # Install required packages for testing
 RUN apt-get update && \
-  apt-get install -y curl libc6 openssh-client jq libxml2-utils gettext-base && \
+  apt-get install -y curl libc6 jq libxml2-utils gettext-base && \
   rm -rf /var/lib/apt/lists/*
 
 # Download and install kubectl

@@ -12,6 +12,45 @@ This file covers every release published in this repository, starting with 1.2.1
 Versions 1.0.0 to 1.2.0 were released before the driver became open source;
 the [compatibility matrix](README.md#compatibility) lists them, but this repository has no history for them.
 
+## [2.0.0] - Unreleased
+
+### Changed
+
+- **Breaking:** the driver manages volumes through PanAPI, the REST API of the PanFS realm, with a service account token.
+  It no longer sends `pancli` commands over SSH. The realm must provide PanAPI.
+- **Breaking:** the StorageClass Secret has the keys `api` and `token`, and an optional `ca_cert`.
+  The keys of the SSH backend are not read, and a Secret without the new keys is refused.
+  Create the Secret and the StorageClass again; see the [upgrade guide](docs/Upgrade.md#migration-from-the-ssh-backend-to-panapi).
+- **Breaking:** the chart values `realm.api`, `realm.token` and `realm.caCert` replace the SSH values of `charts/storageclass`.
+  The `Makefile` variables `REALM_API`, `REALM_TOKEN`, `REALM_CA_CERT` and `STORAGESET`, and the inputs
+  `realm_api`, `realm_token` and `storageset` of the deploy workflow, replace the SSH ones.
+- The CSI volume ID of a new volume is the PanAPI volume id. The volume name goes to the node in the volume context.
+  A PersistentVolume of an earlier version, whose volume ID is the volume name, still works.
+- `panfs.csi.vdura.com/storageset` is optional. A number is the id of the storageset and other text is its name.
+  Without the parameter, the driver uses the first storageset that is assigned to the tenant of the token.
+- `panfs.csi.vdura.com/user` and `panfs.csi.vdura.com/group` accept numeric ids only.
+- `kmm.encryptionSupport` defaults to `false` in `charts/panfs`.
+- The manifest check in CI, and so `make manifests`, uses Helm v4.3.2 (was v3.22.1).
+
+### Added
+
+- The controller reads the mount address (`rmlist`) of the tenant network from PanAPI and passes it to the node.
+  The node mounts `panfs://<first address>/<volume>` with the mount option `rmlist=(...)`.
+  Without a mount address, it mounts from the host of the `api` address.
+- Static provisioning by name: `volumeHandle` of a PersistentVolume is the name of a volume, or a path inside it.
+  The optional volume attribute `panfs.csi.vdura.com/rmlist` sets its mount address.
+- The optional Secret key `insecure_skip_tls_verify` (chart value `realm.insecureSkipTLSVerify`, `Makefile` variable
+  `REALM_INSECURE_SKIP_TLS_VERIFY`) turns the verification of the realm certificate off, for test realms.
+- The token permissions and the network requirements are documented in the [README](README.md#panfs-realm-requirements).
+
+### Removed
+
+- **Breaking:** volume encryption. The parameter `panfs.csi.vdura.com/encryption`, the Secret key `kmip_config_data`
+  and the encryption guide are removed, because PanAPI has no encryption setting for a volume.
+- The parameters `panfs.csi.vdura.com/description` and `panfs.csi.vdura.com/recovery`. The driver rejects them;
+  use `panfs.csi.vdura.com/recoverypriority` in place of `recovery`.
+- The SSH client of the driver, and `openssh-client` in the sanity test image.
+
 ## [1.2.6] - 2026-11-18
 
 ### Changed
@@ -89,7 +128,7 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 
 ### Added
 
-- A guide to end-to-end encryption with the driver: [docs/Encryption.md](docs/Encryption.md).
+- A guide to end-to-end encryption with the driver: `docs/Encryption.md` (removed later, with volume encryption).
 
 ## [1.2.3] - 2025-12-23
 
