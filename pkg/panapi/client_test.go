@@ -674,8 +674,23 @@ func TestTLS(t *testing.T) {
 		}
 	})
 	t.Run("unknown certificate is refused without ca_cert", func(t *testing.T) {
-		if _, err := NewClient().GetVolumeByName(t.Context(), "home", secrets("")); !errors.Is(err, ErrorUnavailable) {
+		_, err := NewClient().GetVolumeByName(t.Context(), "home", secrets(""))
+		if !errors.Is(err, ErrorUnavailable) {
 			t.Errorf("GetVolumeByName() error = %v, want ErrorUnavailable for an untrusted certificate", err)
+		}
+		// The error tells the reader which keys of the Secret solve it.
+		for _, want := range []string{"Hint:", `"ca_cert"`, `"insecure_skip_tls_verify"`} {
+			if err == nil || !strings.Contains(err.Error(), want) {
+				t.Errorf("GetVolumeByName() error = %v, want it to contain %s", err, want)
+			}
+		}
+	})
+	t.Run("another connection failure has no certificate hint", func(t *testing.T) {
+		s := secrets("")
+		s[utils.RealmConnectionContext.API] = "https://127.0.0.1:1"
+		_, err := NewClient().GetVolumeByName(t.Context(), "home", s)
+		if !errors.Is(err, ErrorUnavailable) || strings.Contains(err.Error(), "Hint:") {
+			t.Errorf("GetVolumeByName() error = %v, want ErrorUnavailable without a hint", err)
 		}
 	})
 	t.Run("unknown certificate is accepted with insecure_skip_tls_verify", func(t *testing.T) {

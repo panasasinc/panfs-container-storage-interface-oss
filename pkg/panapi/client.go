@@ -23,6 +23,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -204,6 +205,20 @@ func (c *Client) httpClient(settings tlsSettings) (*http.Client, error) {
 	return hc, nil
 }
 
+// certificateHint returns advice for an error that is a failed check of the realm certificate, and "" for
+// every other error. The reader of the error is the person who can change the Secret, so name its keys.
+func certificateHint(err error) string {
+	var verification *tls.CertificateVerificationError
+	if !errors.As(err, &verification) {
+		return ""
+	}
+	keys := utils.RealmConnectionContext
+	return fmt.Sprintf(". Hint: the certificate of the realm cannot be verified. If a private CA signed it, add the "+
+		"certificate of that CA to the realm credentials Secret as the key %q. For a test realm only, add the key %q "+
+		"with the value \"true\" to that Secret to switch the check off",
+		keys.CACert, keys.InsecureSkipTLSVerify)
+}
+
 // do sends one authenticated request and decodes a JSON response into out when out is not nil.
 func (c *Client) do(ctx context.Context, secrets map[string]string, method, path string, in, out any) error {
 	ep, err := endpointFromSecrets(secrets)
@@ -241,7 +256,7 @@ func (c *Client) do(ctx context.Context, secrets map[string]string, method, path
 	llog.V(5).Info("PanAPI request", "method", method, "path", path)
 	resp, err := hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w: %s %s: %v", ErrorUnavailable, method, path, err)
+		return fmt.Errorf("%w: %s %s: %v%s", ErrorUnavailable, method, path, err, certificateHint(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 
