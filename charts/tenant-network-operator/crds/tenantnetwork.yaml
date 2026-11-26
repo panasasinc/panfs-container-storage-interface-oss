@@ -100,6 +100,8 @@ spec:
                     Optional. firewalld zone of the tenant interface on nodes that run firewalld.
                     An empty string leaves firewalld alone.
                   type: string
+                  maxLength: 17
+                  pattern: "^[A-Za-z0-9_-]*$"
                 detachOnRemoval:
                   description: >-
                     Optional. Whether a pod removes the tenant interface and detaches its node from the subnet

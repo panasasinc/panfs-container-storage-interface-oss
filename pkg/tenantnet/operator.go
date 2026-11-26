@@ -201,6 +201,23 @@ func (o *Operator) ReconcileAll(ctx context.Context) {
 		return a.Before(&b)
 	})
 	o.claims, o.namespaces = make(map[string]string), make(map[string]string)
+	// A TenantNetwork that already runs a DaemonSet keeps its tenant and its namespace, whatever happens to it
+	// in this pass. Without this, a short failure of the oldest one (PanAPI is down, its Secret is missing)
+	// would let a newer one start a second DaemonSet on the same nodes; removing either of the two later
+	// would detach the nodes under the other.
+	for i := range list.Items {
+		item := &list.Items[i]
+		last := statusOf(item)
+		if item.GetDeletionTimestamp() != nil || last.Tenant == "" || last.DaemonSet == "" {
+			continue
+		}
+		if _, claimed := o.claims[last.Tenant]; !claimed {
+			o.claims[last.Tenant] = item.GetNamespace() + "/" + item.GetName()
+		}
+		if _, claimed := o.namespaces[item.GetNamespace()]; !claimed {
+			o.namespaces[item.GetNamespace()] = item.GetName()
+		}
+	}
 	for i := range list.Items {
 		item := &list.Items[i]
 		log := o.Log.WithValues("tenantNetwork", item.GetNamespace()+"/"+item.GetName())
@@ -219,6 +236,15 @@ func (o *Operator) reconcile(ctx context.Context, item *unstructured.Unstructure
 	status, err := o.apply(ctx, item, log)
 	if err != nil {
 		status.Phase, status.Message = PhaseError, err.Error()
+		// Keep what was known before the failure: the DaemonSet may still run, and the next pass uses the
+		// tenant and the DaemonSet of the status to keep the claim of this TenantNetwork.
+		last := statusOf(item)
+		if status.Tenant == "" && last.DaemonSet != "" {
+			status.Tenant = last.Tenant
+		}
+		if status.DaemonSet == "" {
+			status.DaemonSet, status.ReadyLabel = last.DaemonSet, last.ReadyLabel
+		}
 		o.eventOnce(ctx, item, "state", EventTypeError, reasonOf(err), upperFirst(err.Error()))
 	} else {
 		message := status.Message
@@ -267,12 +293,17 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 			fmt.Errorf("the name %q in spec.vlanParentInterface is not a valid interface name", spec.VLANParentInterface))
 	}
 
+	if spec.FirewalldZone != nil && *spec.FirewalldZone != "" && !zoneNamePattern.MatchString(*spec.FirewalldZone) {
+		return status, withReason(ReasonInvalidSpec,
+			fmt.Errorf("the name %q in spec.firewalldZone is not a valid firewalld zone name", *spec.FirewalldZone))
+	}
+
 	if err := o.ensureFinalizer(ctx, item); err != nil {
 		return status, err
 	}
 
 	// The value of the ready label is the namespace, so one namespace holds the network of one tenant.
-	if owner, claimed := o.namespaces[namespace]; claimed {
+	if owner, claimed := o.namespaces[namespace]; claimed && owner != name {
 		return status, withReason(ReasonTenantAlreadyServed,
 			fmt.Errorf("namespace %q already has TenantNetwork %s; a namespace holds the network of one tenant", namespace, owner))
 	}
@@ -287,7 +318,7 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 	status.Tenant = tenant
 	// A node is on one tenant network through one DaemonSet: a second one would undo the work of the first
 	// when it is removed.
-	if owner, claimed := o.claims[tenant]; claimed {
+	if owner, claimed := o.claims[tenant]; claimed && owner != namespace+"/"+name {
 		return status, withReason(ReasonTenantAlreadyServed,
 			fmt.Errorf("tenant %q is already served by TenantNetwork %s", tenant, owner))
 	}
@@ -353,7 +384,8 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 		// Nodes match the selector, but the DaemonSet has not counted them yet: it was created a moment ago.
 		// Saying "no node" here would be wrong, and it would be reported as an event.
 		status.Phase = PhasePending
-		status.Message = "waiting for the pods to start on " + countNodes(len(status.Nodes))
+		status.Message = "waiting for the pods to start on " + countNodes(len(status.Nodes)) +
+			"; if this stays, see the events of DaemonSet " + objectName
 	case status.DesiredNodes == 0:
 		status.Phase = PhasePending
 		status.Message = "no node to serve: the selector is for " + nodesText
@@ -577,7 +609,8 @@ func (o *Operator) daemonSet(meta metav1.ObjectMeta, spec TenantNetworkSpec, ten
 		pullSecrets = append(pullSecrets, corev1.LocalObjectReference{Name: name})
 	}
 	selector := map[string]string{"app": meta.Name}
-	podLabels := map[string]string{"app": meta.Name, "product": productLabelValue, TenantLabelKey: tenant}
+	// The tenant name is not a label: PanFS does not promise that it is a valid label value.
+	podLabels := map[string]string{"app": meta.Name, "product": productLabelValue}
 	no, grace, maxUnavailable := false, int64(60), intstr.FromInt32(1)
 
 	daemonSet := &appsv1.DaemonSet{
@@ -657,7 +690,6 @@ func (o *Operator) daemonSet(meta metav1.ObjectMeta, spec TenantNetworkSpec, ten
 			},
 		},
 	}
-	daemonSet.Labels[TenantLabelKey] = tenant
 
 	// The hash covers everything the operator decides, so a change of an option or of the tenant is an update.
 	encoded, _ := json.Marshal(daemonSet.Spec)

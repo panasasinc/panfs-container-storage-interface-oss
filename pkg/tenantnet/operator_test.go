@@ -197,6 +197,10 @@ func TestOperatorReportsErrors(t *testing.T) {
 			spec: map[string]interface{}{"realmSecretName": "realm", "vlanParentInterface": "eth0; reboot"},
 			api:  &fakeAPI{}, message: "spec.vlanParentInterface is not a valid interface name",
 		},
+		"bad firewalld zone": {
+			spec: map[string]interface{}{"realmSecretName": "realm", "firewalldZone": "trusted; reboot"},
+			api:  &fakeAPI{}, message: "spec.firewalldZone is not a valid firewalld zone name",
+		},
 		"bad interval": {
 			spec: map[string]interface{}{"realmSecretName": "realm", "interval": "soon"}, api: &fakeAPI{}, message: "spec.interval",
 		},
@@ -376,7 +380,7 @@ func TestOperatorUsesTheNodeSelectorOfTheSpec(t *testing.T) {
 	require.Len(t, status.Nodes, 1)
 	assert.Contains(t, status.Nodes, "node-in")
 	// The node matches, but the DaemonSet has not counted it yet: the message does not say "no node".
-	assert.Equal(t, "waiting for the pods to start on 1 node", status.Message)
+	assert.Equal(t, "waiting for the pods to start on 1 node; if this stays, see the events of DaemonSet "+testObject, status.Message)
 
 	// No node matches: now the message says so.
 	require.NoError(t, kube.CoreV1().Nodes().Delete(ctx, "node-in", metav1.DeleteOptions{}))
@@ -392,7 +396,7 @@ func TestOperatorUsesTheNodeSelectorOfTheSpec(t *testing.T) {
 	o.ReconcileAll(ctx)
 	_, status = stored(t, o)
 	assert.Len(t, status.Nodes, 2)
-	assert.Equal(t, "waiting for the pods to start on 2 nodes", status.Message)
+	assert.Contains(t, status.Message, "waiting for the pods to start on 2 nodes")
 	daemonSet, err = kube.AppsV1().DaemonSets(testNamespace).Get(ctx, testObject, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, daemonSet.Spec.Template.Spec.NodeSelector)
@@ -422,4 +426,49 @@ func TestOperatorReplacesABindingToAnotherNodeRole(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "new-node-role", clusterBinding.RoleRef.Name)
 	assert.Equal(t, testObject, clusterBinding.Subjects[0].Name)
+}
+
+func TestOperatorKeepsTheClaimOfARunningTenantNetworkThroughAFailure(t *testing.T) {
+	ctx := context.Background()
+	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
+	first := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
+	first.SetCreationTimestamp(metav1.NewTime(time.Unix(100, 0)))
+	o, kube := newTestOperator(first, api)
+	o.ReconcileAll(ctx)
+	_, err := kube.AppsV1().DaemonSets(testNamespace).Get(ctx, testObject, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	// The Secret of the running TenantNetwork disappears for a while, and a newer TenantNetwork
+	// for the same tenant shows up in another namespace.
+	require.NoError(t, kube.CoreV1().Secrets(testNamespace).Delete(ctx, "realm", metav1.DeleteOptions{}))
+	second := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
+	second.SetNamespace("other-ns")
+	second.SetName("acme-elsewhere")
+	second.SetCreationTimestamp(metav1.NewTime(time.Unix(200, 0)))
+	_, err = o.Dynamic.Resource(TenantNetworkGVR).Namespace("other-ns").Create(ctx, second, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = kube.CoreV1().Secrets("other-ns").Create(ctx, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "realm", Namespace: "other-ns"},
+		Data:       map[string][]byte{"api": []byte("realm.example"), "token": []byte("secret-token")},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	o.ReconcileAll(ctx)
+	o.ReconcileAll(ctx)
+
+	// The first one is in Error, but it keeps its tenant, its DaemonSet and its claim.
+	_, status := stored(t, o)
+	assert.Equal(t, PhaseError, status.Phase)
+	assert.Equal(t, "acme", status.Tenant)
+	assert.Equal(t, testObject, status.DaemonSet)
+	_, err = kube.AppsV1().DaemonSets(testNamespace).Get(ctx, testObject, metav1.GetOptions{})
+	require.NoError(t, err)
+
+	// The newer one gets no DaemonSet: a second one on the same nodes could never be removed safely.
+	item, err := o.Dynamic.Resource(TenantNetworkGVR).Namespace("other-ns").Get(ctx, "acme-elsewhere", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, PhaseError, statusOf(item).Phase)
+	assert.Contains(t, statusOf(item).Message, "already served by TenantNetwork "+testNamespace+"/acme")
+	_, err = kube.AppsV1().DaemonSets("other-ns").Get(ctx, namePrefix+"acme-elsewhere", metav1.GetOptions{})
+	assert.True(t, apierrors.IsNotFound(err))
 }
