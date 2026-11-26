@@ -32,6 +32,7 @@ on:
 
       # Build files changes
       - 'Dockerfile'
+      - 'Dockerfile.tenant-network'
       - 'Makefile'
 
       # Sanity tests changes
