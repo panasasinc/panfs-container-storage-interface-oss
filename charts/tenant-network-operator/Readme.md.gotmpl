@@ -111,10 +111,13 @@ The operator does not create the Secret.
 - **Tenant namespace:** the namespace of a `TenantNetwork` must allow pods that use the host network and a `hostPath` volume
   (Pod Security level `privileged`). The namespace of the operator has no such need.
 - **One node, one tenant:** a node can be on the network of one tenant only, so a node must match the `nodeSelector`
-  of one `TenantNetwork` only. The operator does not check this. Two resources that select the same node,
-  for example two without a `nodeSelector`, overwrite the ready label of each other on that node.
-- **The interface name is reserved:** the tenant interface is `vxlan<VNI>` or `vlan<VLAN id>`. A node must not
-  have another interface with that name: the node pod would change it to match the tenant, or remove it.
+  of one `TenantNetwork` only. The operator checks this when it serves a resource: a `TenantNetwork` that selects
+  a node of another one gets the phase `Error` and no node pods. Two resources without a `nodeSelector` both select
+  every node, so the second one is refused; give each tenant its own nodes.
+  The check does not see a node whose labels change later, so keep the labels of the tenants apart.
+- **The interface name is reserved:** the tenant interface is `vxlan<VNI>` or `vlan<VLAN id>`. The node pod marks
+  the interface it creates with the alias `panfs-tenant-network`. When a node already has an interface with that name
+  and without the alias, the pod does not change or remove it; the node stays `NotReady` with the reason.
 - **One `TenantNetwork` per tenant and per namespace:** a namespace holds one `TenantNetwork`, because its name
   is the value of the ready label, and a tenant is served by one `TenantNetwork`. The one that runs its node pods
   keeps the tenant; without a running one, the oldest gets it. The operator reports an error on every other one.
@@ -298,18 +301,19 @@ so select these events with `--field-selector type=Error`.
 The status always shows the current state. The pods also report on their node, as the annotations
 `panfs.vdura.com/tenant-network-overlay-ip`, `-interface` and `-message`.
 
-| Event reason                                   | Meaning                                                        |
-|------------------------------------------------|----------------------------------------------------------------|
-| `SecretFound`                                  | The operator read the Secret and the tenant of its token       |
-| `DaemonSetCreated`, `DaemonSetUpdated`         | The operator created or changed the DaemonSet of the node pods |
-| `Ready`, `Pending`, `Removing`                 | The phase changed                                              |
-| `NodeAttached`                                 | A node was attached to the subnet of the tenant                |
-| `InterfaceConfigured`, `FirewallZoneSet`       | A pod created or corrected the tenant interface of its node    |
-| `NodeReady`, `NodeNotReady`                    | The check of a node passed, or failed twice in a row           |
-| `NodeStopped`                                  | A pod stopped for a restart; interface and attachment stay     |
-| `NodeDetached`                                 | A node left the tenant and was detached                        |
-| `InvalidSpec`, `SecretNotFound`, `PanAPIError` | Error: the operator cannot serve the resource                  |
-| `TenantAlreadyServed`, `ReconcileFailed`       | Error: the operator cannot serve the resource                  |
+| Event reason                                   | Meaning                                                                |
+|------------------------------------------------|------------------------------------------------------------------------|
+| `SecretFound`                                  | The operator read the Secret and the tenant of its token               |
+| `DaemonSetCreated`, `DaemonSetUpdated`         | The operator created or changed the DaemonSet of the node pods         |
+| `Ready`, `Pending`, `Removing`                 | The phase changed                                                      |
+| `NodeAttached`                                 | A node was attached to the subnet of the tenant                        |
+| `InterfaceConfigured`, `FirewallZoneSet`       | A pod created or corrected the tenant interface of its node            |
+| `NodeReady`, `NodeNotReady`                    | The check of a node passed, or failed twice in a row                   |
+| `NodeStopped`                                  | A pod stopped for a restart; interface and attachment stay             |
+| `NodeDetached`                                 | A node left the tenant and was detached                                |
+| `InvalidSpec`, `SecretNotFound`, `PanAPIError` | Error: the operator cannot serve the resource                          |
+| `TenantAlreadyServed`, `NodeSelectorOverlap`   | Error: another `TenantNetwork` has the tenant, the namespace or a node |
+| `ReconcileFailed`                              | Error: the operator cannot serve the resource                          |
 
 For more detail, read the log of the pod of a node:
 

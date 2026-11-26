@@ -46,6 +46,7 @@ const (
 	ReasonSecretNotFound      = "SecretNotFound"
 	ReasonPanAPIError         = "PanAPIError"
 	ReasonTenantAlreadyServed = "TenantAlreadyServed"
+	ReasonNodeSelectorOverlap = "NodeSelectorOverlap"
 	ReasonReconcileFailed     = "ReconcileFailed"
 
 	ReasonNodeAttached        = "NodeAttached"

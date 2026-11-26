@@ -170,6 +170,10 @@ type Operator struct {
 	tenants map[string]cachedTenant
 	// claims maps a tenant, and a namespace, to the TenantNetwork that serves it in the current pass.
 	claims, namespaces map[string]string
+	// nodeOwners maps a node to the TenantNetwork that selects it in the current pass, and nodeLists holds
+	// the nodes of each selector that was listed in the current pass.
+	nodeOwners map[string]string
+	nodeLists  map[string]*corev1.NodeList
 	// reported holds the last event of each kind per TenantNetwork, so an unchanged state is reported once.
 	reported map[string]string
 }
@@ -201,6 +205,7 @@ func (o *Operator) ReconcileAll(ctx context.Context) {
 		return a.Before(&b)
 	})
 	o.claims, o.namespaces = make(map[string]string), make(map[string]string)
+	o.nodeOwners, o.nodeLists = make(map[string]string), make(map[string]*corev1.NodeList)
 	// A TenantNetwork that already runs a DaemonSet keeps its tenant and its namespace, whatever happens to it
 	// in this pass. Without this, a short failure of the oldest one (PanAPI is down, its Secret is missing)
 	// would let a newer one start a second DaemonSet on the same nodes; removing either of the two later
@@ -216,6 +221,14 @@ func (o *Operator) ReconcileAll(ctx context.Context) {
 		}
 		if _, claimed := o.namespaces[item.GetNamespace()]; !claimed {
 			o.namespaces[item.GetNamespace()] = item.GetName()
+		}
+		// Its nodes too: a running TenantNetwork keeps the nodes it selects.
+		selector, _, _ := unstructured.NestedStringMap(item.Object, "spec", "nodeSelector")
+		if _, err := labels.ValidatedSelectorFromSet(selector); err != nil {
+			continue // apply reports the invalid selector
+		}
+		if nodes, err := o.listNodes(ctx, labels.SelectorFromSet(selector).String()); err == nil {
+			o.claimNodes(nodes, item.GetNamespace()+"/"+item.GetName())
 		}
 	}
 	for i := range list.Items {
@@ -337,6 +350,18 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 	}
 	o.eventOnce(ctx, item, "secret", corev1.EventTypeNormal, ReasonSecretFound,
 		fmt.Sprintf("Using Secret %s; its token belongs to tenant %s", spec.RealmSecretName, tenant))
+
+	// A node can be on the network of one tenant only. Two DaemonSets on one node would overwrite the ready
+	// label of each other, and the realm does not support two tenant networks on one node.
+	nodes, err := o.listNodes(ctx, selectorText)
+	if err != nil {
+		return status, err
+	}
+	if node, owner := o.claimNodes(nodes, namespace+"/"+name); owner != "" {
+		return status, withReason(ReasonNodeSelectorOverlap, fmt.Errorf(
+			"node %q is already selected by TenantNetwork %s; a node can be on the network of one tenant only. "+
+				"Set spec.nodeSelector so that the two select different nodes", node, owner))
+	}
 
 	objectName := namePrefix + name
 	status.DaemonSet = objectName
@@ -725,12 +750,43 @@ func (o *Operator) writeStatus(ctx context.Context, item *unstructured.Unstructu
 	return err
 }
 
+// listNodes returns the nodes that a selector matches. A selector is listed once per pass.
+func (o *Operator) listNodes(ctx context.Context, selector string) (*corev1.NodeList, error) {
+	if list, ok := o.nodeLists[selector]; ok {
+		return list, nil
+	}
+	list, err := o.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: selector})
+	if err != nil {
+		return nil, fmt.Errorf("list the nodes with the label %q: %w", selector, err)
+	}
+	if o.nodeLists != nil {
+		o.nodeLists[selector] = list
+	}
+	return list, nil
+}
+
+// claimNodes records that a TenantNetwork selects the nodes. When another TenantNetwork already selects one of
+// them, nothing is recorded, and that node and its owner are returned.
+func (o *Operator) claimNodes(nodes *corev1.NodeList, key string) (node, owner string) {
+	for i := range nodes.Items {
+		if current := o.nodeOwners[nodes.Items[i].Name]; current != "" && current != key {
+			return nodes.Items[i].Name, current
+		}
+	}
+	if o.nodeOwners != nil {
+		for i := range nodes.Items {
+			o.nodeOwners[nodes.Items[i].Name] = key
+		}
+	}
+	return "", ""
+}
+
 // nodeStatuses returns the state of every node that the selector matches, by node name, and the name of the
 // tenant interface. The node pods report both on their node: the ready label, and annotations.
 func (o *Operator) nodeStatuses(ctx context.Context, selector, readyValue string) (map[string]NodeStatus, string, error) {
-	list, err := o.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: selector})
+	list, err := o.listNodes(ctx, selector)
 	if err != nil {
-		return nil, "", fmt.Errorf("list the nodes with the label %s: %w", selector, err)
+		return nil, "", err
 	}
 	var nodes map[string]NodeStatus
 	iface := ""

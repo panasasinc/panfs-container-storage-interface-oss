@@ -472,3 +472,68 @@ func TestOperatorKeepsTheClaimOfARunningTenantNetworkThroughAFailure(t *testing.
 	_, err = kube.AppsV1().DaemonSets("other-ns").Get(ctx, namePrefix+"acme-elsewhere", metav1.GetOptions{})
 	assert.True(t, apierrors.IsNotFound(err))
 }
+
+// tokenAPI is a PanAPI that names the tenant by the token of the Secret.
+type tokenAPI map[string]string
+
+func (a tokenAPI) GetTenantNetwork(_ context.Context, secrets map[string]string) (*panapi.TenantNetwork, error) {
+	return &panapi.TenantNetwork{TenantName: a[secrets["token"]]}, nil
+}
+
+func TestOperatorRefusesATenantNetworkThatSelectsNodesOfAnother(t *testing.T) {
+	ctx := context.Background()
+	first := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
+	first.SetCreationTimestamp(metav1.NewTime(time.Unix(100, 0)))
+	o, kube := newTestOperator(first, &fakeAPI{})
+	o.API = tokenAPI{"secret-token": "acme", "beta-token": "beta"}
+	for name, labels := range map[string]map[string]string{"node-1": {"pool": "a"}, "node-2": {"pool": "b"}} {
+		_, err := kube.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels}}, metav1.CreateOptions{})
+		require.NoError(t, err)
+	}
+	_, err := kube.CoreV1().Secrets("beta-ns").Create(ctx, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "realm", Namespace: "beta-ns"},
+		Data:       map[string][]byte{"api": []byte("realm.example"), "token": []byte("beta-token")},
+	}, metav1.CreateOptions{})
+	require.NoError(t, err)
+	second := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
+	second.SetNamespace("beta-ns")
+	second.SetName("beta")
+	second.SetCreationTimestamp(metav1.NewTime(time.Unix(200, 0)))
+	_, err = o.Dynamic.Resource(TenantNetworkGVR).Namespace("beta-ns").Create(ctx, second, metav1.CreateOptions{})
+	require.NoError(t, err)
+	beta := func() (*unstructured.Unstructured, TenantNetworkStatus) {
+		item, err := o.Dynamic.Resource(TenantNetworkGVR).Namespace("beta-ns").Get(ctx, "beta", metav1.GetOptions{})
+		require.NoError(t, err)
+		return item, statusOf(item)
+	}
+
+	// Both have no node selector, so both select every node: the older one gets them.
+	o.ReconcileAll(ctx)
+	o.ReconcileAll(ctx)
+	_, status := stored(t, o)
+	assert.Equal(t, PhasePending, status.Phase)
+	_, betaStatus := beta()
+	assert.Equal(t, PhaseError, betaStatus.Phase)
+	assert.Contains(t, betaStatus.Message, "is already selected by TenantNetwork "+testNamespace+"/acme")
+	assert.Equal(t, "beta", betaStatus.Tenant)
+	_, err = kube.AppsV1().DaemonSets("beta-ns").Get(ctx, namePrefix+"beta", metav1.GetOptions{})
+	assert.True(t, apierrors.IsNotFound(err))
+	assert.Equal(t, EventTypeError, eventTypes(t, kube, "beta-ns")[ReasonNodeSelectorOverlap])
+
+	// With selectors for different nodes, both are served.
+	item, _ := stored(t, o)
+	require.NoError(t, unstructured.SetNestedStringMap(item.Object, map[string]string{"pool": "a"}, "spec", "nodeSelector"))
+	_, err = o.Dynamic.Resource(TenantNetworkGVR).Namespace(testNamespace).Update(ctx, item, metav1.UpdateOptions{})
+	require.NoError(t, err)
+	betaItem, _ := beta()
+	require.NoError(t, unstructured.SetNestedStringMap(betaItem.Object, map[string]string{"pool": "b"}, "spec", "nodeSelector"))
+	_, err = o.Dynamic.Resource(TenantNetworkGVR).Namespace("beta-ns").Update(ctx, betaItem, metav1.UpdateOptions{})
+	require.NoError(t, err)
+	o.ReconcileAll(ctx)
+	_, betaStatus = beta()
+	assert.Equal(t, PhasePending, betaStatus.Phase)
+	assert.Contains(t, betaStatus.Nodes, "node-2")
+	daemonSet, err := kube.AppsV1().DaemonSets("beta-ns").Get(ctx, namePrefix+"beta", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"pool": "b"}, daemonSet.Spec.Template.Spec.NodeSelector)
+}
