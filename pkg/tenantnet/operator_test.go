@@ -346,6 +346,9 @@ func TestOperatorReportsTheNodesAndWritesEvents(t *testing.T) {
 	o.ReconcileAll(ctx)
 	reasons := eventReasons(t, kube, testNamespace)
 	assert.Equal(t, ReasonSecretNotFound, reasons[len(reasons)-1])
+	types := eventTypes(t, kube, testNamespace)
+	assert.Equal(t, EventTypeError, types[ReasonSecretNotFound])
+	assert.Equal(t, corev1.EventTypeNormal, types[ReasonSecretFound])
 	assert.Len(t, reasons, 4)
 }
 

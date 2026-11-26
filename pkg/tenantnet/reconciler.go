@@ -282,7 +282,7 @@ func (r *Reconciler) step(ctx context.Context) {
 		r.failures, r.warned = 0, false
 	} else if r.failures++; !r.warned && ((r.ready != nil && *r.ready) || r.failures >= 2) {
 		r.warned = true
-		r.Events.Event(passCtx, corev1.EventTypeWarning, ReasonNodeNotReady, fmt.Sprintf("Node %s: %v", r.Config.NodeName, err))
+		r.Events.Event(passCtx, EventTypeError, ReasonNodeNotReady, fmt.Sprintf("Node %s: %v", r.Config.NodeName, err))
 	}
 	r.message = ""
 	if err != nil {
@@ -353,7 +353,7 @@ func (r *Reconciler) shutdown() {
 	r.Log.Info("shutdown: the node left the tenant; removing the interface and the attachment", "reason", reason)
 	if err := r.Detach(ctx); err != nil {
 		r.Log.Error(err, "shutdown: cannot detach the node from the tenant subnet")
-		r.Events.Event(ctx, corev1.EventTypeWarning, ReasonNodeNotReady, fmt.Sprintf(
+		r.Events.Event(ctx, EventTypeError, ReasonNodeNotReady, fmt.Sprintf(
 			"Node %s left the tenant, but it could not be detached: %v", r.Config.NodeName, err))
 		return
 	}

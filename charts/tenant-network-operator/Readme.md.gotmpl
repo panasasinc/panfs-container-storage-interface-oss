@@ -272,10 +272,13 @@ Events:
   Normal   NodeAttached         panfs-tenant-network           Node worker-1 is attached to the subnet of tenant acme, overlay address 192.168.0.57/16
   Normal   InterfaceConfigured  panfs-tenant-network           Node worker-1: interface vxlan5001 was created or corrected ...
   Normal   NodeReady            panfs-tenant-network           Node worker-1: a tenant director answers on vxlan5001; the label ... is set
-  Warning  NodeNotReady         panfs-tenant-network           Node worker-2: no tenant director answers on vxlan5001: ...
+  Error    NodeNotReady         panfs-tenant-network           Node worker-2: no tenant director answers on vxlan5001: ...
 ```
 
 An event is written when something changes, not on every check, and Kubernetes keeps events for about one hour.
+A failure is an event of the type `Error`, so it stands out in `kubectl describe`. Kubernetes itself uses only
+`Normal` and `Warning`: the filter `kubectl get events --types` does not accept `Error`,
+so select these events with `--field-selector type=Error`.
 The status always shows the current state. The pods also report on their node, as the annotations
 `panfs.vdura.com/tenant-network-overlay-ip`, `-interface` and `-message`.
 
@@ -289,8 +292,8 @@ The status always shows the current state. The pods also report on their node, a
 | `NodeReady`, `NodeNotReady`                    | The check of a node passed, or failed twice in a row           |
 | `NodeStopped`                                  | A pod stopped for a restart; interface and attachment stay     |
 | `NodeDetached`                                 | A node left the tenant and was detached                        |
-| `InvalidSpec`, `SecretNotFound`, `PanAPIError` | Warning: the operator cannot serve the resource                |
-| `TenantAlreadyServed`, `ReconcileFailed`       | Warning: the operator cannot serve the resource                |
+| `InvalidSpec`, `SecretNotFound`, `PanAPIError` | Error: the operator cannot serve the resource                  |
+| `TenantAlreadyServed`, `ReconcileFailed`       | Error: the operator cannot serve the resource                  |
 
 For more detail, read the log of the pod of a node:
 

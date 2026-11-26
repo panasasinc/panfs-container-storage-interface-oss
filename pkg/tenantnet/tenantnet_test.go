@@ -406,6 +406,19 @@ func TestShutdownDetachesNodeThatLeftTheTenant(t *testing.T) {
 	})
 }
 
+// eventTypes returns the type of every event in a namespace, by reason.
+func eventTypes(t *testing.T, kube *fake.Clientset, namespace string) map[string]string {
+	t.Helper()
+	types := make(map[string]string)
+	for _, action := range kube.Actions() {
+		if create, ok := action.(k8stesting.CreateAction); ok && action.Matches("create", "events") && action.GetNamespace() == namespace {
+			event := create.GetObject().(*corev1.Event)
+			types[event.Reason] = event.Type
+		}
+	}
+	return types
+}
+
 // eventReasons returns the reasons of the events in a namespace, in the order they were written.
 func eventReasons(t *testing.T, kube *fake.Clientset, namespace string) []string {
 	t.Helper()
@@ -450,6 +463,10 @@ func TestReconcilerReportsEventsAndNodeAnnotations(t *testing.T) {
 	r.step(ctx)
 	assert.Equal(t, []string{ReasonNodeAttached, ReasonNodeReady, ReasonNodeNotReady}, eventReasons(t, kube, "tenant-ns"))
 	assert.Contains(t, annotations()[MessageAnnotation], "no tenant director answers")
+	// A failure is an event of the type Error; everything else is Normal.
+	assert.Equal(t, map[string]string{
+		ReasonNodeAttached: corev1.EventTypeNormal, ReasonNodeReady: corev1.EventTypeNormal, ReasonNodeNotReady: EventTypeError,
+	}, eventTypes(t, kube, "tenant-ns"))
 
 	// The node leaves the tenant: it is detached, and its annotations are removed.
 	node, err := kube.CoreV1().Nodes().Get(ctx, "node-1", metav1.GetOptions{})

@@ -25,6 +25,14 @@ import (
 	"k8s.io/klog/v2"
 )
 
+// EventTypeError is the type of the events that report a failure.
+//
+// Kubernetes itself knows two event types, Normal and Warning, and reports its own failures as Warning.
+// This type is used on purpose instead: a TenantNetwork that cannot be served, or a node whose tenant network
+// does not work, should read as an error in "kubectl describe". The price is known: the API accepts the type,
+// but "kubectl get events --types" does not, and tools that look for Warning events do not see these.
+const EventTypeError = "Error"
+
 // Reasons of the events on a TenantNetwork.
 const (
 	ReasonSecretFound      = "SecretFound"

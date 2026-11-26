@@ -219,7 +219,7 @@ func (o *Operator) reconcile(ctx context.Context, item *unstructured.Unstructure
 	status, err := o.apply(ctx, item, log)
 	if err != nil {
 		status.Phase, status.Message = PhaseError, err.Error()
-		o.eventOnce(ctx, item, "state", corev1.EventTypeWarning, reasonOf(err), upperFirst(err.Error()))
+		o.eventOnce(ctx, item, "state", EventTypeError, reasonOf(err), upperFirst(err.Error()))
 	} else {
 		message := status.Message
 		if status.Phase == PhaseReady {
