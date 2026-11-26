@@ -11,7 +11,7 @@ metadata:
   namespace: <TENANT_NAMESPACE>
 spec:
   # Secret in the same namespace with the keys api and token: PanAPI address and token of the tenant
-  secretName: <SECRET_NAME>
+  realmSecretName: <SECRET_NAME>
 
   # The nodes of the tenant. Remove nodeSelector to use all nodes of the cluster.
   nodeSelector:

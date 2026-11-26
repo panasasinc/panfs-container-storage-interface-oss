@@ -69,9 +69,9 @@ spec:
           properties:
             spec:
               type: object
-              required: ["secretName"]
+              required: ["realmSecretName"]
               properties:
-                secretName:
+                realmSecretName:
                   description: >-
                     Name of a Secret in the namespace of this resource with the keys api (PanAPI address of the realm),
                     token (PanAPI service account token of the tenant) and, optionally, ca_cert.

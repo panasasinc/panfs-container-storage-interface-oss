@@ -14,7 +14,7 @@ Next steps for a tenant:
      name: <NAME>
      namespace: <NAMESPACE>
    spec:
-     secretName: <SECRET_NAME>
+     realmSecretName: <SECRET_NAME>
      nodeSelector:
        <LABEL_KEY>: <LABEL_VALUE>
 

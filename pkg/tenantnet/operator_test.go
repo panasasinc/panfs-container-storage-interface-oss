@@ -81,7 +81,7 @@ func stored(t *testing.T, o *Operator) (*unstructured.Unstructured, TenantNetwor
 func TestOperatorCreatesTheDaemonSetOfTheTenant(t *testing.T) {
 	ctx := context.Background()
 	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
-	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"secretName": "realm"}), api)
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"}), api)
 
 	o.ReconcileAll(ctx)
 
@@ -142,7 +142,7 @@ func TestOperatorCreatesTheDaemonSetOfTheTenant(t *testing.T) {
 func TestOperatorUpdatesTheDaemonSetOnlyWhenTheWantedOneChanges(t *testing.T) {
 	ctx := context.Background()
 	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
-	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"secretName": "realm"}), api)
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"}), api)
 	updates := func() (n int) {
 		for _, action := range kube.Actions() {
 			if action.Matches("update", "daemonsets") {
@@ -184,21 +184,21 @@ func TestOperatorReportsErrors(t *testing.T) {
 		message string
 	}{
 		"no secret name": {
-			spec: map[string]interface{}{}, api: &fakeAPI{}, message: "spec.secretName is required",
+			spec: map[string]interface{}{}, api: &fakeAPI{}, message: "spec.realmSecretName is required",
 		},
 		"missing secret": {
-			spec: map[string]interface{}{"secretName": "other"}, api: &fakeAPI{}, message: `Secret "other" does not exist`,
+			spec: map[string]interface{}{"realmSecretName": "other"}, api: &fakeAPI{}, message: `Secret "other" does not exist`,
 		},
 		"PanAPI refuses the token": {
-			spec: map[string]interface{}{"secretName": "realm"}, api: &fakeAPI{err: errors.New("unauthenticated")},
+			spec: map[string]interface{}{"realmSecretName": "realm"}, api: &fakeAPI{err: errors.New("unauthenticated")},
 			message: "unauthenticated",
 		},
 		"bad VLAN parent": {
-			spec: map[string]interface{}{"secretName": "realm", "vlanParentInterface": "eth0; reboot"},
+			spec: map[string]interface{}{"realmSecretName": "realm", "vlanParentInterface": "eth0; reboot"},
 			api:  &fakeAPI{}, message: "spec.vlanParentInterface is not a valid interface name",
 		},
 		"bad interval": {
-			spec: map[string]interface{}{"secretName": "realm", "interval": "soon"}, api: &fakeAPI{}, message: "spec.interval",
+			spec: map[string]interface{}{"realmSecretName": "realm", "interval": "soon"}, api: &fakeAPI{}, message: "spec.interval",
 		},
 	}
 	for name, tc := range cases {
@@ -218,7 +218,7 @@ func TestOperatorReportsErrors(t *testing.T) {
 func TestOperatorAsksPanAPIAgainWhenTheSecretChanges(t *testing.T) {
 	ctx := context.Background()
 	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
-	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"secretName": "realm"}), api)
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"}), api)
 	o.ReconcileAll(ctx)
 
 	// The same Secret: the stored answer is used.
@@ -243,7 +243,7 @@ func TestOperatorAsksPanAPIAgainWhenTheSecretChanges(t *testing.T) {
 func TestOperatorRemovesTheDaemonSetBeforeTheTenantNetwork(t *testing.T) {
 	ctx := context.Background()
 	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
-	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"secretName": "realm"}), api)
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"}), api)
 	o.ReconcileAll(ctx)
 
 	item, _ := stored(t, o)
@@ -271,11 +271,11 @@ func TestOperatorRemovesTheDaemonSetBeforeTheTenantNetwork(t *testing.T) {
 func TestOperatorServesATenantThroughOneTenantNetwork(t *testing.T) {
 	ctx := context.Background()
 	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
-	first := newTenantNetwork(map[string]interface{}{"secretName": "realm"})
+	first := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
 	first.SetCreationTimestamp(metav1.NewTime(time.Unix(100, 0)))
 	o, kube := newTestOperator(first, api)
 	add := func(namespace, name string, created int64) {
-		item := newTenantNetwork(map[string]interface{}{"secretName": "realm"})
+		item := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
 		item.SetNamespace(namespace)
 		item.SetName(name)
 		item.SetCreationTimestamp(metav1.NewTime(time.Unix(created, 0)))
@@ -312,7 +312,7 @@ func TestOperatorServesATenantThroughOneTenantNetwork(t *testing.T) {
 func TestOperatorReportsTheNodesAndWritesEvents(t *testing.T) {
 	ctx := context.Background()
 	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
-	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"secretName": "realm"}), api)
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"}), api)
 	node := func(name string, labels, annotations map[string]string) {
 		_, err := kube.CoreV1().Nodes().Create(ctx, &corev1.Node{
 			ObjectMeta: metav1.ObjectMeta{Name: name, Labels: labels, Annotations: annotations},
@@ -353,7 +353,7 @@ func TestOperatorUsesTheNodeSelectorOfTheSpec(t *testing.T) {
 	ctx := context.Background()
 	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
 	selector := map[string]interface{}{"pool": "storage", "zone": "a"}
-	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"secretName": "realm", "nodeSelector": selector}), api)
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm", "nodeSelector": selector}), api)
 	for name, labels := range map[string]map[string]string{
 		"node-in":         {"pool": "storage", "zone": "a"},
 		"node-other-zone": {"pool": "storage", "zone": "b"},
@@ -400,7 +400,7 @@ func TestOperatorUsesTheNodeSelectorOfTheSpec(t *testing.T) {
 func TestOperatorReplacesABindingToAnotherNodeRole(t *testing.T) {
 	ctx := context.Background()
 	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
-	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"secretName": "realm"}), api)
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"}), api)
 	o.ReconcileAll(ctx)
 
 	// The operator is installed again under another name: the ClusterRole of the node pods has a new name.

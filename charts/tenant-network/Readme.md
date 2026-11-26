@@ -36,7 +36,7 @@ metadata:
   name: acme-network
   namespace: acme
 spec:
-  secretName: acme-credentials
+  realmSecretName: acme-credentials
   nodeSelector:
     storage-network: acme
 ```
@@ -60,7 +60,7 @@ Without `nodeSelector`, the pods run on all nodes of the cluster, the control pl
 
 ```yaml
 spec:
-  secretName: acme-credentials
+  realmSecretName: acme-credentials
 ```
 
 A node pod does the following on its node, and repeats it on an interval:
@@ -207,7 +207,7 @@ kind: TenantNetwork
 metadata:
   name: <NAME>
 spec:
-  secretName: <SECRET_NAME>
+  realmSecretName: <SECRET_NAME>
   nodeSelector:
     <LABEL_KEY>: <LABEL_VALUE>
 EOF
@@ -220,7 +220,7 @@ Fields of `spec`:
 
 | Field                 | Required | Meaning                                                                                |
 |-----------------------|----------|----------------------------------------------------------------------------------------|
-| `secretName`          | Yes      | Name of the Secret with the PanAPI address and the token of the tenant                 |
+| `realmSecretName`     | Yes      | Name of the Secret with the PanAPI address and the token of the tenant                 |
 | `nodeSelector`        | No       | Labels that select the nodes of the tenant; without it, all nodes of the cluster       |
 | `vlanParentInterface` | No       | Interface that carries the VLAN on a VLAN segment; see [Segment types](#segment-types) |
 | `interval`            | No       | Replaces the value `interval` of the chart for this tenant                             |

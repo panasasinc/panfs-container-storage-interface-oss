@@ -73,9 +73,9 @@ const (
 
 // TenantNetworkSpec is the spec of a TenantNetwork. Only the Secret name is required.
 type TenantNetworkSpec struct {
-	// SecretName names a Secret in the namespace of the resource with the keys api, token and, optionally, ca_cert.
+	// RealmSecretName names a Secret in the namespace of the resource with the keys api, token and, optionally, ca_cert.
 	// The tenant is the one the token belongs to.
-	SecretName string `json:"secretName"`
+	RealmSecretName string `json:"realmSecretName"`
 	// NodeSelector selects the nodes of the tenant. Without it, they are all nodes of the cluster.
 	NodeSelector map[string]string `json:"nodeSelector,omitempty"`
 	// VLANParentInterface names the interface of the nodes that carries the VLAN, when the subnet of the tenant
@@ -246,8 +246,8 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 			return status, withReason(ReasonInvalidSpec, fmt.Errorf("the spec is not valid: %w", err))
 		}
 	}
-	if spec.SecretName == "" {
-		return status, withReason(ReasonInvalidSpec, fmt.Errorf("spec.secretName is required"))
+	if spec.RealmSecretName == "" {
+		return status, withReason(ReasonInvalidSpec, fmt.Errorf("spec.realmSecretName is required"))
 	}
 	if len(name) > maxResourceNameLength {
 		return status, withReason(ReasonInvalidSpec, fmt.Errorf("the name is longer than %d characters", maxResourceNameLength))
@@ -280,7 +280,7 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 		o.namespaces[namespace] = name
 	}
 
-	tenant, err := o.resolveTenant(ctx, namespace, spec.SecretName)
+	tenant, err := o.resolveTenant(ctx, namespace, spec.RealmSecretName)
 	if err != nil {
 		return status, err
 	}
@@ -305,7 +305,7 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 		nodesText = "the nodes with the label " + selectorText
 	}
 	o.eventOnce(ctx, item, "secret", corev1.EventTypeNormal, ReasonSecretFound,
-		fmt.Sprintf("Using Secret %s; its token belongs to tenant %s", spec.SecretName, tenant))
+		fmt.Sprintf("Using Secret %s; its token belongs to tenant %s", spec.RealmSecretName, tenant))
 
 	objectName := namePrefix + name
 	status.DaemonSet = objectName
@@ -642,7 +642,7 @@ func (o *Operator) daemonSet(meta metav1.ObjectMeta, spec TenantNetworkSpec, ten
 					}},
 					Volumes: []corev1.Volume{
 						{Name: "realm-secret", VolumeSource: corev1.VolumeSource{
-							Secret: &corev1.SecretVolumeSource{SecretName: spec.SecretName},
+							Secret: &corev1.SecretVolumeSource{SecretName: spec.RealmSecretName},
 						}},
 						{Name: "host-dbus", VolumeSource: corev1.VolumeSource{
 							HostPath: &corev1.HostPathVolumeSource{Path: "/run/dbus"},
