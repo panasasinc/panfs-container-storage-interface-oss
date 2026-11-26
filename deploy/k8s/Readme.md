@@ -116,16 +116,16 @@ Deploy the tenant network when the worker nodes are not on that network yet.
   - Replace `<NAME>` with a name for the resource
   - Replace `<TENANT_NAMESPACE>` with the namespace of the Secret that holds the PanAPI address and the token of the tenant
   - Replace `<SECRET_NAME>` with the name of that Secret (keys `api` and `token`)
-  - Replace `<TENANT>` with the value of the node label, or change `nodeSelector` to the labels of your nodes.
-    Without `nodeSelector`, all nodes of the cluster are put on the tenant network
+  - Replace `<LABEL_KEY>` and `<LABEL_VALUE>` with a label of the nodes that mount volumes of the tenant.
+    Any label works. Without `nodeSelector`, all nodes of the cluster are put on the tenant network
 
 ```bash
 # Once per cluster: the operator
 kubectl create namespace panfs-tenant-network
 kubectl apply -f tenant-network/panfs-tenant-network-operator.yaml
 
-# Per tenant: label the nodes, then ask for the tenant network
-kubectl label node <NODE_NAME> panfs.vdura.com/tenant=<TENANT>
+# Per tenant: label the nodes with a label of your choice, then ask for the tenant network
+kubectl label node <NODE_NAME> <LABEL_KEY>=<LABEL_VALUE>
 kubectl apply -f tenant-network/template-tenantnetwork.yaml
 
 # The TenantNetwork must be Ready; its status lists the nodes, and its events say what happened

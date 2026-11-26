@@ -335,7 +335,7 @@ The PanFS Tenant Network operator puts the nodes that you choose on that network
 
 | Label                                        | Who sets it        | Meaning                                      |
 |:---------------------------------------------|:-------------------|:---------------------------------------------|
-| `panfs.vdura.com/tenant=<tenant>`            | You                | The node is meant for this tenant            |
+| A label of your choice                       | You                | The node is meant for this tenant            |
 | `panfs.vdura.com/tenant-network=<namespace>` | Tenant network pod | The network of the tenant works on this node |
 
 ```bash
@@ -343,12 +343,12 @@ The PanFS Tenant Network operator puts the nodes that you choose on that network
 kubectl create namespace panfs-tenant-network
 kubectl apply -f deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
 
-# 2. Label the nodes of the tenant
-kubectl label node <NODE_NAME> panfs.vdura.com/tenant=<TENANT>
+# 2. Label the nodes of the tenant, with a label of your choice
+kubectl label node <NODE_NAME> <LABEL_KEY>=<LABEL_VALUE>
 
 # 3. Ask for the tenant network, in the namespace of the Secret that holds the PanAPI address and the token.
 #    In deploy/k8s/tenant-network/template-tenantnetwork.yaml, replace <NAME>, <TENANT_NAMESPACE>,
-#    <SECRET_NAME> and <TENANT> first.
+#    <SECRET_NAME>, <LABEL_KEY> and <LABEL_VALUE> first.
 kubectl apply -f deploy/k8s/tenant-network/template-tenantnetwork.yaml
 
 # 4. The TenantNetwork must be Ready; its status lists the nodes, and its events say what happened

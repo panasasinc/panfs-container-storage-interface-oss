@@ -15,4 +15,4 @@ spec:
 
   # The nodes of the tenant. Remove nodeSelector to use all nodes of the cluster.
   nodeSelector:
-    panfs.vdura.com/tenant: <TENANT>
+    <LABEL_KEY>: <LABEL_VALUE>
