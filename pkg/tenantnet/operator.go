@@ -442,7 +442,7 @@ func (o *Operator) ensureFinalizer(ctx context.Context, item *unstructured.Unstr
 func (o *Operator) resolveTenant(ctx context.Context, namespace, secretName string) (string, error) {
 	secret, err := o.Kube.CoreV1().Secrets(namespace).Get(ctx, secretName, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
-		return "", withReason(ReasonSecretNotFound, fmt.Errorf("Secret %q does not exist in namespace %q", secretName, namespace))
+		return "", withReason(ReasonSecretNotFound, fmt.Errorf("the Secret %q does not exist in namespace %q", secretName, namespace))
 	}
 	if err != nil {
 		return "", fmt.Errorf("read the Secret %q: %w", secretName, err)
