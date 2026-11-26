@@ -372,6 +372,13 @@ func TestOperatorUsesTheNodeSelectorOfTheSpec(t *testing.T) {
 	_, status := stored(t, o)
 	require.Len(t, status.Nodes, 1)
 	assert.Contains(t, status.Nodes, "node-in")
+	// The node matches, but the DaemonSet has not counted it yet: the message does not say "no node".
+	assert.Equal(t, "waiting for the pods to start on 1 node", status.Message)
+
+	// No node matches: now the message says so.
+	require.NoError(t, kube.CoreV1().Nodes().Delete(ctx, "node-in", metav1.DeleteOptions{}))
+	o.ReconcileAll(ctx)
+	_, status = stored(t, o)
 	assert.Equal(t, "no node to serve: the selector is for the nodes with the label pool=storage,zone=a", status.Message)
 
 	// Without the selector, every node is a node of the tenant.
@@ -381,7 +388,8 @@ func TestOperatorUsesTheNodeSelectorOfTheSpec(t *testing.T) {
 	require.NoError(t, err)
 	o.ReconcileAll(ctx)
 	_, status = stored(t, o)
-	assert.Len(t, status.Nodes, 3)
+	assert.Len(t, status.Nodes, 2)
+	assert.Equal(t, "waiting for the pods to start on 2 nodes", status.Message)
 	daemonSet, err = kube.AppsV1().DaemonSets(testNamespace).Get(ctx, testObject, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Empty(t, daemonSet.Spec.Template.Spec.NodeSelector)

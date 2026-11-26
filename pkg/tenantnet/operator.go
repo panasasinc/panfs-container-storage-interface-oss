@@ -349,6 +349,11 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 		return status, err
 	}
 	switch {
+	case status.DesiredNodes == 0 && len(status.Nodes) > 0:
+		// Nodes match the selector, but the DaemonSet has not counted them yet: it was created a moment ago.
+		// Saying "no node" here would be wrong, and it would be reported as an event.
+		status.Phase = PhasePending
+		status.Message = "waiting for the pods to start on " + countNodes(len(status.Nodes))
 	case status.DesiredNodes == 0:
 		status.Phase = PhasePending
 		status.Message = "no node to serve: the selector is for " + nodesText
@@ -742,6 +747,14 @@ func (o *Operator) eventOnce(ctx context.Context, item *unstructured.Unstructure
 	}
 	o.reported[key] = value
 	o.events(item).Event(ctx, eventType, reason, message)
+}
+
+// countNodes returns the number of nodes as text: "1 node", "3 nodes".
+func countNodes(n int) string {
+	if n == 1 {
+		return "1 node"
+	}
+	return fmt.Sprintf("%d nodes", n)
 }
 
 // upperFirst returns the text with its first letter in upper case.
