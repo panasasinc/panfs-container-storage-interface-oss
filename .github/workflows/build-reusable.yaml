@@ -23,7 +23,7 @@ on:
         default: 'dev'
         required: false
       build-target:
-        description: Build target in Dockerfile
+        description: "What to build: plugin (CSI driver), tests (sanity test tools) or tenant-network (PanFS Tenant Network)"
         type: string
         default: 'plugin'
         required: false
