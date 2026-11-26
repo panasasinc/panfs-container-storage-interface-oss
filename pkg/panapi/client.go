@@ -51,6 +51,9 @@ const (
 
 var llog klog.Logger = klog.NewKlogr()
 
+// plainHTTPWarned holds the hosts the plain HTTP warning was logged for, so it is logged once per host.
+var plainHTTPWarned sync.Map
+
 // Client talks to PanAPI on behalf of the CSI controller.
 // The realm address and the credentials come from the secrets of each call, so one Client serves many realms.
 type Client struct {
@@ -152,7 +155,7 @@ func endpointFromSecrets(secrets map[string]string) (endpoint, error) {
 	if err != nil {
 		return endpoint{}, fmt.Errorf("%w: %v", ErrorInvalidArgument, err)
 	}
-	if parsed.Scheme == "http" {
+	if _, warned := plainHTTPWarned.LoadOrStore(parsed.Host, true); parsed.Scheme == "http" && !warned {
 		llog.Info("WARNING: PanAPI is reached over plain HTTP; the API token crosses the network in clear text",
 			"host", parsed.Host)
 	}
