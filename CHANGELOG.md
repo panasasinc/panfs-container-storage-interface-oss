@@ -34,6 +34,20 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 
 ### Added
 
+- PanFS Tenant Network operator: the new chart `charts/tenant-network`, the manifests in `deploy/k8s/tenant-network`,
+  and the image `panfs-tenant-network`. Install it once per cluster. A `TenantNetwork` resource names the Secret
+  of a tenant and selects its nodes; the operator reads the tenant of the token from PanAPI and runs a pod on every
+  selected node. A pod attaches its node to the subnet of the tenant through PanAPI, builds the tenant interface,
+  sets the firewalld zone, and sets the node label `panfs.vdura.com/tenant-network=<namespace>` while a director
+  of the realm answers. When a node no longer matches the selector, or the `TenantNetwork` is deleted,
+  the pod removes the interface and detaches the node. The pod builds a VXLAN or a VLAN interface, as the realm
+  reports the segment type of the subnet. The status of the resource lists the nodes,
+  and the operator and the pods report changes as events on it.
+  See the [operator documentation](charts/tenant-network/Readme.md).
+- StorageClass chart: the value `tenant`. It creates the `TenantNetwork` of the tenant, and it adds `allowedTopologies`
+  with the node label `panfs.vdura.com/tenant-network=<release namespace>` to the StorageClass.
+  `tenantNetwork.create` switches the resource off.
+- The `Makefile` targets `build-tenant-network-image` and `manifest-tenant-network`.
 - The controller reads the mount address (`rmlist`) of the tenant network from PanAPI and passes it to the node.
   The node mounts `panfs://<first address>/<volume>` with the mount option `rmlist=(...)`.
   Without a mount address, it mounts from the host of the `api` address.

@@ -104,3 +104,58 @@ kubectl apply -f <your-pvc-manifest>.yaml
 - Review all comments in the manifests for guidance on configuration and permissions.
 - Ensure that any referenced ServiceAccounts, Roles, and RoleBindings are created and configured as described.
 - For troubleshooting, check the logs of the CSI driver pods and verify that secrets and StorageClass parameters are correct.
+
+## 3. Deploying the Tenant Network (optional)
+
+A volume of a tenant is reachable only from the network of that tenant.
+Deploy the tenant network when the worker nodes are not on that network yet.
+
+- **Operator manifest:** `tenant-network/panfs-tenant-network-operator.yaml`, once per cluster.
+  It holds the `TenantNetwork` resource definition and the operator, for the namespace `panfs-tenant-network`.
+- **Tenant manifest:** `tenant-network/template-tenantnetwork.yaml`, once per tenant.
+  - Replace `<NAME>` with a name for the resource
+  - Replace `<TENANT_NAMESPACE>` with the namespace of the Secret that holds the PanAPI address and the token of the tenant
+  - Replace `<SECRET_NAME>` with the name of that Secret (keys `api` and `token`)
+  - Replace `<TENANT>` with the value of the node label, or change `nodeSelector` to the labels of your nodes.
+    Without `nodeSelector`, all nodes of the cluster are put on the tenant network
+
+```bash
+# Once per cluster: the operator
+kubectl create namespace panfs-tenant-network
+kubectl apply -f tenant-network/panfs-tenant-network-operator.yaml
+
+# Per tenant: label the nodes, then ask for the tenant network
+kubectl label node <NODE_NAME> panfs.vdura.com/tenant=<TENANT>
+kubectl apply -f tenant-network/template-tenantnetwork.yaml
+
+# The TenantNetwork must be Ready; its status lists the nodes, and its events say what happened
+kubectl get tenantnetworks -A
+kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
+```
+
+A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`.
+To provision volumes only for the ready nodes, add this block to the StorageClass manifest of the tenant:
+
+```yaml
+allowedTopologies:
+  - matchLabelExpressions:
+      - key: panfs.vdura.com/tenant-network
+        values:
+          - "<TENANT_NAMESPACE>"
+```
+
+To take a node off the tenant network, remove its label. The pod of the node then removes the tenant interface
+and detaches the node from the subnet in the realm:
+
+```bash
+kubectl label node <NODE_NAME> panfs.vdura.com/tenant-
+```
+
+To remove the network of a tenant, delete its `TenantNetwork` while the operator runs.
+The delete waits until every pod has cleaned up its node:
+
+```bash
+kubectl delete -f tenant-network/template-tenantnetwork.yaml
+```
+
+The requirements and the details are in the [operator documentation](../../charts/tenant-network/Readme.md).

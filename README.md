@@ -13,6 +13,7 @@ For more details on specific topics, refer to the following documents:
 |:---------|:------------|
 | [Overview](./docs/Overview.md) | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow |
 | [Usage Guide](./docs/Usage-Guide.md) | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples |
+| [Tenant Network](./charts/tenant-network/Readme.md) | Putting worker nodes on the network of a PanFS tenant, and marking the nodes that are ready |
 | [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
 | [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
 | [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
@@ -41,6 +42,7 @@ For more details on specific topics, refer to the following documents:
       * [2.1 Prerequisites](#21-prerequisites)
       * [2.2 Configure and Deploy](#22-configure-and-deploy)
     * [3. Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)
+    * [4. Put the nodes on the tenant network](#4-put-the-nodes-on-the-tenant-network)
 * [Deploying Workloads](#deploying-workloads)
 * [CSI Driver Uninstallation](#csi-driver-uninstallation)
 * [API Documentation](#api-documentation)
@@ -158,6 +160,9 @@ The driver talks to the realm through PanAPI. It does not use SSH.
 - **Tenant network**: A volume of a tenant is reachable only from the network of that tenant.
   Every worker node must be attached to that network before it mounts a volume.
   The driver finds the mount address of the network, but it does not attach the nodes.
+  The [PanFS Tenant Network operator](./charts/tenant-network/Readme.md) attaches the nodes that you label for the tenant,
+  and it marks the nodes that are ready; see [Tenant network](#4-put-the-nodes-on-the-tenant-network).
+  It needs these permissions too: list, read, create and delete attachments of a subnet.
 
 ### CSI Driver Installation - Quick Start
 
@@ -320,6 +325,44 @@ csi-panfs-storage-class   com.vdura.csi.panfs   Delete          WaitForFirstCons
 If the StorageClass is missing or misconfigured, verify the configuration variables and check `kubectl logs` for errors.
 
 ---
+
+#### 4. Put the nodes on the tenant network
+
+Skip this step when the worker nodes already reach the mount address of the tenant.
+
+A volume of a tenant is reachable only from the network of that tenant.
+The PanFS Tenant Network operator puts the nodes that you choose on that network. Two node labels are involved:
+
+| Label                                        | Who sets it        | Meaning                                      |
+|:---------------------------------------------|:-------------------|:---------------------------------------------|
+| `panfs.vdura.com/tenant=<tenant>`            | You                | The node is meant for this tenant            |
+| `panfs.vdura.com/tenant-network=<namespace>` | Tenant network pod | The network of the tenant works on this node |
+
+```bash
+# 1. Install the operator, once per cluster
+kubectl create namespace panfs-tenant-network
+kubectl apply -f deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
+
+# 2. Label the nodes of the tenant
+kubectl label node <NODE_NAME> panfs.vdura.com/tenant=<TENANT>
+
+# 3. Ask for the tenant network, in the namespace of the Secret that holds the PanAPI address and the token.
+#    In deploy/k8s/tenant-network/template-tenantnetwork.yaml, replace <NAME>, <TENANT_NAMESPACE>,
+#    <SECRET_NAME> and <TENANT> first.
+kubectl apply -f deploy/k8s/tenant-network/template-tenantnetwork.yaml
+
+# 4. The TenantNetwork must be Ready; its status lists the nodes, and its events say what happened
+kubectl get tenantnetworks -A
+kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
+```
+
+A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`: the value is the namespace of the `TenantNetwork`.
+
+With Helm, step 3 is the value `tenant` of the [StorageClass chart](./charts/storageclass/Readme.md#tenant-network):
+it creates the `TenantNetwork`, and it restricts the StorageClass to the ready nodes.
+
+The requirements (Calico setting, namespace, token permissions), the Helm installation, and the way to keep workloads
+on the ready nodes are described in the [operator documentation](./charts/tenant-network/Readme.md).
 
 ## Deploying Workloads
 
