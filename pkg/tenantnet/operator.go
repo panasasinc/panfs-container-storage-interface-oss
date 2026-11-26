@@ -527,9 +527,24 @@ func (o *Operator) ensureRBAC(ctx context.Context, meta metav1.ObjectMeta) error
 		Subjects:   subjects,
 		RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "ClusterRole", Name: o.Options.ClusterRole},
 	}
-	if _, err := o.Kube.RbacV1().ClusterRoleBindings().Create(ctx, clusterBinding, metav1.CreateOptions{}); err != nil &&
-		!apierrors.IsAlreadyExists(err) {
-		return fmt.Errorf("create the ClusterRoleBinding: %w", err)
+	clusterBindings := o.Kube.RbacV1().ClusterRoleBindings()
+	current, err := clusterBindings.Get(ctx, clusterBinding.Name, metav1.GetOptions{})
+	if err == nil && (current.RoleRef != clusterBinding.RoleRef || !equality.Semantic.DeepEqual(current.Subjects, subjects)) {
+		// The role of a binding cannot be changed. A binding to another role is left over from an operator
+		// that was installed under another name; replace it, or the pods cannot set the ready label.
+		if err := clusterBindings.Delete(ctx, clusterBinding.Name, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			return fmt.Errorf("delete the outdated ClusterRoleBinding: %w", err)
+		}
+		err = apierrors.NewNotFound(rbacv1.Resource("clusterrolebindings"), clusterBinding.Name)
+	}
+	if apierrors.IsNotFound(err) {
+		if _, err := clusterBindings.Create(ctx, clusterBinding, metav1.CreateOptions{}); err != nil && !apierrors.IsAlreadyExists(err) {
+			return fmt.Errorf("create the ClusterRoleBinding: %w", err)
+		}
+		return nil
+	}
+	if err != nil {
+		return fmt.Errorf("read the ClusterRoleBinding: %w", err)
 	}
 	return nil
 }

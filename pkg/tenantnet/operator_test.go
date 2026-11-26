@@ -396,3 +396,19 @@ func TestOperatorUsesTheNodeSelectorOfTheSpec(t *testing.T) {
 	assert.Equal(t, PhaseError, status.Phase)
 	assert.Contains(t, status.Message, "spec.nodeSelector is not valid")
 }
+
+func TestOperatorReplacesABindingToAnotherNodeRole(t *testing.T) {
+	ctx := context.Background()
+	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"secretName": "realm"}), api)
+	o.ReconcileAll(ctx)
+
+	// The operator is installed again under another name: the ClusterRole of the node pods has a new name.
+	o.Options.ClusterRole = "new-node-role"
+	o.ReconcileAll(ctx)
+
+	clusterBinding, err := kube.RbacV1().ClusterRoleBindings().Get(ctx, testNamespace+"-"+testObject, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "new-node-role", clusterBinding.RoleRef.Name)
+	assert.Equal(t, testObject, clusterBinding.Subjects[0].Name)
+}
