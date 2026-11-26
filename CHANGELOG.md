@@ -40,7 +40,8 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
   selected node. A pod attaches its node to the subnet of the tenant through PanAPI, builds the tenant interface,
   sets the firewalld zone, and sets the node label `panfs.vdura.com/tenant-network=<namespace>` while a director
   of the realm answers. When a node no longer matches the selector, or the `TenantNetwork` is deleted,
-  the pod removes the interface and detaches the node. The pod builds a VXLAN or a VLAN interface, as the realm
+  the pod removes the interface and detaches the node. A ready label that the pods could not remove,
+  for example because the whole namespace was deleted, is removed by the operator. The pod builds a VXLAN or a VLAN interface, as the realm
   reports the segment type of the subnet. The status of the resource lists the nodes,
   and the operator and the pods report changes as events on it.
   See the [operator documentation](charts/tenant-network-operator/Readme.md).

@@ -71,10 +71,11 @@ rules:
     resources: ["secrets"]
     verbs: ["get"]
 
-  # Read the state that the node pods report on their nodes, for the status of a TenantNetwork
+  # Read the state that the node pods report on their nodes, for the status of a TenantNetwork.
+  # Patch: remove the ready label that the pods of a deleted TenantNetwork could not remove themselves
   - apiGroups: [""]
     resources: ["nodes"]
-    verbs: ["list"]
+    verbs: ["list", "patch"]
 
   # Report changes as events on a TenantNetwork; the node pods get the same permission in their namespace
   - apiGroups: [""]

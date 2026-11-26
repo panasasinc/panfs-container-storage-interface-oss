@@ -35,6 +35,7 @@ import (
 	"k8s.io/apimachinery/pkg/labels"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/intstr"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -245,6 +246,7 @@ func (o *Operator) ReconcileAll(ctx context.Context) {
 			log.Error(err, "cannot reconcile")
 		}
 	}
+	o.cleanNodes(ctx, list.Items)
 }
 
 // reconcile brings the objects of one TenantNetwork to the wanted state and reports the result in its status.
@@ -456,6 +458,24 @@ func (o *Operator) remove(ctx context.Context, item *unstructured.Unstructured, 
 		o.eventOnce(ctx, item, "state", corev1.EventTypeNormal, ReasonRemoving,
 			"Deleting DaemonSet "+objectName+"; waiting for the pods to clean up their nodes")
 		return o.writeStatus(ctx, item, status)
+	}
+
+	// The pods are gone. A pod that lost its permissions before it stopped (the whole namespace was deleted)
+	// could not remove the ready label of its node, so remove what is left: a label without a pod behind it
+	// would send workloads to a node that nothing keeps on the tenant network.
+	left, err := o.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+		LabelSelector: labels.SelectorFromSet(labels.Set{ReadyLabelKey: namespace}).String(),
+	})
+	if err != nil {
+		return fmt.Errorf("list the nodes with the label %s=%s: %w", ReadyLabelKey, namespace, err)
+	}
+	for i := range left.Items {
+		if err := o.cleanNode(ctx, &left.Items[i], true, true); err != nil {
+			return err
+		}
+		o.events(item).Event(ctx, corev1.EventTypeNormal, ReasonNodeLabelRemoved, fmt.Sprintf(
+			"Node %s: its pod left the label %s=%s behind; the operator removed it",
+			left.Items[i].Name, ReadyLabelKey, namespace))
 	}
 
 	err = o.Kube.RbacV1().ClusterRoleBindings().Delete(ctx, clusterBindingName(namespace, objectName), metav1.DeleteOptions{})
@@ -819,6 +839,73 @@ func (o *Operator) nodeStatuses(ctx context.Context, selector, readyValue string
 		}
 	}
 	return nodes, iface, nil
+}
+
+// cleanNodes removes the ready label that no TenantNetwork stands behind any more, with the annotations of the
+// node pods. A pod removes them itself when its node leaves the tenant, but it cannot when it loses its
+// permissions first: the namespace was deleted as a whole, or the finalizer was removed by hand.
+// A label is left over when the namespace it names has no TenantNetwork at all. While a TenantNetwork exists
+// there, in any state, its pods and remove look after the label. The annotations stay when another
+// TenantNetwork selects the node, because the pod of that one writes them.
+// Nothing is removed on doubt: a selector that cannot be read counts as a match, and a failed read ends the pass.
+func (o *Operator) cleanNodes(ctx context.Context, items []unstructured.Unstructured) {
+	namespaces := make(map[string]bool, len(items))
+	selectors := make([]labels.Selector, 0, len(items))
+	for i := range items {
+		namespaces[items[i].GetNamespace()] = true
+		selector := labels.Everything()
+		if set, _, err := unstructured.NestedStringMap(items[i].Object, "spec", "nodeSelector"); err == nil {
+			if valid, err := labels.ValidatedSelectorFromSet(set); err == nil {
+				selector = valid
+			}
+		}
+		selectors = append(selectors, selector)
+	}
+
+	// Not through listNodes: its lists are as old as the start of the pass, and a label that was set or
+	// removed since then must be seen here.
+	nodes, err := o.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{LabelSelector: ReadyLabelKey})
+	if err != nil {
+		o.Log.Error(err, "cannot look for labels that were left on nodes")
+		return
+	}
+	for i := range nodes.Items {
+		node := &nodes.Items[i]
+		value := node.Labels[ReadyLabelKey]
+		if namespaces[value] {
+			continue
+		}
+		selected := false
+		for _, selector := range selectors {
+			selected = selected || selector.Matches(labels.Set(node.Labels))
+		}
+		if err := o.cleanNode(ctx, node, true, !selected); err != nil {
+			o.Log.Error(err, "cannot clean up the node", "node", node.Name)
+			continue
+		}
+		o.Log.Info("removed a label that was left on the node: its namespace has no TenantNetwork",
+			"node", node.Name, "label", ReadyLabelKey+"="+value)
+	}
+}
+
+// cleanNode removes the ready label, the annotations of the node pods, or both, from a node.
+func (o *Operator) cleanNode(ctx context.Context, node *corev1.Node, label, annotations bool) error {
+	metadata := map[string]any{}
+	if label {
+		metadata["labels"] = map[string]any{ReadyLabelKey: nil}
+	}
+	if annotations {
+		metadata["annotations"] = map[string]any{OverlayAnnotation: nil, InterfaceAnnotation: nil, MessageAnnotation: nil}
+	}
+	// A merge patch with null removes a key.
+	patch, err := json.Marshal(map[string]any{"metadata": metadata})
+	if err != nil {
+		return err
+	}
+	if _, err := o.Kube.CoreV1().Nodes().Patch(ctx, node.Name, types.MergePatchType, patch, metav1.PatchOptions{}); err != nil {
+		return fmt.Errorf("remove the label %s from node %s: %w", ReadyLabelKey, node.Name, err)
+	}
+	return nil
 }
 
 // events returns the sink for events about a TenantNetwork.

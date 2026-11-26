@@ -41,6 +41,7 @@ const (
 	ReasonReady            = "Ready"
 	ReasonPending          = "Pending"
 	ReasonRemoving         = "Removing"
+	ReasonNodeLabelRemoved = "NodeLabelRemoved"
 
 	ReasonInvalidSpec         = "InvalidSpec"
 	ReasonSecretNotFound      = "SecretNotFound"

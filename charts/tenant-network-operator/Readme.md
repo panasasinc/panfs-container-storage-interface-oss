@@ -175,6 +175,8 @@ in a namespace gets their effect on the selected nodes.
   cluster, because a `TenantNetwork` can be in any namespace. It cannot list Secrets, and it reads only the Secrets
   that a `TenantNetwork` names. Who may create a `TenantNetwork` in a namespace can make the operator use
   a Secret of that namespace.
+- **The operator can change any node.** Its `ClusterRole` allows `list` and `patch` on nodes. It uses the patch
+  only to remove the ready label and the annotations of the node pods that a deleted `TenantNetwork` left behind.
 - **The operator creates workloads in every namespace.** It may create DaemonSets, ServiceAccounts, Roles and
   RoleBindings wherever a `TenantNetwork` is, and it may create and delete ClusterRoleBindings.
 - **The firewalld zone `trusted` opens the node to the tenant network.** Every port of the node is then reachable
@@ -322,6 +324,7 @@ The status always shows the current state. The pods also report on their node, a
 | `NodeReady`, `NodeNotReady`                    | The check of a node passed, or failed twice in a row                   |
 | `NodeStopped`                                  | A pod stopped for a restart; interface and attachment stay             |
 | `NodeDetached`                                 | A node left the tenant and was detached                                |
+| `NodeLabelRemoved`                             | The operator removed a ready label that the pods left behind           |
 | `InvalidSpec`, `SecretNotFound`, `PanAPIError` | Error: the operator cannot serve the resource                          |
 | `TenantAlreadyServed`, `NodeSelectorOverlap`   | Error: another `TenantNetwork` has the tenant, the namespace or a node |
 | `ReconcileFailed`                              | Error: the operator cannot serve the resource                          |
@@ -377,9 +380,14 @@ The delete waits until the operator has removed the DaemonSet and every pod has 
 the ready label, the tenant interface, and the attachment in the realm are gone afterwards.
 
 Delete the `TenantNetwork` before you delete its namespace or its Secret. When the whole namespace is deleted
-at once, the pods can lose their permissions before they have cleaned up; the ready label, the interface
-and the attachment of a node can then stay behind. A node is detached only when its pod can see for certain
-that the node left the tenant.
+at once, the pods can lose their permissions before they have cleaned up. A node is detached only when its pod
+can see for certain that the node left the tenant, so the following can stay behind:
+
+- **The ready label.** The operator removes it: before it releases a deleted `TenantNetwork`, and in every pass
+  for a label whose namespace has no `TenantNetwork` any more. Workloads are not sent to such a node.
+- **The tenant interface and the attachment in the realm.** The operator cannot remove them, because it does not
+  run on the node and the token is gone with the Secret. Remove the interface with `ip link delete <INTERFACE>`
+  on the node, and the attachment in the realm.
 
 To keep the interfaces and the attachments, set `detachOnRemoval` to `false` before you delete:
 

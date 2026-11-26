@@ -537,3 +537,78 @@ func TestOperatorRefusesATenantNetworkThatSelectsNodesOfAnother(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, map[string]string{"pool": "b"}, daemonSet.Spec.Template.Spec.NodeSelector)
 }
+
+func TestOperatorRemovesLabelsThatWereLeftOnNodes(t *testing.T) {
+	ctx := context.Background()
+	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{
+		"realmSecretName": "realm", "nodeSelector": map[string]interface{}{TenantLabelKey: "acme"},
+	}), api)
+	annotations := func() map[string]string {
+		return map[string]string{OverlayAnnotation: "192.168.0.57", InterfaceAnnotation: "vxlan7"}
+	}
+	for name, nodeLabels := range map[string]map[string]string{
+		// Its namespace has no TenantNetwork, and no TenantNetwork selects the node.
+		"left-over": {ReadyLabelKey: "gone"},
+		// Its namespace has no TenantNetwork, but the TenantNetwork of the test selects the node now.
+		"taken-over": {ReadyLabelKey: "gone", TenantLabelKey: "acme"},
+		// The node of a working TenantNetwork.
+		"served": {ReadyLabelKey: testNamespace, TenantLabelKey: "acme"},
+		// The namespace has a TenantNetwork, so its pods look after the label, whatever the selector says.
+		"leaving": {ReadyLabelKey: testNamespace},
+	} {
+		_, err := kube.CoreV1().Nodes().Create(ctx, &corev1.Node{
+			ObjectMeta: metav1.ObjectMeta{Name: name, Labels: nodeLabels, Annotations: annotations()},
+		}, metav1.CreateOptions{})
+		require.NoError(t, err)
+	}
+
+	o.ReconcileAll(ctx)
+
+	node := func(name string) *corev1.Node {
+		found, err := kube.CoreV1().Nodes().Get(ctx, name, metav1.GetOptions{})
+		require.NoError(t, err)
+		return found
+	}
+	assert.NotContains(t, node("left-over").Labels, ReadyLabelKey)
+	assert.Empty(t, node("left-over").Annotations)
+	assert.NotContains(t, node("taken-over").Labels, ReadyLabelKey)
+	assert.Equal(t, annotations(), node("taken-over").Annotations, "the pod of the new TenantNetwork writes them")
+	assert.Equal(t, testNamespace, node("served").Labels[ReadyLabelKey])
+	assert.Equal(t, testNamespace, node("leaving").Labels[ReadyLabelKey])
+	assert.Equal(t, annotations(), node("leaving").Annotations)
+}
+
+func TestOperatorRemovesTheLabelsOfATenantNetworkBeforeItReleasesIt(t *testing.T) {
+	ctx := context.Background()
+	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"}), api)
+	_, err := kube.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name: "node-a", Labels: map[string]string{ReadyLabelKey: testNamespace, "kept": "yes"},
+		Annotations: map[string]string{OverlayAnnotation: "192.168.0.57", "kept": "yes"},
+	}}, metav1.CreateOptions{})
+	require.NoError(t, err)
+	o.ReconcileAll(ctx)
+
+	item, _ := stored(t, o)
+	now := metav1.Now()
+	item.SetDeletionTimestamp(&now)
+	_, err = o.Dynamic.Resource(TenantNetworkGVR).Namespace(testNamespace).Update(ctx, item, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	// First pass: the DaemonSet is deleted. The label stays, because a pod may still be cleaning up.
+	o.ReconcileAll(ctx)
+	node, err := kube.CoreV1().Nodes().Get(ctx, "node-a", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, testNamespace, node.Labels[ReadyLabelKey])
+
+	// Second pass: the pods are gone and the label is still there, so the operator removes it.
+	o.ReconcileAll(ctx)
+	node, err = kube.CoreV1().Nodes().Get(ctx, "node-a", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, map[string]string{"kept": "yes"}, node.Labels)
+	assert.Equal(t, map[string]string{"kept": "yes"}, node.Annotations)
+	item, _ = stored(t, o)
+	assert.Empty(t, item.GetFinalizers())
+	assert.Contains(t, eventReasons(t, kube, testNamespace), ReasonNodeLabelRemoved)
+}
