@@ -28,7 +28,10 @@ import (
 	"github.com/stretchr/testify/require"
 	appsv1 "k8s.io/api/apps/v1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/fake"
 	k8stesting "k8s.io/client-go/testing"
@@ -707,4 +710,29 @@ func TestReconcilerOnAVLANSegment(t *testing.T) {
 	r.shutdown()
 	assert.Contains(t, run.changes, "ip link del vlan123")
 	assert.Equal(t, []string{"a1"}, api.detached)
+}
+
+func TestShutdownDoesNotDetachWhenItCannotReadTheCluster(t *testing.T) {
+	forbidden := apierrors.NewForbidden(schema.GroupResource{Resource: "nodes"}, "node-1", errors.New("no permission"))
+	cases := map[string]struct{ verb, resource string }{
+		"the node cannot be read":      {"get", "nodes"},
+		"the DaemonSet cannot be read": {"get", "daemonsets"},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme", SubnetID: "s1", Directors: []string{"192.168.0.2"}}}
+			run := &fakeRunner{outputs: map[string]string{readLinks: matchingLink, readFDB: matchingFDB}}
+			r, kube := newTestReconciler(t, api, run)
+			// The permissions of the pod are gone, for example while the operator is installed again.
+			kube.PrependReactor(tc.verb, tc.resource, func(k8stesting.Action) (bool, runtime.Object, error) {
+				return true, nil, forbidden
+			})
+
+			removed, _ := r.removedFromTenant(context.Background())
+			assert.False(t, removed)
+			r.shutdown()
+			assert.Empty(t, api.detached)
+			assert.Empty(t, run.changes)
+		})
+	}
 }

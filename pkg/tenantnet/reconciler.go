@@ -363,7 +363,7 @@ func (r *Reconciler) shutdown() {
 }
 
 // removedFromTenant reports whether the node no longer belongs to the tenant, and why.
-// When the state cannot be read for another reason than missing permissions, the answer is no:
+// When the state cannot be read, for whatever reason, the answer is no:
 // a wrong detach cuts mounted volumes off, and a missed detach only leaves a record behind.
 func (r *Reconciler) removedFromTenant(ctx context.Context) (bool, string) {
 	if r.Kube == nil {
@@ -372,12 +372,12 @@ func (r *Reconciler) removedFromTenant(ctx context.Context) (bool, string) {
 
 	node, err := r.Kube.CoreV1().Nodes().Get(ctx, r.Config.NodeName, metav1.GetOptions{})
 	switch {
-	case apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err):
-		// The permissions of the release are deleted with the release.
-		return true, "the permissions of the release are gone"
 	case apierrors.IsNotFound(err):
 		return true, "the node object is gone"
 	case err != nil:
+		// This includes missing permissions. They are no sign that the node left the tenant: the operator
+		// can be reinstalled, or its ClusterRole can be missing for a moment, while this pod stops for another
+		// reason. Only positive evidence leads to a detach.
 		r.Log.Error(err, "shutdown: cannot read the node; assuming a restart")
 		return false, ""
 	}
@@ -391,8 +391,6 @@ func (r *Reconciler) removedFromTenant(ctx context.Context) (bool, string) {
 		switch {
 		case apierrors.IsNotFound(err):
 			return true, "the DaemonSet is deleted"
-		case apierrors.IsForbidden(err) || apierrors.IsUnauthorized(err):
-			return true, "the permissions of the release are gone"
 		case err != nil:
 			r.Log.Error(err, "shutdown: cannot read the DaemonSet; assuming a restart")
 			return false, ""
