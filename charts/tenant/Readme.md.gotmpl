@@ -57,16 +57,24 @@ see the [operator documentation](../tenant-network-operator/Readme.md#resources-
 
 ### 1. Install a release for the tenant
 
+Label the nodes that mount volumes of the tenant, with a label of your choice, and give the chart the same label:
+
 ```bash
+kubectl label node <NODE_NAME> storage-network=acme
+
 helm upgrade --install acme ./ \
     --namespace acme \
     --create-namespace \
     --set realm.api=<PANAPI_ADDRESS> \
-    --set realm.token=<TOKEN>
+    --set realm.token=<TOKEN> \
+    --set nodeSelector.storage-network=acme
 ```
 
-Without more values, all nodes of the cluster are put on the tenant network. To use only some nodes, label them
-with a label of your choice and give the chart the same label:
+Without `nodeSelector`, all nodes of the cluster are put on the tenant network, the control plane nodes included.
+A label key with dots needs a backslash before each dot on the command line, for example
+`--set nodeSelector."example\.com/storage-network"=acme`; a values file needs none.
+
+#### Using Helm overrides:
 
 ```yaml
 # overrides.yaml
@@ -79,8 +87,6 @@ nodeSelector:
 ```
 
 ```bash
-kubectl label node <NODE_NAME> storage-network=acme
-
 helm upgrade --install acme ./ \
     --namespace acme \
     --create-namespace \
