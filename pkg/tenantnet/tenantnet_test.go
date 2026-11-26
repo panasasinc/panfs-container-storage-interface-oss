@@ -83,7 +83,7 @@ func testAttachment() *panapi.Attachment {
 
 // matchingLink is the `ip` output of an interface that already matches testAttachment.
 const matchingLink = `[{"ifname":"lo","flags":["UP"],"mtu":65536},
-{"ifname":"vxlan5001","flags":["BROADCAST","UP","LOWER_UP"],"mtu":1450,"address":"02:00:5e:10:00:a4",
+{"ifname":"vxlan5001","ifalias":"panfs-tenant-network","flags":["BROADCAST","UP","LOWER_UP"],"mtu":1450,"address":"02:00:5e:10:00:a4",
  "linkinfo":{"info_kind":"vxlan","info_data":{"id":5001,"local":"10.0.0.5","port":4789}},
  "addr_info":[{"family":"inet","local":"192.168.0.58","prefixlen":16},{"family":"inet6","local":"fe80::1","prefixlen":64}]}]`
 
@@ -110,6 +110,7 @@ func TestEnsureInterface(t *testing.T) {
 		assert.True(t, changed)
 		assert.Equal(t, []string{
 			"ip link add vxlan5001 type vxlan id 5001 dstport 4789 local 10.0.0.5",
+			"ip link set vxlan5001 alias panfs-tenant-network",
 			"ip link set vxlan5001 address 02:00:5e:10:00:a4",
 			"ip link set vxlan5001 mtu 1450",
 			"ip link set vxlan5001 up",
@@ -566,7 +567,7 @@ const hostLinks = `[{"ifname":"lo","flags":["UP"],"mtu":65536},
 
 // matchingVLANLink adds the interface that already matches vlanAttachment.
 var matchingVLANLink = strings.TrimSuffix(hostLinks, "]") + `,
-{"ifname":"vlan123","link":"bond0","flags":["BROADCAST","UP","LOWER_UP"],"mtu":1500,"address":"aa:bb:cc:00:00:01",
+{"ifname":"vlan123","ifalias":"panfs-tenant-network","link":"bond0","flags":["BROADCAST","UP","LOWER_UP"],"mtu":1500,"address":"aa:bb:cc:00:00:01",
  "linkinfo":{"info_kind":"vlan","info_data":{"protocol":"802.1Q","id":123}},
  "addr_info":[{"family":"inet","local":"192.168.0.58","prefixlen":16}]}]`
 
@@ -590,6 +591,7 @@ func TestEnsureVLANInterface(t *testing.T) {
 		// No MAC address and no flood list: the VLAN fabric forwards and learns on its own.
 		assert.Equal(t, []string{
 			"ip link add link bond0 name vlan123 type vlan id 123",
+			"ip link set vlan123 alias panfs-tenant-network",
 			"ip link set vlan123 mtu 1500",
 			"ip link set vlan123 up",
 			"ip addr add 192.168.0.58/16 dev vlan123",
@@ -735,4 +737,48 @@ func TestShutdownDoesNotDetachWhenItCannotReadTheCluster(t *testing.T) {
 			assert.Empty(t, run.changes)
 		})
 	}
+}
+
+func TestEnsureInterfaceLeavesAForeignInterfaceAlone(t *testing.T) {
+	ctx := context.Background()
+	unmark := func(links string) string { return strings.Replace(links, `"ifalias":"panfs-tenant-network",`, "", 1) }
+
+	t.Run("an interface of somebody else is refused and not touched", func(t *testing.T) {
+		for name, tc := range map[string]struct {
+			links      string
+			attachment *panapi.Attachment
+		}{
+			"VXLAN, even when it matches the record": {unmark(matchingLink), testAttachment()},
+			"VLAN on another parent":                 {strings.Replace(unmark(matchingVLANLink), `"link":"bond0"`, `"link":"eth1"`, 1), vlanAttachment()},
+		} {
+			t.Run(name, func(t *testing.T) {
+				run := &fakeRunner{outputs: map[string]string{readLinks: tc.links, readFDB: matchingFDB}}
+				_, changed, err := EnsureInterface(ctx, run, tc.attachment)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "was not created by the PanFS Tenant Network")
+				assert.False(t, changed)
+				assert.Empty(t, run.changes)
+			})
+		}
+	})
+
+	t.Run("a half-built interface of an earlier pod is taken over", func(t *testing.T) {
+		halfBuilt := `[{"ifname":"lo"},{"ifname":"vxlan5001","flags":["BROADCAST"],"mtu":1500,"address":"aa:aa:aa:aa:aa:aa",
+ "linkinfo":{"info_kind":"vxlan","info_data":{"id":5001,"local":"10.0.0.5","port":4789}}}]`
+		run := &fakeRunner{outputs: map[string]string{readLinks: halfBuilt, readFDB: `[]`}}
+		_, changed, err := EnsureInterface(ctx, run, testAttachment())
+		require.NoError(t, err)
+		assert.True(t, changed)
+		assert.Equal(t, "ip link set vxlan5001 alias panfs-tenant-network", run.changes[0])
+		assert.NotContains(t, run.changes, "ip link del vxlan5001")
+	})
+
+	t.Run("a detach does not remove an interface of somebody else", func(t *testing.T) {
+		api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme", SubnetID: "s1", Directors: []string{"192.168.0.2"}}}
+		run := &fakeRunner{outputs: map[string]string{readLinks: unmark(matchingLink), readFDB: matchingFDB}}
+		r, _ := newTestReconciler(t, api, run)
+		require.NoError(t, r.Detach(ctx))
+		assert.NotContains(t, run.changes, "ip link del vxlan5001")
+		assert.Equal(t, []string{"a1"}, api.detached)
+	})
 }

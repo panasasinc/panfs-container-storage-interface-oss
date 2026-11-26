@@ -435,7 +435,12 @@ func (r *Reconciler) Detach(ctx context.Context) error {
 		if err != nil {
 			return err
 		}
-		if state != nil {
+		switch {
+		case state == nil:
+		case state.Alias != OwnerAlias:
+			r.Log.Info("an interface with the name of the tenant interface was not created by this program; it stays",
+				"interface", name)
+		default:
 			if _, err := r.Run.Run(ctx, "ip", "link", "del", name); err != nil {
 				return err
 			}

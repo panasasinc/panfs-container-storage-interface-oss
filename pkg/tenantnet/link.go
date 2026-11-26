@@ -31,6 +31,10 @@ import (
 // floodMAC is the all-zero address of a VXLAN flood entry.
 const floodMAC = "00:00:00:00:00:00"
 
+// OwnerAlias is the alias that marks an interface as created by this program. An interface with the name
+// of a tenant interface but without this alias belongs to somebody else and is never changed or removed.
+const OwnerAlias = "panfs-tenant-network"
+
 // Runner runs a command of the host network tools and returns its output.
 type Runner interface {
 	Run(ctx context.Context, name string, args ...string) ([]byte, error)
@@ -85,6 +89,8 @@ type linkState struct {
 	Flags   []string `json:"flags"`
 	MTU     int      `json:"mtu"`
 	Address string   `json:"address"`
+	// Alias is the alias of the interface; see OwnerAlias.
+	Alias string `json:"ifalias"`
 	// Link is the parent interface of a VLAN interface.
 	Link     string `json:"link"`
 	LinkInfo struct {
@@ -232,12 +238,25 @@ func EnsureTenantInterface(ctx context.Context, run Runner, a *panapi.Attachment
 		return name, false, err
 	}
 	state := findLink(links, name)
-
-	if a.SegmentType == panapi.SegmentTypeVLAN {
-		state, changed, err = ensureVLANLink(ctx, run, a, name, state, links, vlanParent)
-	} else {
-		state, changed, err = ensureVXLANLink(ctx, run, a, name, state)
+	if state != nil && state.Alias != OwnerAlias {
+		if !isHalfBuilt(state, a) {
+			return name, false, fmt.Errorf("an interface %s already exists on the node and was not created by the "+
+				"PanFS Tenant Network (it has no alias %q); it is left as it is. Remove or rename it", name, OwnerAlias)
+		}
+		// An earlier pod created the interface and stopped before it could mark it. Nothing uses it yet.
+		if err := markOwned(ctx, run, name); err != nil {
+			return name, false, err
+		}
+		changed = true
 	}
+
+	var built bool
+	if a.SegmentType == panapi.SegmentTypeVLAN {
+		state, built, err = ensureVLANLink(ctx, run, a, name, state, links, vlanParent)
+	} else {
+		state, built, err = ensureVXLANLink(ctx, run, a, name, state)
+	}
+	changed = changed || built
 	if err != nil {
 		return name, changed, err
 	}
@@ -249,6 +268,27 @@ func EnsureTenantInterface(ctx context.Context, run Runner, a *panapi.Attachment
 	}
 	fdbChanged, err := ensureFloodList(ctx, run, name, a.Tunnel.VTEPs)
 	return name, changed || fdbChanged, err
+}
+
+// markOwned marks an interface as created by this program.
+func markOwned(ctx context.Context, run Runner, name string) error {
+	_, err := run.Run(ctx, "ip", "link", "set", name, "alias", OwnerAlias)
+	return err
+}
+
+// isHalfBuilt reports whether an unmarked interface is one that an earlier pod created for this segment and
+// did not finish: it has the kind and the id of the segment, it is down, and it has no IPv4 address.
+// Nothing can use such an interface, so it is safe to take it over.
+func isHalfBuilt(state *linkState, a *panapi.Attachment) bool {
+	if state.LinkInfo.Kind != a.SegmentType || state.LinkInfo.Data.ID != a.SegmentID || state.hasFlag("UP") {
+		return false
+	}
+	for _, addr := range state.AddrInfo {
+		if addr.Family == "inet" {
+			return false
+		}
+	}
+	return true
 }
 
 // ensureVXLANLink makes the VXLAN interface exist with the right network id, port, local address and MAC.
@@ -273,6 +313,9 @@ func ensureVXLANLink(ctx context.Context, run Runner, a *panapi.Attachment, name
 		if _, err := run.Run(ctx, "ip", "link", "add", name, "type", "vxlan",
 			"id", strconv.Itoa(a.SegmentID), "dstport", strconv.Itoa(a.Tunnel.UDPPort), "local", a.UnderlayIP); err != nil {
 			return state, changed, err
+		}
+		if err := markOwned(ctx, run, name); err != nil {
+			return state, true, err
 		}
 		changed, state = true, &linkState{}
 	}
@@ -336,6 +379,9 @@ func ensureVLANLink(ctx context.Context, run Runner, a *panapi.Attachment, name 
 		if _, err := run.Run(ctx, "ip", "link", "add", "link", parent, "name", name, "type", "vlan",
 			"id", strconv.Itoa(a.SegmentID)); err != nil {
 			return state, changed, err
+		}
+		if err := markOwned(ctx, run, name); err != nil {
+			return state, true, err
 		}
 		changed, state = true, &linkState{}
 	}
