@@ -17,10 +17,22 @@ csiPanFSDriver:
   # -- Namespace where the PanFS CSI driver is deployed
   namespace: csi-panfs
 
+# -- Name of the PanFS tenant that the token of this StorageClass belongs to. When it is set, the chart creates
+# a `TenantNetwork` resource that puts the nodes with the label `panfs.vdura.com/tenant=<tenant>` on the network
+# of the tenant, and it restricts volume provisioning to the nodes where that network works
+# (node label `panfs.vdura.com/tenant-network=<release namespace>`).
+# Leave it empty when the nodes reach the realm without a tenant network.
+tenant: ""
+
+tenantNetwork:
+  # -- Create the `TenantNetwork` resource when `tenant` is set. It needs the PanFS Tenant Network operator
+  # (chart `panfs-tenant-network`) in the cluster. Set it to `false` when you manage the tenant network yourself.
+  create: true
+
 # -- Allowed topologies for volume provisioning
 # This can be used to restrict volume provisioning to specific nodes or zones
 # based on node labels. Uncomment and modify the example below as needed.
-# If left empty, no topology constraints will be applied.
+# If left empty, the topology of `tenant` is used; without `tenant`, no topology constraints will be applied.
 allowedTopologies: {}
   # - matchLabelExpressions:
   #   - key: node.kubernetes.io/csi-panfs.panfs.ready
