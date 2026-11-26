@@ -773,6 +773,28 @@ func TestEnsureInterfaceLeavesAForeignInterfaceAlone(t *testing.T) {
 		assert.NotContains(t, run.changes, "ip link del vxlan5001")
 	})
 
+	t.Run("a down interface with another port or parent is not a half-built one", func(t *testing.T) {
+		for name, tc := range map[string]struct {
+			links      string
+			attachment *panapi.Attachment
+		}{
+			"VXLAN with another port": {`[{"ifname":"lo"},{"ifname":"vxlan5001","flags":["BROADCAST"],"mtu":1500,
+ "linkinfo":{"info_kind":"vxlan","info_data":{"id":5001,"local":"10.0.0.5","port":8472}}}]`, testAttachment()},
+			"VLAN on another parent": {strings.TrimSuffix(hostLinks, "]") + `,
+{"ifname":"vlan123","link":"eth1","flags":["BROADCAST"],"mtu":1500,"linkinfo":{"info_kind":"vlan","info_data":{"id":123}}}]`,
+				vlanAttachment()},
+		} {
+			t.Run(name, func(t *testing.T) {
+				run := &fakeRunner{outputs: map[string]string{readLinks: tc.links, readFDB: `[]`}}
+				_, changed, err := EnsureInterface(ctx, run, tc.attachment)
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), "was not created by the PanFS Tenant Network")
+				assert.False(t, changed)
+				assert.Empty(t, run.changes)
+			})
+		}
+	})
+
 	t.Run("a detach does not remove an interface of somebody else", func(t *testing.T) {
 		api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme", SubnetID: "s1", Directors: []string{"192.168.0.2"}}}
 		run := &fakeRunner{outputs: map[string]string{readLinks: unmark(matchingLink), readFDB: matchingFDB}}

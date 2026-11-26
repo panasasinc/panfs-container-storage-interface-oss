@@ -612,3 +612,79 @@ func TestOperatorRemovesTheLabelsOfATenantNetworkBeforeItReleasesIt(t *testing.T
 	assert.Empty(t, item.GetFinalizers())
 	assert.Contains(t, eventReasons(t, kube, testNamespace), ReasonNodeLabelRemoved)
 }
+
+func TestOperatorLeavesTheLabelsOfTheServingTenantNetworkWhenARefusedOneIsDeleted(t *testing.T) {
+	ctx := context.Background()
+	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
+	first := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
+	first.SetCreationTimestamp(metav1.NewTime(time.Unix(100, 0)))
+	o, kube := newTestOperator(first, api)
+	second := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
+	second.SetName("acme-again")
+	second.SetCreationTimestamp(metav1.NewTime(time.Unix(200, 0)))
+	_, err := o.Dynamic.Resource(TenantNetworkGVR).Namespace(testNamespace).Create(ctx, second, metav1.CreateOptions{})
+	require.NoError(t, err)
+	_, err = kube.CoreV1().Nodes().Create(ctx, &corev1.Node{ObjectMeta: metav1.ObjectMeta{
+		Name: "node-a", Labels: map[string]string{ReadyLabelKey: testNamespace},
+		Annotations: map[string]string{OverlayAnnotation: "192.168.0.57"},
+	}}, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	o.ReconcileAll(ctx)
+	o.ReconcileAll(ctx)
+
+	// The refused one owns nothing, so it has no finalizer and is deleted at once.
+	refused, err := o.Dynamic.Resource(TenantNetworkGVR).Namespace(testNamespace).Get(ctx, "acme-again", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, PhaseError, statusOf(refused).Phase)
+	assert.Empty(t, refused.GetFinalizers())
+
+	// One that got the finalizer from an older operator: its removal must not touch the labels of the first.
+	now := metav1.Now()
+	refused.SetFinalizers([]string{Finalizer})
+	refused.SetDeletionTimestamp(&now)
+	_, err = o.Dynamic.Resource(TenantNetworkGVR).Namespace(testNamespace).Update(ctx, refused, metav1.UpdateOptions{})
+	require.NoError(t, err)
+	o.ReconcileAll(ctx)
+
+	node, err := kube.CoreV1().Nodes().Get(ctx, "node-a", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, testNamespace, node.Labels[ReadyLabelKey])
+	assert.Equal(t, "192.168.0.57", node.Annotations[OverlayAnnotation])
+	refused, err = o.Dynamic.Resource(TenantNetworkGVR).Namespace(testNamespace).Get(ctx, "acme-again", metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Empty(t, refused.GetFinalizers(), "it is released")
+	assert.NotContains(t, eventReasons(t, kube, testNamespace), ReasonNodeLabelRemoved)
+}
+
+func TestOperatorKeepsItsTenantWhenTheTokenChangesToATenantOfAnother(t *testing.T) {
+	ctx := context.Background()
+	api := &fakeAPI{network: &panapi.TenantNetwork{TenantName: "acme"}}
+	o, kube := newTestOperator(newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"}), api)
+	o.ReconcileAll(ctx)
+	_, status := stored(t, o)
+	require.Equal(t, "acme", status.Tenant)
+
+	// Another TenantNetwork serves tenant beta, and the token of the first now belongs to beta too.
+	other := newTenantNetwork(map[string]interface{}{"realmSecretName": "realm"})
+	other.SetNamespace("other-ns")
+	other.SetName("beta")
+	other.Object["status"] = map[string]interface{}{"tenant": "beta", "daemonSet": namePrefix + "beta"}
+	_, err := o.Dynamic.Resource(TenantNetworkGVR).Namespace("other-ns").Create(ctx, other, metav1.CreateOptions{})
+	require.NoError(t, err)
+	api.network = &panapi.TenantNetwork{TenantName: "beta"}
+	_, err = kube.CoreV1().Secrets(testNamespace).Update(ctx, &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{Name: "realm", Namespace: testNamespace, ResourceVersion: "2"},
+		Data:       map[string][]byte{"api": []byte("realm.example"), "token": []byte("token-of-beta")},
+	}, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	o.ReconcileAll(ctx)
+	o.ReconcileAll(ctx)
+
+	_, status = stored(t, o)
+	assert.Equal(t, PhaseError, status.Phase)
+	assert.Contains(t, status.Message, `tenant "beta" is already served by TenantNetwork other-ns/beta`)
+	assert.Equal(t, "acme", status.Tenant, "a refused TenantNetwork does not take the tenant of another one")
+	assert.Equal(t, testObject, status.DaemonSet)
+}

@@ -171,6 +171,8 @@ in a namespace gets their effect on the selected nodes.
   This is why the namespace of a `TenantNetwork` needs the Pod Security level `privileged`.
 - **The node pods can change any node.** Their ServiceAccount may read and patch every node of the cluster,
   not only its own, because Kubernetes cannot limit this permission to one node or to one label.
+  Who may create pods in the namespace of a `TenantNetwork` can run a pod with that ServiceAccount,
+  so give that right only to people who may change nodes.
 - **The operator reads Secrets in every namespace.** Its `ClusterRole` allows `get` on Secrets in the whole
   cluster, because a `TenantNetwork` can be in any namespace. It cannot list Secrets, and it reads only the Secrets
   that a `TenantNetwork` names. Who may create a `TenantNetwork` in a namespace can make the operator use
@@ -388,6 +390,10 @@ can see for certain that the node left the tenant, so the following can stay beh
 - **The tenant interface and the attachment in the realm.** The operator cannot remove them, because it does not
   run on the node and the token is gone with the Secret. Remove the interface with `ip link delete <INTERFACE>`
   on the node, and the attachment in the realm.
+
+The delete also waits for a node that cannot be reached, for example one that is powered off: its pod cannot
+confirm that it stopped, so the `TenantNetwork` stays in the phase `Removing`. Bring the node back, or delete
+its Node object (`kubectl delete node <NODE_NAME>`) when the node is gone for good.
 
 To keep the interfaces and the attachments, set `detachOnRemoval` to `false` before you delete:
 

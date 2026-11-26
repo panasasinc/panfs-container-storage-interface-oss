@@ -156,9 +156,11 @@ func endpointFromSecrets(secrets map[string]string) (endpoint, error) {
 	if err != nil {
 		return endpoint{}, fmt.Errorf("%w: %v", ErrorInvalidArgument, err)
 	}
-	if _, warned := plainHTTPWarned.LoadOrStore(parsed.Host, true); parsed.Scheme == "http" && !warned {
-		llog.Info("WARNING: PanAPI is reached over plain HTTP; the API token crosses the network in clear text",
-			"host", parsed.Host)
+	if parsed.Scheme == "http" {
+		if _, warned := plainHTTPWarned.LoadOrStore(parsed.Host, true); !warned {
+			llog.Info("WARNING: PanAPI is reached over plain HTTP; the API token crosses the network in clear text",
+				"host", parsed.Host)
+		}
 	}
 
 	settings := tlsSettings{caCert: secrets[keys.CACert]}

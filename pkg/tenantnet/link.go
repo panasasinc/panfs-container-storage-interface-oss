@@ -239,7 +239,7 @@ func EnsureTenantInterface(ctx context.Context, run Runner, a *panapi.Attachment
 	}
 	state := findLink(links, name)
 	if state != nil && state.Alias != OwnerAlias {
-		if !isHalfBuilt(state, a) {
+		if !isHalfBuilt(state, a, links, vlanParent) {
 			return name, false, fmt.Errorf("an interface %s already exists on the node and was not created by the "+
 				"PanFS Tenant Network (it has no alias %q); it is left as it is. Remove or rename it", name, OwnerAlias)
 		}
@@ -277,9 +277,10 @@ func markOwned(ctx context.Context, run Runner, name string) error {
 }
 
 // isHalfBuilt reports whether an unmarked interface is one that an earlier pod created for this segment and
-// did not finish: it has the kind and the id of the segment, it is down, and it has no IPv4 address.
-// Nothing can use such an interface, so it is safe to take it over.
-func isHalfBuilt(state *linkState, a *panapi.Attachment) bool {
+// did not finish: it is down, it has no IPv4 address, and it has every setting that cannot be changed later
+// as this program would create it (VXLAN: network id, port and local address; VLAN: id and parent).
+// Nothing can use such an interface, and taking it over never deletes it.
+func isHalfBuilt(state *linkState, a *panapi.Attachment, links []namedLink, vlanParent string) bool {
 	if state.LinkInfo.Kind != a.SegmentType || state.LinkInfo.Data.ID != a.SegmentID || state.hasFlag("UP") {
 		return false
 	}
@@ -288,7 +289,11 @@ func isHalfBuilt(state *linkState, a *panapi.Attachment) bool {
 			return false
 		}
 	}
-	return true
+	if a.SegmentType == panapi.SegmentTypeVLAN {
+		parent, err := vlanParentOf(links, a, vlanParent)
+		return err == nil && state.Link == parent
+	}
+	return state.LinkInfo.Data.Port == a.Tunnel.UDPPort && sameIP(state.LinkInfo.Data.Local, a.UnderlayIP)
 }
 
 // ensureVXLANLink makes the VXLAN interface exist with the right network id, port, local address and MAC.

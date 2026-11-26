@@ -320,10 +320,6 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 			fmt.Errorf("the name %q in spec.firewalldZone is not a valid firewalld zone name", *spec.FirewalldZone))
 	}
 
-	if err := o.ensureFinalizer(ctx, item); err != nil {
-		return status, err
-	}
-
 	// The value of the ready label is the namespace, so one namespace holds the network of one tenant.
 	if owner, claimed := o.namespaces[namespace]; claimed && owner != name {
 		return status, withReason(ReasonTenantAlreadyServed,
@@ -337,7 +333,6 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 	if err != nil {
 		return status, err
 	}
-	status.Tenant = tenant
 	// A node is on one tenant network through one DaemonSet: a second one would undo the work of the first
 	// when it is removed.
 	if owner, claimed := o.claims[tenant]; claimed && owner != namespace+"/"+name {
@@ -347,6 +342,9 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 	if o.claims != nil {
 		o.claims[tenant] = namespace + "/" + name
 	}
+	// Only now: a refused TenantNetwork must not report the tenant of another one as its own. The next pass
+	// reads the claim of a running TenantNetwork from its status, and would take the tenant over with it.
+	status.Tenant = tenant
 	status.ManagedTopology = &Topology{Key: ReadyLabelKey, Value: namespace}
 	// An empty selector selects every node.
 	if _, err := labels.ValidatedSelectorFromSet(spec.NodeSelector); err != nil {
@@ -370,6 +368,12 @@ func (o *Operator) apply(ctx context.Context, item *unstructured.Unstructured, l
 		return status, withReason(ReasonNodeSelectorOverlap, fmt.Errorf(
 			"node %q is already selected by TenantNetwork %s; a node can be on the network of one tenant only. "+
 				"Set spec.nodeSelector so that the two select different nodes", node, owner))
+	}
+
+	// The finalizer comes with the first object. A TenantNetwork that was refused above owns nothing,
+	// so it is deleted at once, and its removal has nothing to clean up.
+	if err := o.ensureFinalizer(ctx, item); err != nil {
+		return status, err
 	}
 
 	objectName := namePrefix + name
@@ -463,11 +467,15 @@ func (o *Operator) remove(ctx context.Context, item *unstructured.Unstructured, 
 	// The pods are gone. A pod that lost its permissions before it stopped (the whole namespace was deleted)
 	// could not remove the ready label of its node, so remove what is left: a label without a pod behind it
 	// would send workloads to a node that nothing keeps on the tenant network.
-	left, err := o.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{
-		LabelSelector: labels.SelectorFromSet(labels.Set{ReadyLabelKey: namespace}).String(),
-	})
-	if err != nil {
-		return fmt.Errorf("list the nodes with the label %s=%s: %w", ReadyLabelKey, namespace, err)
+	// Only the labels of this TenantNetwork: when another one serves the namespace, the labels are its own.
+	left := &corev1.NodeList{}
+	if owner, claimed := o.namespaces[namespace]; !claimed || owner == item.GetName() {
+		left, err = o.Kube.CoreV1().Nodes().List(ctx, metav1.ListOptions{
+			LabelSelector: labels.SelectorFromSet(labels.Set{ReadyLabelKey: namespace}).String(),
+		})
+		if err != nil {
+			return fmt.Errorf("list the nodes with the label %s=%s: %w", ReadyLabelKey, namespace, err)
+		}
 	}
 	for i := range left.Items {
 		if err := o.cleanNode(ctx, &left.Items[i], true, true); err != nil {
