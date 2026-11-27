@@ -97,6 +97,13 @@ func TestDriver_GetPluginCapabilities(t *testing.T) {
 						},
 					},
 				},
+				{
+					Type: &csi.PluginCapability_Service_{
+						Service: &csi.PluginCapability_Service{
+							Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
+						},
+					},
+				},
 			},
 		},
 	}

@@ -29,6 +29,7 @@ import (
 // Now we support the following capabilities:
 // - Controller Service
 // - Online Volume Expansion
+// - Volume Accessibility Constraints: CreateVolume returns the topologies from which the volume can be used
 var pluginCapabilities = []*csi.PluginCapability{
 	{
 		Type: &csi.PluginCapability_Service_{
@@ -41,6 +42,13 @@ var pluginCapabilities = []*csi.PluginCapability{
 		Type: &csi.PluginCapability_VolumeExpansion_{
 			VolumeExpansion: &csi.PluginCapability_VolumeExpansion{
 				Type: csi.PluginCapability_VolumeExpansion_ONLINE,
+			},
+		},
+	},
+	{
+		Type: &csi.PluginCapability_Service_{
+			Service: &csi.PluginCapability_Service{
+				Type: csi.PluginCapability_Service_VOLUME_ACCESSIBILITY_CONSTRAINTS,
 			},
 		},
 	},

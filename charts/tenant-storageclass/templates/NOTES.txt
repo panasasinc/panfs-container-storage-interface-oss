@@ -1,0 +1,12 @@
+The PanfsStorageClass {{ .Release.Name }} is created in namespace {{ .Release.Namespace }}.
+
+The PanFS StorageClass operator now creates the StorageClass {{ .Release.Name }}.
+Check the result:
+
+   kubectl -n {{ .Release.Namespace }} get panfsstorageclass {{ .Release.Name }}
+   kubectl -n {{ .Release.Namespace }} describe panfsstorageclass {{ .Release.Name }}
+   kubectl get storageclass {{ .Release.Name }}
+
+The phase must become Ready. The phase Pending means that the TenantNetwork of the namespace is not ready yet.
+A resource that stays without a status means that the operator is not running;
+look at its pod in the namespace where the chart panfs-storageclass-operator is installed.

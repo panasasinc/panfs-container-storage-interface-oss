@@ -1,0 +1,33 @@
+The PanFS StorageClass operator is installed in namespace {{ .Release.Namespace }}.
+
+Next steps for a StorageClass:
+
+1. Install a release of the chart panfs-tenant-storageclass (charts/tenant-storageclass) in the namespace
+   of the tenant. The name of the release becomes the name of the StorageClass.
+
+   In the namespace of a TenantNetwork, no value is needed: the operator finds the TenantNetwork.
+
+   helm upgrade --install <STORAGE_CLASS_NAME> charts/tenant-storageclass \
+       --namespace <TENANT_NAMESPACE>
+
+   In a namespace without a tenant network, name the Secret of the realm:
+
+   helm upgrade --install <STORAGE_CLASS_NAME> charts/tenant-storageclass \
+       --namespace <NAMESPACE> \
+       --set realmSecretName=<SECRET_NAME>
+
+   The PanFS parameters and the other settings of the StorageClass are values of that chart.
+
+   Without Helm, apply the PanfsStorageClass resource that the chart creates:
+
+   apiVersion: panfs.vdura.com/v1alpha1
+   kind: PanfsStorageClass
+   metadata:
+     name: <STORAGE_CLASS_NAME>
+     namespace: <TENANT_NAMESPACE>
+
+2. Check the result:
+
+   kubectl get panfsstorageclasses -A
+   kubectl -n <NAMESPACE> describe panfsstorageclass <STORAGE_CLASS_NAME>
+   kubectl get storageclass <STORAGE_CLASS_NAME>

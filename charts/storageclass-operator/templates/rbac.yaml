@@ -1,0 +1,109 @@
+{{/*
+  # Copyright 2025 VDURA Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+*/}}
+{{- if eq .Release.Namespace "default" }}
+{{- fail "Installation into the 'default' namespace is not permitted. Use --namespace <namespace>." }}
+{{- end }}
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ServiceAccount of the PanFS StorageClass operator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ClusterRole of the operator. PanfsStorageClasses can be in any namespace, and a StorageClass has no namespace,
+# so the permissions are cluster-wide.
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+rules:
+  # Read the PanfsStorageClasses, hold them with a finalizer, and report their status
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses/status", "panfsstorageclasses/finalizers"]
+    verbs: ["update", "patch"]
+
+  # Find the TenantNetwork in the namespace of a PanfsStorageClass: its Secret and the node label of the tenant network.
+  # The TenantNetwork resource comes with the PanFS Tenant Network operator; without it, this rule is unused
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["tenantnetworks"]
+    verbs: ["get", "list"]
+
+  # The StorageClass of a PanfsStorageClass
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "create", "update", "delete"]
+
+  # Read the namespace of the PanFS CSI driver from its CSIDriver object
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csidrivers"]
+    resourceNames: ["com.vdura.csi.panfs"]
+    verbs: ["get"]
+
+  # Find out whether a deleted PanfsStorageClass left volumes that still need its Secret
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["list"]
+
+  # The operator checks that the Secret of a PanfsStorageClass exists, and it gives the CSI controller
+  # the permission to read that Secret. It can give only a permission that it holds itself
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+
+  # The Role and the RoleBinding that let the CSI controller read the Secret of a PanfsStorageClass
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "create", "update", "delete"]
+
+  # Report changes as events on a PanfsStorageClass
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Bind the ClusterRole to the ServiceAccount of the operator
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}
+  apiGroup: rbac.authorization.k8s.io

@@ -1,0 +1,47 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Everything is optional. In the namespace of a TenantNetwork, the defaults give a working StorageClass.
+
+# -- Only for a realm that is reachable without a tenant network, in a namespace without a `TenantNetwork`:
+# name of a Secret in the namespace of the release with the keys `api` and `token`, and optionally `ca_cert`.
+# Leave it empty in the namespace of a `TenantNetwork`: the operator uses the Secret of the `TenantNetwork`.
+realmSecretName: ""
+
+# -- PanFS parameters of new volumes, for example `panfs.csi.vdura.com/layout`. Without them the defaults of the driver apply.
+# They cannot change after the StorageClass was created.
+parameters: {}
+  # panfs.csi.vdura.com/layout: "raid6+"
+  # panfs.csi.vdura.com/stripeunit: "64k"
+
+# -- `Delete` or `Retain`. Empty means the default of the operator: `Delete`.
+# It cannot change after the StorageClass was created.
+reclaimPolicy: ""
+
+# -- (bool) Whether a volume can be expanded. Empty means the default of the operator: `true`.
+allowVolumeExpansion:
+
+# -- `Immediate` or `WaitForFirstConsumer`. Empty means the default of the operator: `Immediate` with a tenant network,
+# `WaitForFirstConsumer` without one. It cannot change after the StorageClass was created.
+volumeBindingMode: ""
+
+# -- Mount options of the volumes
+mountOptions: []
+
+# -- Make the StorageClass the default one of the cluster
+default: false
+
+# -- Check that the PanFS StorageClass operator is installed before anything is created.
+# Set it to `false` only to render or lint the chart without a cluster.
+checkOperator: true

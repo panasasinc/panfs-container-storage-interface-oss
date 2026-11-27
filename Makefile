@@ -69,6 +69,7 @@ endif
 CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
 TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
 TENANT_NETWORK_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-tenant-network:2.0.0
+STORAGECLASS_OPERATOR_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-storageclass-operator:2.0.0
 
 ## [Build Driver and DFC Images]
 
@@ -113,6 +114,22 @@ build-tenant-network-image: ## Build the PanFS Tenant Network Docker image
 		--build-arg GIT_COMMIT=$(shell git rev-parse --short HEAD) \
 		.
 	@printf "$(GREEN)Successfully built PanFS Tenant Network Docker image: $(TENANT_NETWORK_IMAGE)$(RESET)\n\n"
+
+.PHONY: build-storageclass-operator-image
+build-storageclass-operator-image: ## Build the PanFS StorageClass Operator Docker image
+	@if [ -z "$(STORAGECLASS_OPERATOR_IMAGE)" ]; then \
+		printf "$(RED)STORAGECLASS_OPERATOR_IMAGE is not set$(RESET)\n"; \
+		exit 1; \
+	fi
+	docker build -t $(STORAGECLASS_OPERATOR_IMAGE) \
+		-f Dockerfile.storageclass-operator \
+		--platform linux/amd64 \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		--build-arg APP_VERSION=$(APP_VERSION) \
+		--build-arg VERSION=$(APP_VERSION) \
+		--build-arg GIT_COMMIT=$(shell git rev-parse --short HEAD) \
+		.
+	@printf "$(GREEN)Successfully built PanFS StorageClass Operator Docker image: $(STORAGECLASS_OPERATOR_IMAGE)$(RESET)\n\n"
 
 .PHONY: build-dfc-image
 build-dfc-image: ## Build the Kernel Module Management Docker image
@@ -431,8 +448,17 @@ manifest-tenant-network: ## Generate manifests for the PanFS Tenant Network
 		grep -v '^# Source:' > deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
 	@printf "$(GREEN)Successfully generated manifests for the PanFS Tenant Network$(RESET)\n\n"
 
+.PHONY: manifest-storageclass-operator
+manifest-storageclass-operator: ## Generate manifests for the PanFS StorageClass Operator
+	@printf "$(BOLD)Generating manifests for the PanFS StorageClass Operator...$(RESET)\n"
+	@mkdir -p deploy/k8s/storageclass-operator/
+	helm template panfs-storageclass-operator charts/storageclass-operator --include-crds \
+		--namespace csi-panfs | \
+		grep -v '^# Source:' > deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
+	@printf "$(GREEN)Successfully generated manifests for the PanFS StorageClass Operator$(RESET)\n\n"
+
 .PHONY: manifests
-manifests: manifest-driver manifest-storageclass manifest-tenant-network ## Generate manifests for the PanFS CSI Driver, Storage Class and Tenant Network
+manifests: manifest-driver manifest-storageclass manifest-tenant-network manifest-storageclass-operator ## Generate manifests for the PanFS CSI Driver, Storage Class, Tenant Network and StorageClass Operator
 	@if command -v helm-docs >/dev/null 2>&1; then \
 		helm-docs --template-files Readme.md.gotmpl --output-file Readme.md; \
 	else \

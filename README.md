@@ -14,7 +14,9 @@ For more details on specific topics, refer to the following documents:
 | [Overview](./docs/Overview.md) | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow |
 | [Usage Guide](./docs/Usage-Guide.md) | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples |
 | [Tenant Network Operator](./charts/tenant-network-operator/Readme.md) | Putting worker nodes on the network of a PanFS tenant, and marking the nodes that are ready: the `TenantNetwork` resource, its status and events, VXLAN and VLAN segments |
+| [StorageClass Operator](./charts/storageclass-operator/Readme.md) | Creating a StorageClass from a small `PanfsStorageClass` resource: the Secret references, the permission of the CSI controller and, for a tenant network, the binding of volumes to the ready nodes |
 | [Tenant Chart](./charts/tenant/Readme.md) | Setting up one PanFS tenant with Helm: the Secret with the realm connection and the `TenantNetwork` in one release |
+| [Tenant StorageClass Chart](./charts/tenant-storageclass/Readme.md) | Creating the StorageClass of a tenant with Helm: one `PanfsStorageClass` per release |
 | [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
 | [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
 | [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
@@ -92,6 +94,7 @@ The driver exposes advanced PanFS features through CSI:
   * **Multiple Volume Layouts**: Provisioning support for various PanFS layouts (e.g., `raid6+`, `raid5+`, `raid10+`).
   * **Robust Operation**: Includes extensive parameter validation, unit conversion (e.g., GB/bytes), and mapping of PanAPI errors to CSI-compliant error codes.
   * **Static Provisioning**: A PersistentVolume can name an existing PanFS volume, or a directory inside it.
+  * **Volume Topology**: A new volume gets the `allowedTopologies` of its StorageClass as node affinity, so the pods of a tenant volume run only on nodes of the tenant network.
 
 The driver manages volumes through **PanAPI**, the REST API of the PanFS realm, with a service account token.
 Volume encryption is not supported with PanAPI.
@@ -392,24 +395,32 @@ and the events say what happened on each node. A ready node has the label
 
 ##### 4.4 Keep volumes on the ready nodes
 
-Add the ready label to the StorageClass of the tenant, so that a new volume is provisioned only for a pod
-on a node where the tenant network works. `allowedTopologies` can be added to an existing StorageClass:
+Install the PanFS StorageClass operator, once per cluster. It is a workload of its own, apart from the
+PanFS Tenant Network operator. Then create the StorageClass of the tenant with a `PanfsStorageClass` in the
+namespace of the `TenantNetwork`. Only a name is required: the operator finds the `TenantNetwork` of the namespace.
 
-```yaml
-allowedTopologies:
-  - matchLabelExpressions:
-      - key: panfs.vdura.com/tenant-network
-        values:
-          - "<TENANT_NAMESPACE>"
+```bash
+# Once per cluster: the StorageClass operator, in the namespace of the driver (csi-panfs)
+kubectl apply -f deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
+
+# In deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml, replace <STORAGE_CLASS_NAME>
+# and <TENANT_NAMESPACE> first, and remove the optional fields that you do not need.
+kubectl apply -f deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml
+kubectl get panfsstorageclasses -A
 ```
 
-Kubernetes checks `allowedTopologies` when it places the first pod that uses a new volume.
-For every other pod that uses the volume, add a node selector to the workload:
+The StorageClass operator creates a StorageClass with the name of the resource.
+It fills in the provisioner, the Secret of the `TenantNetwork` and `allowedTopologies`,
+and it lets the CSI controller read the Secret. Every volume of this StorageClass is bound to the nodes
+where the tenant network works, so Kubernetes places every pod that uses the volume on a ready node.
+A workload needs no node selector.
 
-```yaml
-nodeSelector:
-  panfs.vdura.com/tenant-network: "<TENANT_NAMESPACE>"
-```
+This replaces the StorageClass of step 3 for the tenant; the Secret of step 3 stays in use.
+The fields, the status and the migration from the StorageClass chart are described in the
+[documentation of the StorageClass operator](./charts/storageclass-operator/Readme.md#panfsstorageclass).
+
+> **Note:** a StorageClass that you write yourself with `allowedTopologies` on the ready label must have
+> `volumeBindingMode: Immediate`. With `WaitForFirstConsumer` no volume is provisioned.
 
 ##### With Helm
 
@@ -453,6 +464,18 @@ helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
 The requirements (Calico setting, namespace, token permissions), the VXLAN and VLAN segment types, the status
 and the events are described in the [operator documentation](./charts/tenant-network-operator/Readme.md).
 
+Step 4.4 has two charts: the [StorageClass operator chart](./charts/storageclass-operator/Readme.md), installed once,
+and the [tenant StorageClass chart](./charts/tenant-storageclass/Readme.md), one release per StorageClass.
+The name of the release is the name of the StorageClass:
+
+```bash
+helm upgrade --install panfs-storageclass-operator charts/storageclass-operator \
+    --namespace csi-panfs
+
+helm upgrade --install <STORAGE_CLASS_NAME> charts/tenant-storageclass \
+    --namespace <TENANT_NAMESPACE>
+```
+
 ## Deploying Workloads
 
 Refer to [Usage-Guide.md](./docs/Usage-Guide.md) for YAML manifests and examples of deploying workloads with the PanFS CSI Driver.
@@ -488,12 +511,16 @@ the pods have taken the nodes off the tenant network: the ready label and the te
 and the nodes are detached from the subnet in the realm.
 
 ```bash
-# Per tenant
+# Per tenant: the StorageClasses first, while the StorageClass operator runs, then the network
+kubectl -n <TENANT_NAMESPACE> delete panfsstorageclass --all
 kubectl -n <TENANT_NAMESPACE> delete tenantnetwork <NAME>
 
 # After the last tenant: the operator and the resource definition
 kubectl delete -f deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
 kubectl delete namespace panfs-tenant-network
+
+# The StorageClass operator and its resource definition, when no PanfsStorageClass is left
+kubectl delete -f deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
 ```
 
 With Helm, uninstall the tenant releases first, then the operator release, and delete the resource definition

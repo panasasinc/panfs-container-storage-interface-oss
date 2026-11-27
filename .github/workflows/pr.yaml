@@ -33,6 +33,7 @@ on:
       # Build files changes
       - 'Dockerfile'
       - 'Dockerfile.tenant-network'
+      - 'Dockerfile.storageclass-operator'
       - 'Makefile'
 
       # Sanity tests changes
@@ -74,6 +75,25 @@ jobs:
       app-version: "${{ github.ref_name }}"
       build-target: "tenant-network"
       image-name: "panfs-tenant-network"
+      image-tags: "pr${{ github.event.pull_request.number }}"
+      repo-url: "ghcr.io/${{ github.repository }}"
+      ref: "${{ github.ref }}"
+      trivy-scan: true
+      push: true
+    secrets: inherit
+
+  storageclass-operator-image:
+    name: StorageClass Operator
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/build-reusable.yaml
+    with:
+      runner-label: "ubuntu-latest"
+      app-version: "${{ github.ref_name }}"
+      build-target: "storageclass-operator"
+      image-name: "panfs-storageclass-operator"
       image-tags: "pr${{ github.event.pull_request.number }}"
       repo-url: "ghcr.io/${{ github.repository }}"
       ref: "${{ github.ref }}"

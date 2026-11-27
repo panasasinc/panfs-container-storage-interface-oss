@@ -337,12 +337,29 @@ For more detail, read the log of the pod of a node:
 kubectl -n <NAMESPACE> logs -l panfs.vdura.com/tenant-network-name=<NAME> --tail=20
 ```
 
-### 5. Place workloads on the ready nodes
+### 5. Create the StorageClass of the tenant
 
 The ready label is `panfs.vdura.com/tenant-network=<NAMESPACE>`, with the namespace of the `TenantNetwork` as its value.
-Add this block to the StorageClass of the tenant. With the PanFS StorageClass chart, it is the value `allowedTopologies`:
+The status of the `TenantNetwork` names it in `status.managedTopology`.
+
+The [PanFS StorageClass operator](../storageclass-operator/Readme.md) is a separate chart. With it, a StorageClass
+of the tenant is a small `PanfsStorageClass` resource in the namespace of the `TenantNetwork`:
 
 ```yaml
+apiVersion: panfs.vdura.com/v1alpha1
+kind: PanfsStorageClass
+metadata:
+  name: acme-storage
+  namespace: acme
+```
+
+That operator creates the StorageClass with the Secret of the `TenantNetwork` and with the ready label
+in `allowedTopologies`. Every volume is then bound to the ready nodes, and a workload needs no node selector.
+
+Without that operator, write the StorageClass yourself. With the PanFS StorageClass chart, set these values:
+
+```yaml
+volumeBindingMode: Immediate
 allowedTopologies:
   - matchLabelExpressions:
       - key: panfs.vdura.com/tenant-network
@@ -350,13 +367,9 @@ allowedTopologies:
           - "<NAMESPACE>"
 ```
 
-Kubernetes checks `allowedTopologies` when it places the first pod that uses a new volume.
-For pods that use an existing volume, add a node selector to the workload:
-
-```yaml
-nodeSelector:
-  panfs.vdura.com/tenant-network: "<NAMESPACE>"
-```
+> **Note:** from this version on, the CSI driver reports topology. With `allowedTopologies` on the ready label,
+> `volumeBindingMode` must be `Immediate`. With `WaitForFirstConsumer` no volume is provisioned: the claim shows
+> the event `error generating accessibility requirements`.
 
 ### More than one tenant
 
