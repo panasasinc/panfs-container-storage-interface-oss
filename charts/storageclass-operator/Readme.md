@@ -100,7 +100,18 @@ helm upgrade --install panfs-storageclass-operator ./ \
 
 ### 2. Create a PanfsStorageClass
 
-In the namespace of the `TenantNetwork`, the smallest one is only a name:
+With Helm, a StorageClass is one release of the chart [`panfs-tenant-storageclass`](../tenant-storageclass/Readme.md),
+in the namespace of the `TenantNetwork`. The name of the release is the name of the StorageClass, and no value is needed:
+
+```bash
+helm upgrade --install acme-storage ../tenant-storageclass \
+    --namespace acme
+```
+
+The PanFS parameters and the other settings of the StorageClass are values of that chart, for example
+`--set reclaimPolicy=Retain`; see its [values](../tenant-storageclass/Readme.md#values).
+
+The chart creates a `PanfsStorageClass`. Without Helm, apply the same resource yourself. The smallest one is only a name:
 
 ```yaml
 apiVersion: panfs.vdura.com/v1alpha1
@@ -110,14 +121,13 @@ metadata:
   namespace: acme
 ```
 
-The operator finds the `TenantNetwork` by itself, because a namespace holds the network of one tenant.
+The template [template-panfsstorageclass.yaml](../../deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml)
+shows all fields.
+
+In both ways, the operator finds the `TenantNetwork` by itself, because a namespace holds the network of one tenant.
 It creates the StorageClass `acme-storage`. It fills in the provisioner, the references to the Secret
 of the `TenantNetwork`, and `allowedTopologies` with the ready label of the tenant network. It also lets
 the CSI controller read the Secret.
-
-The template [template-panfsstorageclass.yaml](../../deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml)
-shows all fields. The chart [`panfs-tenant-storageclass`](../tenant-storageclass/Readme.md) creates the same
-resource as a Helm release.
 
 ### 3. Check the result
 
