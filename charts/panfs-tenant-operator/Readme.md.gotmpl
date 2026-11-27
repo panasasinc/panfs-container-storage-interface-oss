@@ -639,55 +639,6 @@ a `PanfsStorageClass`. A StorageClass that exists keeps working. To move it to a
 > no longer provisions volumes: the claim shows the event `error generating accessibility requirements`.
 > Replace it with a `PanfsStorageClass`, or create it again with `volumeBindingMode: Immediate`.
 
-## Moving from the two operators to the one
-
-Development builds of version 2.0.0 had two operators: the PanFS Tenant Network operator (chart
-`panfs-tenant-network-operator`, image `panfs-tenant-network`) and the PanFS StorageClass operator (chart
-`panfs-storageclass-operator`, image `panfs-storageclass-operator`). No release had them. A cluster that runs them
-moves to the PanFS Tenant operator like this. The `TenantNetwork` and `PanfsStorageClass` resources, the StorageClasses,
-the volumes and the tenant interfaces on the nodes all stay in place.
-
-1. Stop the two old operators, but keep their releases for now. The `ClusterRole` of the node pods stays this way,
-   so the node pods keep working:
-
-   ```bash
-   kubectl -n panfs-tenant-network scale deployment panfs-tenant-network-operator --replicas=0
-   kubectl -n csi-panfs scale deployment panfs-storageclass-operator --replicas=0
-   ```
-
-   Use the namespaces and the release names of your cluster. Two operators that serve one resource at the same time
-   would undo the changes of each other, so do not skip this step.
-
-2. Install the PanFS Tenant operator; see [Install the operator](#1-install-the-operator). The two resource
-   definitions are already in the cluster, and Helm leaves them as they are.
-
-3. Wait until the operator has taken over. It moves the DaemonSet of every `TenantNetwork` to its own image and
-   binds the node pods to its own `ClusterRole`. The node pods restart one node at a time; a restart does not
-   remove the tenant interface, so mounted volumes keep working.
-
-   ```bash
-   kubectl get tenantnetworks,panfsstorageclasses -A
-   kubectl -n <NAMESPACE> rollout status daemonset/panfs-tenant-network-<NAME>
-   ```
-
-   Every resource must show the phase `Ready` again.
-
-4. Remove the two old releases, and the old namespace when nothing else is in it:
-
-   ```bash
-   helm uninstall panfs-tenant-network-operator --namespace panfs-tenant-network
-   helm uninstall panfs-storageclass-operator --namespace csi-panfs
-   kubectl delete namespace panfs-tenant-network
-   ```
-
-   Do not delete the resource definitions: the new operator uses them.
-
-5. A release of the former chart `panfs-tenant-storageclass` needs no change. The chart is now
-   [`panfs-storageclass`](../storageclass/Readme.md) in `charts/storageclass`, with the same values;
-   use that path for the next `helm upgrade` of the release.
-
-The images `panfs-tenant-network` and `panfs-storageclass-operator` are no longer built.
-
 ## Uninstalling the operator
 
 Delete every `PanfsStorageClass` and every `TenantNetwork` first, while the operator runs. Then:
