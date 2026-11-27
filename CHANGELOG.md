@@ -64,11 +64,17 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
     references and `allowedTopologies`, and it lets the CSI controller read the Secret.
     `spec.realmSecretName` is for a realm without a tenant network; such a cluster installs the same operator.
     The template is `deploy/k8s/storage-class/template-panfsstorageclass.yaml`.
-- The StorageClass chart checks the namespace before it creates anything: the `TenantNetwork` is there and `Ready`,
-  or `realmSecretName` is set and the namespace has none, and the Secret has the keys `api` and `token`.
-  The install stops with a message otherwise. The chart value `checkNamespace=false` switches the check off.
-- `helm test <release>` for the StorageClass chart: a test pod waits until the `PanfsStorageClass` of the release
-  is `Ready`, and the command fails when it is not. The chart values `test.*` set the image and the timeout.
+- The charts check the cluster before they create anything, and the install stops with a message otherwise:
+  - StorageClass chart: the `TenantNetwork` of the namespace is there and `Ready`, or `realmSecretName` is set and
+    the namespace has none; the Secret has the keys `api` and `token`; no other StorageClass has the name of the release.
+  - Tenant chart: the namespace has no `TenantNetwork` of another release; the Secret of `existingSecret` exists
+    with the keys `api` and `token`.
+  - Operator chart: the CSI driver is installed.
+
+  The chart values `checkNamespace=false` and, for the operator chart, `checkDriver=false` switch the checks off.
+- `helm test <release>` for the StorageClass chart and the tenant chart: a test pod waits until the
+  `PanfsStorageClass` or the `TenantNetwork` of the release is `Ready`, and the command fails when it is not.
+  The chart values `test.*` set the image and the timeout.
 - PersistentVolume node affinity: the controller returns the `allowedTopologies` of the StorageClass as the
   topology of a new volume. Every pod of a volume of a tenant is placed on a node where the tenant network works,
   without a node selector in the workload.

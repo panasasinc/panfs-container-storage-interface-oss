@@ -65,6 +65,17 @@
   {{- fail (printf "The Secret %q in namespace %q has no key %q. It needs the keys api and token. To skip this check, set checkNamespace=false." $secretName $ns .) }}
   {{- end }}
 {{- end }}
+{{- /*
+  A StorageClass has no namespace and takes the name of the release. The operator never takes over a StorageClass
+  that it did not create for this resource; it marks its own with the annotation below.
+*/}}
+{{- $class := lookup "storage.k8s.io/v1" "StorageClass" "" .Release.Name }}
+{{- if $class }}
+  {{- $owner := dig "metadata" "annotations" "panfs.vdura.com/storage-class-owner" "" $class }}
+  {{- if ne $owner (printf "%s/%s" $ns .Release.Name) }}
+  {{- fail (printf "A StorageClass with the name %q exists already (%s). The name of a StorageClass is unique in the cluster: choose another release name. To skip this check, set checkNamespace=false." .Release.Name (ternary (printf "it belongs to the PanfsStorageClass %s" $owner) "the PanFS Tenant operator did not create it" (ne $owner ""))) }}
+  {{- end }}
+{{- end }}
 {{- end }}
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.

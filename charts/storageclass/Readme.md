@@ -65,6 +65,8 @@ see the [operator documentation](../panfs-tenant-operator/Readme.md#resources-cr
   so you need to read the `TenantNetwork` resources and that Secret in the namespace.
   Set `checkNamespace=false` to install first and let the operator report the state in the status of the resource.
 - **The name of the release is free:** a StorageClass has no namespace, so its name must be unique in the cluster.
+  The chart checks this too: the install stops when a StorageClass with that name exists and the operator
+  did not create it for this release.
 
 ## Usage
 
@@ -187,7 +189,7 @@ see [Deleting a PanfsStorageClass](../panfs-tenant-operator/Readme.md#deleting-a
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | allowVolumeExpansion | bool | `nil` | Whether a volume can be expanded. Empty means the default of the operator: `true`. |
-| checkNamespace | bool | `true` | Check the namespace before anything is created: it has a `TenantNetwork` that is `Ready` (for a new release), or `realmSecretName` is set and it has none, and the Secret exists with the keys `api` and `token`. The install stops with a message otherwise. Helm reads these objects with your permissions. Set it to `false` to install first and let the operator report the state in the status of the resource. |
+| checkNamespace | bool | `true` | Check the cluster before anything is created: the namespace has a `TenantNetwork` that is `Ready` (for a new release), or `realmSecretName` is set and it has none; the Secret exists with the keys `api` and `token`; and no other StorageClass has the name of the release. The install stops with a message otherwise. Helm reads these objects with your permissions. Set it to `false` to install first and let the operator report the state in the status of the resource. |
 | checkOperator | bool | `true` | Check that the PanFS Tenant operator is installed before anything is created. Set it to `false` only to render or lint the chart without a cluster. |
 | default | bool | `false` | Make the StorageClass the default one of the cluster |
 | mountOptions | list | `[]` | Mount options of the volumes |

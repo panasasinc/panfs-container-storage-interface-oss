@@ -141,7 +141,8 @@ For every `PanfsStorageClass`:
 ## Requirements
 
 - **PanFS CSI driver:** the driver is installed. The operator reads the namespace of the driver from the CSIDriver
-  object `com.vdura.csi.panfs`.
+  object `com.vdura.csi.panfs`. The chart checks that this object exists and stops with a message when it does not;
+  set `checkDriver=false` to install the operator before the driver.
 
 The other requirements are for a `TenantNetwork`. A cluster that uses only `PanfsStorageClass` with
 `spec.realmSecretName` needs a Secret with the keys `api` and `token` in the namespace of the resource, and nothing else.

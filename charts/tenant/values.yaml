@@ -51,6 +51,24 @@ firewalldZone:
 # @default -- `null`
 detachOnRemoval:
 
+# -- Check the namespace before anything is created: it has no other `TenantNetwork`, and the Secret that
+# `existingSecret` names exists with the keys `api` and `token`. The install stops with a message otherwise.
+# Helm reads these objects with your permissions. Set it to `false` to install first and let the operator
+# report the state in the status of the resource.
+checkNamespace: true
+
+# The test of `helm test <release>`: a pod that waits until the TenantNetwork of the release is Ready.
+test:
+  # -- Create the ServiceAccount, the Role and the RoleBinding of the test pod with the release.
+  # The Role allows reading the TenantNetwork of the release only. With `false`, `helm test` has no test.
+  enabled: true
+  # -- Image of the test pod. It must have `kubectl`
+  image: registry.k8s.io/kubectl:v1.33.1
+  # -- List of image pull secrets of the test pod, for an image in a private registry
+  imagePullSecrets: []
+  # -- How long the test waits for the phase `Ready`. The node pods must start and reach the realm first
+  timeout: 300s
+
 # -- Stop the install when the PanFS Tenant operator is not installed in the cluster.
 # Set it to `false` for tools that render the chart without a cluster and cannot pass
 # `--api-versions panfs.vdura.com/v1alpha1/TenantNetwork`, for example `helm lint`.

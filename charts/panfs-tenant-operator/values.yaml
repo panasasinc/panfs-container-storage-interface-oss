@@ -52,6 +52,10 @@ vlanParentInterface: ""
 # from the subnet in the realm. With `false`, both stay. A restart or an upgrade of the pods never detaches a node.
 detachOnRemoval: true
 
+# -- Stop the install when the PanFS CSI driver is not installed: the CSIDriver object `com.vdura.csi.panfs`
+# is missing. Set it to `false` to install the operator before the driver.
+checkDriver: true
+
 # -- Log verbosity (klog level) of the operator and of the node pods
 logLevel: 2
 

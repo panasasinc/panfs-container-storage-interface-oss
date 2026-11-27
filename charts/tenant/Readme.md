@@ -38,6 +38,8 @@ Install one release per tenant, each in its own namespace.
 - A `Secret` with the name of the release and the keys `api` and `token`, and optionally `ca_cert`.
   It is not created when you name your own Secret with `existingSecret`.
 - A `TenantNetwork` with the name of the release, which names that Secret.
+- A `ServiceAccount`, a `Role` and a `RoleBinding` named `<release>-test`, for the pod of `helm test`;
+  see [Testing the release](#testing-the-release).
 
 The operator then creates the DaemonSet of node pods and its permissions in the same namespace;
 see the [operator documentation](../panfs-tenant-operator/Readme.md#resources-created-by-the-operator).
@@ -49,7 +51,11 @@ see the [operator documentation](../panfs-tenant-operator/Readme.md#resources-cr
   The check looks for the resource kind `TenantNetwork`, so it proves that the operator chart is installed,
   not that the operator pod runs at this moment.
 - **One release per namespace.** A namespace holds one `TenantNetwork`, because its name is the value of the node label
-  `panfs.vdura.com/tenant-network`.
+  `panfs.vdura.com/tenant-network`. The chart checks this before it creates anything: the install stops when the
+  namespace has a `TenantNetwork` of another release.
+- **With `existingSecret`, the Secret exists** and has the keys `api` and `token`. The chart checks this too.
+  Helm reads the `TenantNetwork` resources and that Secret with your permissions. Set `checkNamespace=false`
+  to install first and let the operator report the state in the status of the resource.
 - The requirements of the tenant network itself (realm, token permissions, namespace, Calico) are in the
   [operator documentation](../panfs-tenant-operator/Readme.md#requirements).
 
@@ -180,9 +186,29 @@ To create a StorageClass of the tenant, install the chart [`panfs-storageclass`]
 in the same namespace when the phase is `Ready`. Every volume of that StorageClass is bound to the ready nodes;
 see [Create the StorageClass of the tenant](../panfs-tenant-operator/Readme.md#5-create-the-storageclass-of-the-tenant).
 
+### Testing the release
+
+The install does not wait for the operator and the node pods. `helm test` checks the result:
+it runs a pod that waits until the `TenantNetwork` has the phase `Ready`.
+
+```bash
+helm test acme --namespace acme
+```
+
+The command fails when the phase is not `Ready` after `test.timeout` (300 seconds by default).
+The status and the events of the resource then say why: `kubectl -n acme describe tenantnetwork acme`.
+
+- The test pod uses the image `test.image`, which must have `kubectl`. For a private registry, set `test.image`
+  and `test.imagePullSecrets`.
+- The `Role` of the test pod allows reading the `TenantNetwork` of the release, and nothing else.
+  Set `test.enabled=false` to leave the three objects out; `helm test` then has no test.
+- A test pod that passed is deleted. A pod that failed stays, so that its log can be read, and `helm uninstall`
+  does not remove it: `kubectl -n acme delete pod acme-test`.
+
 ### Rendering the chart without a cluster
 
-`helm template` has no cluster to ask, so the check for the operator fails there. Tell Helm that the kind exists:
+`helm template` has no cluster to ask, so the check for the operator fails there, and the check of the namespace
+is skipped. Tell Helm that the kind exists:
 
 ```bash
 helm template acme ./ --namespace acme \
@@ -208,6 +234,7 @@ The command returns before that is finished; `kubectl -n acme get tenantnetwork`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| checkNamespace | bool | `true` | Check the namespace before anything is created: it has no other `TenantNetwork`, and the Secret that `existingSecret` names exists with the keys `api` and `token`. The install stops with a message otherwise. Helm reads these objects with your permissions. Set it to `false` to install first and let the operator report the state in the status of the resource. |
 | checkOperator | bool | `true` | Stop the install when the PanFS Tenant operator is not installed in the cluster. Set it to `false` for tools that render the chart without a cluster and cannot pass `--api-versions panfs.vdura.com/v1alpha1/TenantNetwork`, for example `helm lint`. |
 | detachOnRemoval | string | `null` | Whether a pod removes the tenant interface and detaches its node from the subnet when the node leaves the tenant. Leave it unset (`null`) to use the default of the operator. |
 | existingSecret | string | `""` | Name of an existing Secret in the release namespace with the keys `api` and `token`, and optionally `ca_cert`. When it is set, the chart creates no Secret and `realm` is not used. Use it to keep the token out of the Helm values. |
@@ -218,4 +245,8 @@ The command returns before that is finished; `kubectl -n acme get tenantnetwork`
 | realm.caCert | string | `""` | Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store. |
 | realm.insecureSkipTLSVerify | bool | `false` | Do not verify the realm certificate. Use it for a realm whose certificate cannot be verified, for example because it has no subject alternative name. The connection stays encrypted, but the identity of the realm is not checked: a host that poses as the realm can read the token. Prefer `realm.caCert` where it works. |
 | realm.token | string | `""` | PanAPI service account token of the tenant |
+| test.enabled | bool | `true` | Create the ServiceAccount, the Role and the RoleBinding of the test pod with the release. The Role allows reading the TenantNetwork of the release only. With `false`, `helm test` has no test. |
+| test.image | string | `"registry.k8s.io/kubectl:v1.33.1"` | Image of the test pod. It must have `kubectl` |
+| test.imagePullSecrets | list | `[]` | List of image pull secrets of the test pod, for an image in a private registry |
+| test.timeout | string | `"300s"` | How long the test waits for the phase `Ready`. The node pods must start and reach the realm first |
 | vlanParentInterface | string | `""` | Only for a realm that places subnets on VLAN segments: the interface of the nodes that carries the VLAN. Leave it empty to use the default of the operator: the interface with the underlay address of the node. |

@@ -54,9 +54,10 @@ test:
   # -- How long the test waits for the phase `Ready`
   timeout: 120s
 
-# -- Check the namespace before anything is created: it has a `TenantNetwork` that is `Ready` (for a new release),
-# or `realmSecretName` is set and it has none, and the Secret exists with the keys `api` and `token`.
-# The install stops with a message otherwise. Helm reads these objects with your permissions.
+# -- Check the cluster before anything is created: the namespace has a `TenantNetwork` that is `Ready` (for a new release),
+# or `realmSecretName` is set and it has none; the Secret exists with the keys `api` and `token`; and no other
+# StorageClass has the name of the release. The install stops with a message otherwise.
+# Helm reads these objects with your permissions.
 # Set it to `false` to install first and let the operator report the state in the status of the resource.
 checkNamespace: true
 

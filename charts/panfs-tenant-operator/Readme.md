@@ -141,7 +141,8 @@ For every `PanfsStorageClass`:
 ## Requirements
 
 - **PanFS CSI driver:** the driver is installed. The operator reads the namespace of the driver from the CSIDriver
-  object `com.vdura.csi.panfs`.
+  object `com.vdura.csi.panfs`. The chart checks that this object exists and stops with a message when it does not;
+  set `checkDriver=false` to install the operator before the driver.
 
 The other requirements are for a `TenantNetwork`. A cluster that uses only `PanfsStorageClass` with
 `spec.realmSecretName` needs a Secret with the keys `api` and `token` in the namespace of the resource, and nothing else.
@@ -717,6 +718,7 @@ kubectl -n <NAMESPACE> patch panfsstorageclass <STORAGE_CLASS_NAME> --type merge
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| checkDriver | bool | `true` | Stop the install when the PanFS CSI driver is not installed: the CSIDriver object `com.vdura.csi.panfs` is missing. Set it to `false` to install the operator before the driver. |
 | csiControllerServiceAccount | string | `""` | ServiceAccount of the CSI controller in that namespace. Leave it empty to use the name that the driver chart gives it: `<namespace of the driver>-controller`, for example `csi-panfs-controller`. |
 | csiDriverNamespace | string | `""` | Namespace of the PanFS CSI driver: the CSI controller in that namespace gets the permission to read the realm Secret of a StorageClass. Leave it empty to read the namespace from the CSIDriver object `com.vdura.csi.panfs`, where the driver chart writes it. |
 | detachOnRemoval | bool | `true` | Default for what a node pod does when its node leaves the tenant: the label `panfs.vdura.com/tenant` is removed from the node, or the TenantNetwork is deleted. With `true`, the pod removes the tenant interface and detaches the node from the subnet in the realm. With `false`, both stay. A restart or an upgrade of the pods never detaches a node. |

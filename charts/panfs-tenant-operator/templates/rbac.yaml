@@ -16,6 +16,14 @@
 {{- if eq .Release.Namespace "default" }}
 {{- fail "Installation into the 'default' namespace is not permitted. Use --namespace <namespace>." }}
 {{- end }}
+{{- /*
+  The operator serves the PanFS CSI driver, and its StorageClass part reads the namespace of the driver from the
+  CSIDriver object. Stop with a clear message when the driver is not installed. "helm template" and a client-side
+  dry run have no cluster: "lookup" finds nothing there, not even the namespace kube-system, and the check is skipped.
+*/}}
+{{- if and .Values.checkDriver (lookup "v1" "Namespace" "" "kube-system") (not (lookup "storage.k8s.io/v1" "CSIDriver" "" "com.vdura.csi.panfs")) }}
+{{- fail "The PanFS CSI driver is not installed in this cluster: the CSIDriver object com.vdura.csi.panfs does not exist. Install the chart csi-panfs first. To skip this check, set checkDriver=false." }}
+{{- end }}
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
