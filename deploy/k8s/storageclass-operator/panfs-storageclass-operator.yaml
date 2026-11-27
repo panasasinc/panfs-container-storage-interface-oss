@@ -142,7 +142,7 @@ apiVersion: v1
 kind: ServiceAccount
 metadata:
   name: panfs-storageclass-operator
-  namespace: panfs-storageclass-operator
+  namespace: csi-panfs
   labels:
     app: panfs-storageclass-operator
     product: com.vdura.csi.panfs
@@ -156,7 +156,7 @@ metadata:
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: panfs-storageclass-operator-panfs-storageclass-operator
+  name: csi-panfs-panfs-storageclass-operator
   labels:
     app: panfs-storageclass-operator
     product: com.vdura.csi.panfs
@@ -215,17 +215,17 @@ rules:
 kind: ClusterRoleBinding
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
-  name: panfs-storageclass-operator-panfs-storageclass-operator
+  name: csi-panfs-panfs-storageclass-operator
   labels:
     app: panfs-storageclass-operator
     product: com.vdura.csi.panfs
 subjects:
   - kind: ServiceAccount
     name: panfs-storageclass-operator
-    namespace: panfs-storageclass-operator
+    namespace: csi-panfs
 roleRef:
   kind: ClusterRole
-  name: panfs-storageclass-operator-panfs-storageclass-operator
+  name: csi-panfs-panfs-storageclass-operator
   apiGroup: rbac.authorization.k8s.io
 
 ---
@@ -238,7 +238,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: panfs-storageclass-operator
-  namespace: panfs-storageclass-operator
+  namespace: csi-panfs
   labels:
     app: panfs-storageclass-operator
     product: com.vdura.csi.panfs

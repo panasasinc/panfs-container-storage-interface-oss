@@ -137,7 +137,7 @@ A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`.
 
 - **StorageClass operator manifest:** `storageclass-operator/panfs-storageclass-operator.yaml`, once per cluster.
   It holds the resource definition of `PanfsStorageClass` and the PanFS StorageClass operator,
-  for the namespace `panfs-storageclass-operator`. It is a workload of its own, apart from the tenant network operator.
+  for `csi-panfs`, the namespace of the driver. It is a workload of its own, apart from the tenant network operator.
 - **StorageClass manifest:** `storageclass-operator/template-panfsstorageclass.yaml`, once per StorageClass of the tenant.
   The StorageClass operator creates the StorageClass from it and binds every volume to the ready nodes.
   - Replace `<STORAGE_CLASS_NAME>` with the name of the StorageClass
@@ -146,8 +146,7 @@ A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`.
   - Remove the optional fields that you do not need
 
 ```bash
-# Once per cluster: the StorageClass operator
-kubectl create namespace panfs-storageclass-operator
+# Once per cluster: the StorageClass operator, in the namespace of the driver (csi-panfs)
 kubectl apply -f storageclass-operator/panfs-storageclass-operator.yaml
 
 # Per StorageClass

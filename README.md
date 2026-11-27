@@ -399,8 +399,7 @@ PanFS Tenant Network operator. Then create the StorageClass of the tenant with a
 namespace of the `TenantNetwork`. Only a name and the name of the `TenantNetwork` are required:
 
 ```bash
-# Once per cluster: the StorageClass operator
-kubectl create namespace panfs-storageclass-operator
+# Once per cluster: the StorageClass operator, in the namespace of the driver (csi-panfs)
 kubectl apply -f deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
 
 # In deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml, replace <STORAGE_CLASS_NAME>,
@@ -468,8 +467,7 @@ Step 4.4 has its own chart, the [StorageClass operator chart](./charts/storagecl
 
 ```bash
 helm upgrade --install panfs-storageclass-operator charts/storageclass-operator \
-    --namespace panfs-storageclass-operator \
-    --create-namespace
+    --namespace csi-panfs
 ```
 
 ## Deploying Workloads
@@ -517,7 +515,6 @@ kubectl delete namespace panfs-tenant-network
 
 # The StorageClass operator and its resource definition, when no PanfsStorageClass is left
 kubectl delete -f deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
-kubectl delete namespace panfs-storageclass-operator
 ```
 
 With Helm, uninstall the tenant releases first, then the operator release, and delete the resource definition

@@ -453,7 +453,7 @@ manifest-storageclass-operator: ## Generate manifests for the PanFS StorageClass
 	@printf "$(BOLD)Generating manifests for the PanFS StorageClass Operator...$(RESET)\n"
 	@mkdir -p deploy/k8s/storageclass-operator/
 	helm template panfs-storageclass-operator charts/storageclass-operator --include-crds \
-		--namespace panfs-storageclass-operator | \
+		--namespace csi-panfs | \
 		grep -v '^# Source:' > deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
 	@printf "$(GREEN)Successfully generated manifests for the PanFS StorageClass Operator$(RESET)\n\n"
 

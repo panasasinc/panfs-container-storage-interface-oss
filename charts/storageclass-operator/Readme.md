@@ -74,14 +74,15 @@ For every `PanfsStorageClass`:
 
 ### 1. Install the operator
 
-Once per cluster:
+Once per cluster, in the namespace of the PanFS CSI driver (`csi-panfs` in the examples of this repository):
 
 ```bash
 helm upgrade --install panfs-storageclass-operator ./ \
-    --namespace panfs-storageclass-operator \
-    --create-namespace \
+    --namespace csi-panfs \
     --wait
 ```
+
+The operator works in any other namespace too: it finds the driver through the CSIDriver object.
 
 #### Using Helm overrides:
 
@@ -94,8 +95,7 @@ imagePullSecrets:
 
 ```bash
 helm upgrade --install panfs-storageclass-operator ./ \
-    --namespace panfs-storageclass-operator \
-    --create-namespace \
+    --namespace csi-panfs \
     --values overrides.yaml \
     --wait
 ```
@@ -289,7 +289,7 @@ the operator uses them. To move a StorageClass of the chart to a `PanfsStorageCl
 Delete every `PanfsStorageClass` first, while the operator runs. Then:
 
 ```bash
-helm uninstall panfs-storageclass-operator --namespace panfs-storageclass-operator
+helm uninstall panfs-storageclass-operator --namespace csi-panfs
 kubectl delete crd panfsstorageclasses.panfs.vdura.com
 ```
 
