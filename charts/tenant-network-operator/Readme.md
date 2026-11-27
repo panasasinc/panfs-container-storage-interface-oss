@@ -490,14 +490,15 @@ The Secret has the keys `api` and `token`, and optionally `ca_cert`. The volumes
 | `Pending` | The `TenantNetwork` is not ready yet; the StorageClass is created when it is                              |
 | `Error`   | The message says what is wrong: a missing `TenantNetwork` or Secret, a name that is taken, a refused edit |
 
-Nothing is created while the phase is `Pending` or `Error`. A StorageClass that exists stays when its
+No StorageClass is created while the phase is `Pending`, or while it is `Error` for a new resource.
+A StorageClass that exists stays when its
 `TenantNetwork` is not ready for a while, for example while a node restarts; the message then says so.
 The operator reports changes as events on the resource: `kubectl -n <NAMESPACE> describe panfsstorageclass <NAME>`.
 
 ### The name is unique in the cluster
 
 A StorageClass has no namespace, and it takes the name of the resource. When two resources in two namespaces
-have one name, the older one gets the StorageClass and the other one shows an error. The operator also refuses
+have one name, the one whose StorageClass is created first keeps it, and the other one shows an error. The operator also refuses
 a name that a StorageClass of somebody else has: it never takes over a StorageClass that it did not create.
 
 ### Changing a PanfsStorageClass
@@ -524,6 +525,16 @@ An event on the resource says so. Delete the two by hand when the volumes are go
 ```bash
 kubectl -n <NAMESPACE> delete role,rolebinding panfs-storage-class-<NAME>
 ```
+
+When you create a resource with the same name again, it uses the same `Role`. The operator adds the Secret
+of the new resource to it and keeps the Secret of the old volumes.
+
+### The ServiceAccount of the CSI controller
+
+The `RoleBinding` names the ServiceAccount of the CSI controller. The operator reads the namespace of the driver
+from the CSIDriver object `com.vdura.csi.panfs`, and it uses the name that the driver chart gives the account:
+`<namespace of the driver>-controller`. For a driver that was installed in another way, set the chart values
+`csiDriverNamespace` and `csiControllerServiceAccount`.
 
 ### What a volume keeps for its whole life
 
@@ -593,6 +604,7 @@ kubectl delete clusterrolebinding <NAMESPACE>-panfs-tenant-network-<NAME>
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
+| csiControllerServiceAccount | string | `""` | ServiceAccount of the CSI controller in that namespace. Leave it empty to use the name that the driver chart gives it: `<namespace of the driver>-controller`, for example `csi-panfs-controller`. |
 | csiDriverNamespace | string | `""` | Namespace of the PanFS CSI driver, for the StorageClasses that the operator creates from PanfsStorageClass resources: the CSI controller in that namespace gets the permission to read the realm Secret. Leave it empty to read the namespace from the CSIDriver object `com.vdura.csi.panfs`, where the driver chart writes it. |
 | detachOnRemoval | bool | `true` | Default for what a node pod does when its node leaves the tenant: the label `panfs.vdura.com/tenant` is removed from the node, or the TenantNetwork is deleted. With `true`, the pod removes the tenant interface and detaches the node from the subnet in the realm. With `false`, both stay. A restart or an upgrade of the pods never detaches a node. |
 | firewalldZone | string | `"trusted"` | Default firewalld zone that the tenant interface is moved to on nodes that run firewalld. The realm opens connections to the PanFS client, and the default zone usually drops them. Set it to an empty string to leave firewalld alone. |

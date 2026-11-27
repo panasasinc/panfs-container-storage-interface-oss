@@ -84,6 +84,9 @@ func main() {
 	flag.StringVar(&options.CSIDriverNamespace, "csi-driver-namespace", "",
 		"Operator: namespace of the PanFS CSI driver, for the StorageClasses the operator creates; "+
 			"the default is the namespace that the CSIDriver object names")
+	flag.StringVar(&options.CSIControllerServiceAccount, "csi-controller-service-account", "",
+		"Operator: ServiceAccount of the CSI controller, which reads the realm Secret of a StorageClass; "+
+			"the default is <namespace of the driver>-controller")
 	resync := flag.Duration("resync", 15*time.Second, "Operator: time between two passes over the TenantNetwork resources")
 	flag.Parse()
 	defer klog.Flush()

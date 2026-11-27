@@ -77,6 +77,7 @@ spec:
             - "--detach-on-removal={{ .Values.detachOnRemoval }}"
             - "--vlan-parent={{ .Values.vlanParentInterface }}"
             - "--csi-driver-namespace={{ .Values.csiDriverNamespace }}"
+            - "--csi-controller-service-account={{ .Values.csiControllerServiceAccount }}"
           env:
             # The node pods run the same image as the operator
             - name: NODE_IMAGE

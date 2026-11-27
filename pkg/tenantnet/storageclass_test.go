@@ -21,6 +21,7 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	corev1 "k8s.io/api/core/v1"
+	rbacv1 "k8s.io/api/rbac/v1"
 	storagev1 "k8s.io/api/storage/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -138,7 +139,7 @@ func TestStorageClassFromATenantNetwork(t *testing.T) {
 	assert.Equal(t, []string{"get"}, role.Rules[0].Verbs)
 	binding, err := kube.RbacV1().RoleBindings(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
 	require.NoError(t, err)
-	assert.Equal(t, ControllerServiceAccount, binding.Subjects[0].Name)
+	assert.Equal(t, "csi-panfs-controller", binding.Subjects[0].Name)
 	assert.Equal(t, "csi-panfs", binding.Subjects[0].Namespace)
 
 	item, status := storedClass(t, o, testNamespace)
@@ -281,6 +282,14 @@ func TestStorageClassFailsWithoutTheDriver(t *testing.T) {
 	binding, err := kube.RbacV1().RoleBindings(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "storage", binding.Subjects[0].Namespace)
+	// The driver chart names the ServiceAccount after its namespace.
+	assert.Equal(t, "storage-controller", binding.Subjects[0].Name)
+
+	o.Options.CSIControllerServiceAccount = "custom"
+	o.ReconcileStorageClasses(ctx)
+	binding, err = kube.RbacV1().RoleBindings(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "custom", binding.Subjects[0].Name)
 }
 
 func TestStorageClassKeepsWorkingWhenTheTenantNetworkIsNotReady(t *testing.T) {
@@ -476,4 +485,80 @@ func TestStorageClassLeavesTheSecretReaderToItsVolumes(t *testing.T) {
 	require.NoError(t, err)
 	item, _ := storedClass(t, o, testNamespace)
 	assert.Empty(t, item.GetFinalizers())
+}
+
+func TestStorageClassOfSomebodyElseSurvivesTheDeletionOfTheResource(t *testing.T) {
+	ctx := context.Background()
+	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
+	o.ReconcileStorageClasses(ctx)
+	// Somebody replaced the StorageClass of the operator with one of their own.
+	require.NoError(t, kube.StorageV1().StorageClasses().Delete(ctx, testClass, metav1.DeleteOptions{}))
+	foreign := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: testClass}, Provisioner: "example.com/other"}
+	_, err := kube.StorageV1().StorageClasses().Create(ctx, foreign, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	deleteClass(t, o)
+	o.ReconcileStorageClasses(ctx)
+
+	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "example.com/other", class.Provisioner)
+	item, _ := storedClass(t, o, testNamespace)
+	assert.Empty(t, item.GetFinalizers())
+}
+
+func TestStorageClassFinalizerComesBack(t *testing.T) {
+	ctx := context.Background()
+	o, _ := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
+	o.ReconcileStorageClasses(ctx)
+	item, _ := storedClass(t, o, testNamespace)
+	item.SetFinalizers(nil)
+	_, err := o.Dynamic.Resource(PanfsStorageClassGVR).Namespace(testNamespace).Update(ctx, item, metav1.UpdateOptions{})
+	require.NoError(t, err)
+
+	o.ReconcileStorageClasses(ctx)
+
+	item, _ = storedClass(t, o, testNamespace)
+	assert.Equal(t, []string{StorageClassFinalizer}, item.GetFinalizers())
+}
+
+func TestStorageClassSecretReaderIsRemovedWithoutTheStorageClass(t *testing.T) {
+	ctx := context.Background()
+	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
+	o.ReconcileStorageClasses(ctx)
+	// Somebody deleted the StorageClass by hand.
+	require.NoError(t, kube.StorageV1().StorageClasses().Delete(ctx, testClass, metav1.DeleteOptions{}))
+
+	deleteClass(t, o)
+	o.ReconcileStorageClasses(ctx)
+
+	_, err := kube.RbacV1().Roles(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
+	assert.True(t, apierrors.IsNotFound(err))
+	_, err = kube.RbacV1().RoleBindings(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
+	assert.True(t, apierrors.IsNotFound(err))
+	item, _ := storedClass(t, o, testNamespace)
+	assert.Empty(t, item.GetFinalizers())
+}
+
+func TestStorageClassSecretReaderKeepsTheSecretOfOlderVolumes(t *testing.T) {
+	ctx := context.Background()
+	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "second"}))
+	_, err := kube.CoreV1().Secrets(testNamespace).Create(ctx,
+		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "second", Namespace: testNamespace}}, metav1.CreateOptions{})
+	require.NoError(t, err)
+	// The Role of an earlier resource with this name was kept for its volumes; it names the Secret realm.
+	kept := &rbacv1.Role{
+		ObjectMeta: metav1.ObjectMeta{Name: testReader, Namespace: testNamespace},
+		Rules: []rbacv1.PolicyRule{
+			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{"realm"}, Verbs: []string{"get"}},
+		},
+	}
+	_, err = kube.RbacV1().Roles(testNamespace).Create(ctx, kept, metav1.CreateOptions{})
+	require.NoError(t, err)
+
+	o.ReconcileStorageClasses(ctx)
+
+	role, err := kube.RbacV1().Roles(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, []string{"realm", "second"}, role.Rules[0].ResourceNames)
 }

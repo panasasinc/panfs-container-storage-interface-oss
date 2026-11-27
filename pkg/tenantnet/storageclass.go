@@ -52,8 +52,9 @@ const (
 	Provisioner = "com.vdura.csi.panfs"
 	// CSIDriverNamespaceAnnotation is the annotation of the CSIDriver object that names the namespace of the driver.
 	CSIDriverNamespaceAnnotation = "csi-driver-namespace"
-	// ControllerServiceAccount is the ServiceAccount of the CSI controller; it reads the realm Secret.
-	ControllerServiceAccount = "csi-panfs-controller"
+	// controllerAccountSuffix ends the name of the ServiceAccount of the CSI controller, which reads the realm Secret.
+	// The driver chart names the account after its namespace: "<namespace>-controller".
+	controllerAccountSuffix = "-controller"
 
 	// secretReaderPrefix starts the name of the Role and the RoleBinding that let the CSI controller read the Secret.
 	secretReaderPrefix = "panfs-storage-class-"
@@ -218,16 +219,18 @@ func (o *Operator) applyStorageClass(ctx context.Context, item *unstructured.Uns
 		return status, nil
 	}
 
+	// The finalizer comes before the first object: a resource that was refused above owns nothing, and one
+	// that owns a Role or a StorageClass is never deleted without its cleanup. A finalizer that was removed
+	// by hand comes back here.
+	if err := o.ensureClassFinalizer(ctx, item); err != nil {
+		return status, err
+	}
 	// The CSI controller must read the Secret before it sees the StorageClass.
 	if err := o.ensureSecretReader(ctx, item, source.secretName); err != nil {
 		return status, err
 	}
 
 	if !exists {
-		// The finalizer comes with the StorageClass: a resource that was refused above owns nothing.
-		if err := o.ensureClassFinalizer(ctx, item); err != nil {
-			return status, err
-		}
 		if _, err := classes.Create(ctx, wanted, metav1.CreateOptions{}); err != nil {
 			return status, fmt.Errorf("create the StorageClass: %w", err)
 		}
@@ -428,6 +431,20 @@ func mutableChanged(current, wanted *storagev1.StorageClass) bool {
 		!equality.Semantic.DeepEqual(current.Labels, wanted.Labels)
 }
 
+// controllerAccount returns the ServiceAccount of the CSI controller as a subject. Its name is the option of the
+// operator, or the name that the driver chart gives it: "<namespace of the driver>-controller".
+func (o *Operator) controllerAccount(ctx context.Context) (rbacv1.Subject, error) {
+	namespace, err := o.driverNamespace(ctx)
+	if err != nil {
+		return rbacv1.Subject{}, err
+	}
+	name := o.Options.CSIControllerServiceAccount
+	if name == "" {
+		name = namespace + controllerAccountSuffix
+	}
+	return rbacv1.Subject{Kind: rbacv1.ServiceAccountKind, Name: name, Namespace: namespace}, nil
+}
+
 // driverNamespace returns the namespace of the CSI driver: the option of the operator, or the annotation
 // that the driver chart sets on the CSIDriver object.
 func (o *Operator) driverNamespace(ctx context.Context) (string, error) {
@@ -454,7 +471,7 @@ func (o *Operator) driverNamespace(ctx context.Context) (string, error) {
 // in the namespace of the Secret. The resource does not own them: the volumes of the StorageClass need the Secret
 // for an expansion and for their deletion, also after the resource is gone. See removeStorageClass.
 func (o *Operator) ensureSecretReader(ctx context.Context, item *unstructured.Unstructured, secretName string) error {
-	driverNamespace, err := o.driverNamespace(ctx)
+	account, err := o.controllerAccount(ctx)
 	if err != nil {
 		return err
 	}
@@ -478,16 +495,21 @@ func (o *Operator) ensureSecretReader(ctx context.Context, item *unstructured.Un
 		}
 	} else if err != nil {
 		return fmt.Errorf("read the Role: %w", err)
-	} else if !equality.Semantic.DeepEqual(current.Rules, role.Rules) {
-		role.ResourceVersion = current.ResourceVersion
-		if _, err := roles.Update(ctx, role, metav1.UpdateOptions{}); err != nil {
-			return fmt.Errorf("update the Role: %w", err)
+	} else {
+		// A Role that was kept for the volumes of a deleted resource of this name may name another Secret.
+		// Those volumes still need it, so the Secret is added and nothing is taken away.
+		role.Rules[0].ResourceNames = secretNames(current.Rules, secretName)
+		if !equality.Semantic.DeepEqual(current.Rules, role.Rules) {
+			role.ResourceVersion = current.ResourceVersion
+			if _, err := roles.Update(ctx, role, metav1.UpdateOptions{}); err != nil {
+				return fmt.Errorf("update the Role: %w", err)
+			}
 		}
 	}
 
 	binding := &rbacv1.RoleBinding{
 		ObjectMeta: meta,
-		Subjects:   []rbacv1.Subject{{Kind: rbacv1.ServiceAccountKind, Name: ControllerServiceAccount, Namespace: driverNamespace}},
+		Subjects:   []rbacv1.Subject{account},
 		RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: name},
 	}
 	bindings := o.Kube.RbacV1().RoleBindings(namespace)
@@ -505,6 +527,22 @@ func (o *Operator) ensureSecretReader(ctx context.Context, item *unstructured.Un
 		}
 	}
 	return nil
+}
+
+// secretNames returns the Secrets that the rules of a Role name, and the given one, sorted.
+func secretNames(rules []rbacv1.PolicyRule, secretName string) []string {
+	names := map[string]bool{secretName: true}
+	for _, rule := range rules {
+		for _, name := range rule.ResourceNames {
+			names[name] = true
+		}
+	}
+	sorted := make([]string, 0, len(names))
+	for name := range names {
+		sorted = append(sorted, name)
+	}
+	sort.Strings(sorted)
+	return sorted
 }
 
 // removeStorageClass deletes the StorageClass of a resource that is being deleted, and then lets the resource go.
@@ -529,7 +567,16 @@ func (o *Operator) removeStorageClass(ctx context.Context, item *unstructured.Un
 		log.Info("the StorageClass was deleted", "storageClass", name)
 		o.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonStorageClassDeleted,
 			"Deleted StorageClass "+name+"; its volumes keep working")
+	}
 
+	// The Role and the RoleBinding, also when the StorageClass is already gone: they can exist without it,
+	// after a failed creation or after somebody deleted the StorageClass.
+	reader := secretReaderPrefix + name
+	_, err = o.Kube.RbacV1().Roles(namespace).Get(ctx, reader, metav1.GetOptions{})
+	if err != nil && !apierrors.IsNotFound(err) {
+		return fmt.Errorf("read the Role: %w", err)
+	}
+	if err == nil {
 		volumes, err := o.Kube.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("list the volumes of the StorageClass: %w", err)
@@ -541,7 +588,6 @@ func (o *Operator) removeStorageClass(ctx context.Context, item *unstructured.Un
 				left++
 			}
 		}
-		reader := secretReaderPrefix + name
 		if left > 0 {
 			log.Info("the Role and the RoleBinding for the Secret stay: volumes of the StorageClass exist",
 				"role", reader, "volumes", left)

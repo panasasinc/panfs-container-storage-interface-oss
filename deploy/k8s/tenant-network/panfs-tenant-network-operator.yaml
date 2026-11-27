@@ -496,6 +496,7 @@ spec:
             - "--detach-on-removal=true"
             - "--vlan-parent="
             - "--csi-driver-namespace="
+            - "--csi-controller-service-account="
           env:
             # The node pods run the same image as the operator
             - name: NODE_IMAGE

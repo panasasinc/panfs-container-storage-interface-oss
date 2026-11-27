@@ -48,6 +48,10 @@ detachOnRemoval: true
 # Leave it empty to read the namespace from the CSIDriver object `com.vdura.csi.panfs`, where the driver chart writes it.
 csiDriverNamespace: ""
 
+# -- ServiceAccount of the CSI controller in that namespace. Leave it empty to use the name that the driver chart
+# gives it: `<namespace of the driver>-controller`, for example `csi-panfs-controller`.
+csiControllerServiceAccount: ""
+
 # -- Log verbosity (klog level) of the operator and of the node pods
 logLevel: 2
 

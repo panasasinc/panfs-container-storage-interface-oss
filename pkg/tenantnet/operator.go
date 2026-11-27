@@ -152,6 +152,9 @@ type NodeOptions struct {
 	// CSIDriverNamespace is the namespace of the PanFS CSI driver, for the StorageClasses the operator creates.
 	// Empty means the namespace that the CSIDriver object names.
 	CSIDriverNamespace string
+	// CSIControllerServiceAccount is the ServiceAccount of the CSI controller.
+	// Empty means the name that the driver chart gives it: "<namespace of the driver>-controller".
+	CSIControllerServiceAccount string
 }
 
 // TenantResolver tells which tenant a token belongs to.
@@ -208,6 +211,8 @@ func (o *Operator) ReconcileAll(ctx context.Context) {
 	list, err := o.Dynamic.Resource(TenantNetworkGVR).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
 		o.Log.Error(err, "cannot list the TenantNetworks")
+		// A PanfsStorageClass without a tenant network, or one that is being deleted, does not need them.
+		o.ReconcileStorageClasses(ctx)
 		return
 	}
 	// The oldest TenantNetwork of a tenant serves it; see apply.
