@@ -176,7 +176,8 @@ The phase must become `Ready`. A resource that stays without a status means that
 The status and the events are described in the [operator documentation](../panfs-tenant-operator/Readme.md#4-check-the-result).
 
 A ready node has the label `panfs.vdura.com/tenant-network=acme`, with the namespace of the release as its value.
-Use it in `allowedTopologies` of the StorageClass of the tenant and in the node selector of its workloads;
+To create a StorageClass of the tenant, install the chart [`panfs-storageclass`](../storageclass/Readme.md)
+in the same namespace when the phase is `Ready`. Every volume of that StorageClass is bound to the ready nodes;
 see [Create the StorageClass of the tenant](../panfs-tenant-operator/Readme.md#5-create-the-storageclass-of-the-tenant).
 
 ### Rendering the chart without a cluster

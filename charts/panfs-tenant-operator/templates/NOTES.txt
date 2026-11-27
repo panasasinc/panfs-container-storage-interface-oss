@@ -15,7 +15,8 @@ A tenant, whose volumes are reachable only from the network of that tenant:
    Without nodeSelector, all nodes of the cluster are put on the tenant network.
    A ready node has the label panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>.
 
-2. Install the chart panfs-storageclass in the same namespace. The name of the release is the name of the StorageClass:
+2. When the TenantNetwork is Ready, install the chart panfs-storageclass in the same namespace.
+   The name of the release is the name of the StorageClass:
 
    helm install <STORAGE_CLASS_NAME> charts/storageclass --namespace <TENANT_NAMESPACE>
 

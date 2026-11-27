@@ -34,9 +34,10 @@ help:
 			sub(/^## /, "");\
 			printf "\n  $(BOLD)%s$(RESET)\n", $$0\
 		}\
-		/^[a-zA-Z0-9_-]+:.*##/ {\
-			match($$0, /^([a-zA-Z0-9_-]+):.*## (.*)$$/, arr);\
-			if (arr[1]&&arr[2]){printf "    $(BLUE)%-40s$(RESET) %s\n", arr[1], arr[2]}\
+		/^[a-zA-Z0-9_-]+:.*## / {\
+			target = $$0; sub(/:.*/, "", target);\
+			text = $$0; sub(/^.*## /, "", text);\
+			printf "    $(BLUE)%-40s$(RESET) %s\n", target, text\
 		}' Makefile
 	@printf "\n$(BOLD)Environment Variables:$(RESET)\n\n"
 	@printf "  $(BOLD)$(GREEN)[Build/Deploy Settings]$(RESET)\n"

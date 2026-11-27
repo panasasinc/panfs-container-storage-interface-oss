@@ -10,4 +10,10 @@ The phase must become Ready. A resource that stays without a status means that t
 look at its pod in the namespace where the chart panfs-tenant-operator is installed.
 
 A ready node has the label panfs.vdura.com/tenant-network={{ .Release.Namespace }}.
-Use it in `allowedTopologies` of the StorageClass of the tenant and in the node selector of its workloads.
+
+When the phase is Ready, create a StorageClass of the tenant with the chart panfs-storageclass, in this namespace.
+The name of the release is the name of the StorageClass:
+
+   helm install <STORAGE_CLASS_NAME> charts/storageclass --namespace {{ .Release.Namespace }}
+
+Every volume of that StorageClass is bound to the ready nodes, so a workload needs no node selector.

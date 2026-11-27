@@ -415,7 +415,8 @@ The fields and the status are described in the
 Three charts do steps 3 to 5: the [operator chart](./charts/panfs-tenant-operator/Readme.md), installed once;
 the [tenant chart](./charts/tenant/Readme.md), one release per tenant, which creates the Secret and the `TenantNetwork`;
 and the [StorageClass chart](./charts/storageclass/Readme.md), one release per StorageClass.
-The tenant chart and the StorageClass chart check first that the operator is installed.
+The tenant chart and the StorageClass chart check first that the operator is installed. The StorageClass chart
+also checks its namespace: the `TenantNetwork` must be `Ready`, and its Secret must exist.
 The name of a StorageClass release is the name of the StorageClass.
 
 ```bash
@@ -429,8 +430,15 @@ helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
     --set realm.token=<TOKEN> \
     --set nodeSelector.<LABEL_KEY>=<LABEL_VALUE>
 
+# The StorageClass chart installs only when the tenant network is Ready
+kubectl -n <TENANT_NAMESPACE> wait tenantnetwork/<TENANT_NAMESPACE> \
+    --for=jsonpath='{.status.phase}'=Ready --timeout=5m
+
 helm upgrade --install <STORAGE_CLASS_NAME> charts/storageclass \
     --namespace <TENANT_NAMESPACE>
+
+# Optional: let Helm check that the StorageClass is in place
+helm test <STORAGE_CLASS_NAME> --namespace <TENANT_NAMESPACE>
 ```
 
 With an `https://` address, the operator and the node pods check the certificate of the realm. For a certificate

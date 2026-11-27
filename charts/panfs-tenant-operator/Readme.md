@@ -382,7 +382,8 @@ kubectl -n <NAMESPACE> logs -l panfs.vdura.com/tenant-network-name=<NAME> --tail
 
 A StorageClass of the tenant is a `PanfsStorageClass` in the namespace of the `TenantNetwork`.
 With Helm, it is one release of the chart [`panfs-storageclass`](../storageclass/Readme.md).
-The name of the release is the name of the StorageClass, and no value is needed:
+The name of the release is the name of the StorageClass, and no value is needed.
+The chart installs only when the `TenantNetwork` is `Ready` (step 4):
 
 ```bash
 helm upgrade --install acme-storage ../storageclass \
