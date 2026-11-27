@@ -64,6 +64,9 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
     references and `allowedTopologies`, and it lets the CSI controller read the Secret.
     `spec.realmSecretName` is for a realm without a tenant network; such a cluster installs the same operator.
     The template is `deploy/k8s/storage-class/template-panfsstorageclass.yaml`.
+- The StorageClass chart checks the namespace before it creates anything: the `TenantNetwork` is there and `Ready`,
+  or `realmSecretName` is set and the namespace has none, and the Secret has the keys `api` and `token`.
+  The install stops with a message otherwise. The chart value `checkNamespace=false` switches the check off.
 - `helm test <release>` for the StorageClass chart: a test pod waits until the `PanfsStorageClass` of the release
   is `Ready`, and the command fails when it is not. The chart values `test.*` set the image and the timeout.
 - PersistentVolume node affinity: the controller returns the `allowedTopologies` of the StorageClass as the

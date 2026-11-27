@@ -54,6 +54,12 @@ test:
   # -- How long the test waits for the phase `Ready`
   timeout: 120s
 
+# -- Check the namespace before anything is created: it has a `TenantNetwork` that is `Ready` (for a new release),
+# or `realmSecretName` is set and it has none, and the Secret exists with the keys `api` and `token`.
+# The install stops with a message otherwise. Helm reads these objects with your permissions.
+# Set it to `false` to install first and let the operator report the state in the status of the resource.
+checkNamespace: true
+
 # -- Check that the PanFS Tenant operator is installed before anything is created.
 # Set it to `false` only to render or lint the chart without a cluster.
 checkOperator: true

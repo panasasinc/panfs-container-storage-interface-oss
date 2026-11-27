@@ -50,6 +50,20 @@ see the [operator documentation](../panfs-tenant-operator/Readme.md#resources-cr
 - **The namespace has a `TenantNetwork`**, for example from the [tenant chart](../tenant/Readme.md).
   The operator finds it: a namespace holds the network of one tenant. For a realm that is reachable without
   a tenant network, set `realmSecretName` instead; see [Realm without a tenant network](#realm-without-a-tenant-network).
+- **The chart checks the namespace before it creates anything**, with the rules of the operator, and it stops
+  with a message when one fails:
+
+| The namespace has  | `realmSecretName` | The install                                                        |
+|:-------------------|:------------------|:-------------------------------------------------------------------|
+| a `TenantNetwork`  | not set           | goes on when the `TenantNetwork` is `Ready` and its Secret exists  |
+| a `TenantNetwork`  | set               | stops: the volumes would not be bound to the nodes of the tenant   |
+| no `TenantNetwork` | set               | goes on when that Secret exists                                    |
+| no `TenantNetwork` | not set           | stops: install the tenant chart first, or pass the right namespace |
+
+  The Secret must have the keys `api` and `token`. The phase of the `TenantNetwork` counts only for a new release:
+  an upgrade does not stop while a node of the tenant restarts. Helm reads these objects with your permissions,
+  so you need to read the `TenantNetwork` resources and that Secret in the namespace.
+  Set `checkNamespace=false` to install first and let the operator report the state in the status of the resource.
 - **The name of the release is free:** a StorageClass has no namespace, so its name must be unique in the cluster.
 
 ## Usage
@@ -127,15 +141,16 @@ The status and the events are described in the [operator documentation](../panfs
 
 ### Testing the release
 
-The install succeeds as soon as the `PanfsStorageClass` is created; it does not wait for the operator.
+The chart checks the namespace before the install, but the install does not wait for the operator:
+it succeeds as soon as the `PanfsStorageClass` is created.
 `helm test` checks the result: it runs a pod that waits until the resource has the phase `Ready`.
 
 ```bash
 helm test acme-storage --namespace acme
 ```
 
-The command fails when the phase is not `Ready` after `test.timeout` (120 seconds by default), for example in a namespace
-without a `TenantNetwork`. The status of the resource then says why:
+The command fails when the phase is not `Ready` after `test.timeout` (120 seconds by default), for example when
+the name of the StorageClass is taken. The status of the resource then says why:
 `kubectl -n acme describe panfsstorageclass acme-storage`.
 
 - The test pod uses the image `test.image`, which must have `kubectl`. For a private registry, set `test.image`
@@ -148,7 +163,8 @@ without a `TenantNetwork`. The status of the resource then says why:
 
 ### Rendering the chart without a cluster
 
-`helm template` has no cluster to ask, so the check for the operator fails there. Tell Helm that the kind exists:
+`helm template` has no cluster to ask, so the check for the operator fails there, and the check of the namespace
+is skipped. Tell Helm that the kind exists:
 
 ```bash
 helm template acme-storage ./ --namespace acme \
@@ -171,6 +187,7 @@ see [Deleting a PanfsStorageClass](../panfs-tenant-operator/Readme.md#deleting-a
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
 | allowVolumeExpansion | bool | `nil` | Whether a volume can be expanded. Empty means the default of the operator: `true`. |
+| checkNamespace | bool | `true` | Check the namespace before anything is created: it has a `TenantNetwork` that is `Ready` (for a new release), or `realmSecretName` is set and it has none, and the Secret exists with the keys `api` and `token`. The install stops with a message otherwise. Helm reads these objects with your permissions. Set it to `false` to install first and let the operator report the state in the status of the resource. |
 | checkOperator | bool | `true` | Check that the PanFS Tenant operator is installed before anything is created. Set it to `false` only to render or lint the chart without a cluster. |
 | default | bool | `false` | Make the StorageClass the default one of the cluster |
 | mountOptions | list | `[]` | Mount options of the volumes |
