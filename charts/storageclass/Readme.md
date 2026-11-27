@@ -39,9 +39,10 @@ The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource
 - The token needs these permissions for its own tenant: read the tenant and its storageset assignments;
   list, read, create, update and delete volumes; list the subnets and read the mount recipe of a subnet.
 - The worker nodes must be attached to the network of the tenant. The driver does not attach them;
-  the [PanFS Tenant Network operator](../tenant-network-operator/Readme.md) does. With that operator, prefer a
-  [PanfsStorageClass](../tenant-network-operator/Readme.md#panfsstorageclass) to this chart: it fills in the Secret
-  references and `allowedTopologies`, and it keeps the volumes on the nodes where the tenant network works.
+  the [PanFS Tenant Network operator](../tenant-network-operator/Readme.md) does. For a tenant network, prefer a
+  [PanfsStorageClass](../storageclass-operator/Readme.md#panfsstorageclass) of the PanFS StorageClass operator
+  to this chart: it fills in the Secret references and `allowedTopologies`, and it keeps the volumes on the nodes
+  where the tenant network works.
 - With `allowedTopologies` on the ready label of the tenant network, set `volumeBindingMode` to `Immediate`.
   With `WaitForFirstConsumer` no volume is provisioned.
 - If the realm certificate is signed by a private CA, set `realm.caCert` to the PEM certificate of that CA,

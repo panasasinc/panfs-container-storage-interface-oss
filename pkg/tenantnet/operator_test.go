@@ -51,10 +51,7 @@ func newTenantNetwork(spec map[string]interface{}) *unstructured.Unstructured {
 
 // newTestOperator returns an operator over fake clients that hold the TenantNetwork and a realm Secret.
 func newTestOperator(item *unstructured.Unstructured, api *fakeAPI) (*Operator, *fake.Clientset) {
-	kinds := map[schema.GroupVersionResource]string{
-		TenantNetworkGVR:     TenantNetworkKind + "List",
-		PanfsStorageClassGVR: PanfsStorageClassKind + "List",
-	}
+	kinds := map[schema.GroupVersionResource]string{TenantNetworkGVR: TenantNetworkKind + "List"}
 	kube := fake.NewSimpleClientset(&corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{Name: "realm", Namespace: testNamespace, ResourceVersion: "1"},
 		Data:       map[string][]byte{"api": []byte("realm.example"), "token": []byte("secret-token\n")},

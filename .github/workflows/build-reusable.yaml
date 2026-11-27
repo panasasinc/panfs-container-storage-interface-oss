@@ -23,7 +23,7 @@ on:
         default: 'dev'
         required: false
       build-target:
-        description: "What to build: plugin (CSI driver), tests (sanity test tools) or tenant-network (PanFS Tenant Network)"
+        description: "What to build: plugin (CSI driver), tests (sanity test tools), tenant-network (PanFS Tenant Network) or storageclass-operator (PanFS StorageClass Operator)"
         type: string
         default: 'plugin'
         required: false

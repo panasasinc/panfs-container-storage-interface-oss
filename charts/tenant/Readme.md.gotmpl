@@ -177,7 +177,7 @@ The status and the events are described in the [operator documentation](../tenan
 
 A ready node has the label `panfs.vdura.com/tenant-network=acme`, with the namespace of the release as its value.
 Use it in `allowedTopologies` of the StorageClass of the tenant and in the node selector of its workloads;
-see [Place workloads on the ready nodes](../tenant-network-operator/Readme.md#5-place-workloads-on-the-ready-nodes).
+see [Create the StorageClass of the tenant](../tenant-network-operator/Readme.md#5-create-the-storageclass-of-the-tenant).
 
 ### Rendering the chart without a cluster
 

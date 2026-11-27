@@ -50,12 +50,15 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
   reports the segment type of the subnet. The status of the resource lists the nodes,
   and the operator and the pods report changes as events on it.
   See the [operator documentation](charts/tenant-network-operator/Readme.md).
-- `PanfsStorageClass`, a second resource of the PanFS Tenant Network operator. From a name and the name of
+- PanFS StorageClass operator: the new chart `charts/storageclass-operator`, the manifests in
+  `deploy/k8s/storageclass-operator`, and the image `panfs-storageclass-operator`. Install it once per cluster.
+  It is a workload of its own, apart from the CSI driver and the PanFS Tenant Network operator.
+  It serves the new resource `PanfsStorageClass`. From a name and the name of
   a `TenantNetwork`, the operator creates a StorageClass: it fills in the provisioner, the Secret references and
   `allowedTopologies`, and it lets the CSI controller read the Secret. `spec.realmSecretName` in place of
   `spec.tenantNetwork` is for a realm without a tenant network. The template is
-  `deploy/k8s/tenant-network/template-panfsstorageclass.yaml`. The StorageClass chart and its manifests stay.
-  See the [operator documentation](charts/tenant-network-operator/Readme.md#panfsstorageclass).
+  `deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml`. The StorageClass chart and its manifests stay.
+  See the [operator documentation](charts/storageclass-operator/Readme.md).
 - PersistentVolume node affinity: the controller returns the `allowedTopologies` of the StorageClass as the
   topology of a new volume. Every pod of a volume of a tenant is placed on a node where the tenant network works,
   without a node selector in the workload.

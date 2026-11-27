@@ -54,3 +54,21 @@ jobs:
       trivy-scan: false
       push: true
     secrets: inherit
+
+  storageclass-operator-image-ghcr:
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/build-reusable.yaml
+    with:
+      runner-label: "ubuntu-latest"
+      app-version: "${{ github.ref_name }}"
+      build-target: "storageclass-operator"
+      image-name: "panfs-storageclass-operator"
+      image-tags: "${{ github.ref_name }}"
+      repo-url: "ghcr.io/${{ github.repository }}"
+      ref: "${{ github.ref }}"
+      trivy-scan: false
+      push: true
+    secrets: inherit

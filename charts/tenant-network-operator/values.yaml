@@ -43,15 +43,6 @@ vlanParentInterface: ""
 # from the subnet in the realm. With `false`, both stay. A restart or an upgrade of the pods never detaches a node.
 detachOnRemoval: true
 
-# -- Namespace of the PanFS CSI driver, for the StorageClasses that the operator creates from PanfsStorageClass resources:
-# the CSI controller in that namespace gets the permission to read the realm Secret.
-# Leave it empty to read the namespace from the CSIDriver object `com.vdura.csi.panfs`, where the driver chart writes it.
-csiDriverNamespace: ""
-
-# -- ServiceAccount of the CSI controller in that namespace. Leave it empty to use the name that the driver chart
-# gives it: `<namespace of the driver>-controller`, for example `csi-panfs-controller`.
-csiControllerServiceAccount: ""
-
 # -- Log verbosity (klog level) of the operator and of the node pods
 logLevel: 2
 

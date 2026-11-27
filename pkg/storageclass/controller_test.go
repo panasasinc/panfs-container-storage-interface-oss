@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tenantnet
+package storageclass
 
 import (
 	"context"
@@ -31,12 +31,25 @@ import (
 	dynamicfake "k8s.io/client-go/dynamic/fake"
 	"k8s.io/client-go/kubernetes/fake"
 	"k8s.io/klog/v2"
+
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/tenantnet"
 )
 
 const (
-	testClass  = "fast"
-	testReader = secretReaderPrefix + testClass
+	testNamespace = "tenant-ns"
+	testClass     = "fast"
+	testReader    = secretReaderPrefix + testClass
 )
+
+// newTenantNetwork returns a TenantNetwork named acme with the given spec.
+func newTenantNetwork(spec map[string]interface{}) *unstructured.Unstructured {
+	return &unstructured.Unstructured{Object: map[string]interface{}{
+		"apiVersion": tenantnet.TenantNetworkGVR.GroupVersion().String(),
+		"kind":       tenantnet.TenantNetworkKind,
+		"metadata":   map[string]interface{}{"name": "acme", "namespace": testNamespace, "uid": "uid-1"},
+		"spec":       spec,
+	}}
+}
 
 // newClass returns a PanfsStorageClass named fast in the given namespace.
 func newClass(namespace string, spec map[string]interface{}) *unstructured.Unstructured {
@@ -56,17 +69,17 @@ func readyNetwork(phase string) *unstructured.Unstructured {
 		"message":         "the tenant network works on 1 of 2 nodes",
 		"desiredNodes":    int64(2),
 		"readyNodes":      int64(1),
-		"managedTopology": map[string]interface{}{"key": ReadyLabelKey, "value": testNamespace},
+		"managedTopology": map[string]interface{}{"key": tenantnet.ReadyLabelKey, "value": testNamespace},
 	}
 	return network
 }
 
 // newClassOperator returns an operator over fake clients that hold the given custom resources, a realm Secret
 // and the CSIDriver object of a driver in the namespace csi-panfs.
-func newClassOperator(items ...runtime.Object) (*Operator, *fake.Clientset) {
+func newClassOperator(items ...runtime.Object) (*Controller, *fake.Clientset) {
 	kinds := map[schema.GroupVersionResource]string{
-		TenantNetworkGVR:     TenantNetworkKind + "List",
-		PanfsStorageClassGVR: PanfsStorageClassKind + "List",
+		tenantnet.TenantNetworkGVR: tenantnet.TenantNetworkKind + "List",
+		PanfsStorageClassGVR:       PanfsStorageClassKind + "List",
 	}
 	kube := fake.NewSimpleClientset(
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "realm", Namespace: testNamespace}},
@@ -74,7 +87,7 @@ func newClassOperator(items ...runtime.Object) (*Operator, *fake.Clientset) {
 			Name: Provisioner, Annotations: map[string]string{CSIDriverNamespaceAnnotation: "csi-panfs"},
 		}},
 	)
-	return &Operator{
+	return &Controller{
 		Kube:    kube,
 		Dynamic: dynamicfake.NewSimpleDynamicClientWithCustomListKinds(runtime.NewScheme(), kinds, items...),
 		Log:     klog.NewKlogr(),
@@ -82,7 +95,7 @@ func newClassOperator(items ...runtime.Object) (*Operator, *fake.Clientset) {
 }
 
 // storedClass returns the PanfsStorageClass as the fake API server holds it, and its status.
-func storedClass(t *testing.T, o *Operator, namespace string) (*unstructured.Unstructured, PanfsStorageClassStatus) {
+func storedClass(t *testing.T, o *Controller, namespace string) (*unstructured.Unstructured, PanfsStorageClassStatus) {
 	t.Helper()
 	item, err := o.Dynamic.Resource(PanfsStorageClassGVR).Namespace(namespace).Get(context.Background(), testClass, metav1.GetOptions{})
 	require.NoError(t, err)
@@ -90,7 +103,7 @@ func storedClass(t *testing.T, o *Operator, namespace string) (*unstructured.Uns
 }
 
 // updateClassSpec replaces the spec of the stored PanfsStorageClass.
-func updateClassSpec(t *testing.T, o *Operator, spec map[string]interface{}) {
+func updateClassSpec(t *testing.T, o *Controller, spec map[string]interface{}) {
 	t.Helper()
 	item, _ := storedClass(t, o, testNamespace)
 	item.Object["spec"] = spec
@@ -108,9 +121,9 @@ func assertNoStorageClass(t *testing.T, kube *fake.Clientset) {
 
 func TestStorageClassFromATenantNetwork(t *testing.T) {
 	ctx := context.Background()
-	o, kube := newClassOperator(readyNetwork(PhaseReady), newClass(testNamespace, map[string]interface{}{"tenantNetwork": "acme"}))
+	o, kube := newClassOperator(readyNetwork(tenantnet.PhaseReady), newClass(testNamespace, map[string]interface{}{"tenantNetwork": "acme"}))
 
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
@@ -125,7 +138,7 @@ func TestStorageClassFromATenantNetwork(t *testing.T) {
 		"csi.storage.k8s.io/controller-expand-secret-namespace": testNamespace,
 	}, class.Parameters)
 	assert.Equal(t, []corev1.TopologySelectorTerm{{MatchLabelExpressions: []corev1.TopologySelectorLabelRequirement{
-		{Key: ReadyLabelKey, Values: []string{testNamespace}},
+		{Key: tenantnet.ReadyLabelKey, Values: []string{testNamespace}},
 	}}}, class.AllowedTopologies)
 	assert.Equal(t, storagev1.VolumeBindingImmediate, *class.VolumeBindingMode)
 	assert.Equal(t, corev1.PersistentVolumeReclaimDelete, *class.ReclaimPolicy)
@@ -144,14 +157,14 @@ func TestStorageClassFromATenantNetwork(t *testing.T) {
 
 	item, status := storedClass(t, o, testNamespace)
 	assert.Equal(t, []string{StorageClassFinalizer}, item.GetFinalizers())
-	assert.Equal(t, PhaseReady, status.Phase)
+	assert.Equal(t, tenantnet.PhaseReady, status.Phase)
 	assert.Equal(t, testClass, status.StorageClass)
 	assert.Equal(t, "the StorageClass fast is in place", status.Message)
 }
 
 func TestStorageClassParametersAndSettingsReachTheStorageClass(t *testing.T) {
 	ctx := context.Background()
-	o, kube := newClassOperator(readyNetwork(PhaseReady), newClass(testNamespace, map[string]interface{}{
+	o, kube := newClassOperator(readyNetwork(tenantnet.PhaseReady), newClass(testNamespace, map[string]interface{}{
 		"tenantNetwork": "acme",
 		"parameters": map[string]interface{}{
 			"panfs.csi.vdura.com/layout":   "raid6+",
@@ -163,7 +176,7 @@ func TestStorageClassParametersAndSettingsReachTheStorageClass(t *testing.T) {
 		"default":              true,
 	}))
 
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
@@ -180,7 +193,7 @@ func TestStorageClassWithoutATenantNetwork(t *testing.T) {
 	ctx := context.Background()
 	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
 
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
@@ -188,7 +201,7 @@ func TestStorageClassWithoutATenantNetwork(t *testing.T) {
 	assert.Equal(t, storagev1.VolumeBindingWaitForFirstConsumer, *class.VolumeBindingMode)
 	assert.Equal(t, "realm", class.Parameters["csi.storage.k8s.io/provisioner-secret-name"])
 	_, status := storedClass(t, o, testNamespace)
-	assert.Equal(t, PhaseReady, status.Phase)
+	assert.Equal(t, tenantnet.PhaseReady, status.Phase)
 }
 
 func TestStorageClassIsNotCreatedWithoutItsSources(t *testing.T) {
@@ -202,40 +215,40 @@ func TestStorageClassIsNotCreatedWithoutItsSources(t *testing.T) {
 		{
 			name:    "the TenantNetwork is missing",
 			spec:    map[string]interface{}{"tenantNetwork": "acme"},
-			phase:   PhaseError,
+			phase:   tenantnet.PhaseError,
 			message: `the TenantNetwork "acme" does not exist in namespace "tenant-ns"`,
 		},
 		{
 			name:    "the TenantNetwork is not ready",
-			objects: []runtime.Object{readyNetwork(PhasePending)},
+			objects: []runtime.Object{readyNetwork(tenantnet.PhasePending)},
 			spec:    map[string]interface{}{"tenantNetwork": "acme"},
-			phase:   PhasePending,
+			phase:   tenantnet.PhasePending,
 			message: `waiting for the TenantNetwork "acme" to be ready (Pending: the tenant network works on 1 of 2 nodes)`,
 		},
 		{
 			name:    "the Secret is missing",
 			spec:    map[string]interface{}{"realmSecretName": "other"},
-			phase:   PhaseError,
+			phase:   tenantnet.PhaseError,
 			message: `the Secret "other" does not exist in namespace "tenant-ns"`,
 		},
 		{
 			name:    "both sources are set",
-			objects: []runtime.Object{readyNetwork(PhaseReady)},
+			objects: []runtime.Object{readyNetwork(tenantnet.PhaseReady)},
 			spec:    map[string]interface{}{"tenantNetwork": "acme", "realmSecretName": "realm"},
-			phase:   PhaseError,
+			phase:   tenantnet.PhaseError,
 			message: "exactly one of spec.tenantNetwork and spec.realmSecretName is required",
 		},
 		{
 			name:    "no source is set",
 			spec:    map[string]interface{}{},
-			phase:   PhaseError,
+			phase:   tenantnet.PhaseError,
 			message: "exactly one of spec.tenantNetwork and spec.realmSecretName is required",
 		},
 		{
 			name:    "the binding mode does not work with a tenant network",
-			objects: []runtime.Object{readyNetwork(PhaseReady)},
+			objects: []runtime.Object{readyNetwork(tenantnet.PhaseReady)},
 			spec:    map[string]interface{}{"tenantNetwork": "acme", "volumeBindingMode": "WaitForFirstConsumer"},
-			phase:   PhaseError,
+			phase:   tenantnet.PhaseError,
 			message: "spec.volumeBindingMode WaitForFirstConsumer cannot be used with spec.tenantNetwork; " +
 				"use Immediate, which is the default: the volume is bound to the nodes of the tenant network",
 		},
@@ -244,7 +257,7 @@ func TestStorageClassIsNotCreatedWithoutItsSources(t *testing.T) {
 			spec: map[string]interface{}{"realmSecretName": "realm", "parameters": map[string]interface{}{
 				"csi.storage.k8s.io/provisioner-secret-name": "other",
 			}},
-			phase:   PhaseError,
+			phase:   tenantnet.PhaseError,
 			message: `the parameter "csi.storage.k8s.io/provisioner-secret-name" in spec.parameters is set by the operator; remove it`,
 		},
 	}
@@ -252,7 +265,7 @@ func TestStorageClassIsNotCreatedWithoutItsSources(t *testing.T) {
 		t.Run(test.name, func(t *testing.T) {
 			o, kube := newClassOperator(append(test.objects, newClass(testNamespace, test.spec))...)
 
-			o.ReconcileStorageClasses(context.Background())
+			o.ReconcileAll(context.Background())
 
 			assertNoStorageClass(t, kube)
 			item, status := storedClass(t, o, testNamespace)
@@ -269,16 +282,16 @@ func TestStorageClassFailsWithoutTheDriver(t *testing.T) {
 	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
 	require.NoError(t, kube.StorageV1().CSIDrivers().Delete(ctx, Provisioner, metav1.DeleteOptions{}))
 
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	assertNoStorageClass(t, kube)
 	_, status := storedClass(t, o, testNamespace)
-	assert.Equal(t, PhaseError, status.Phase)
+	assert.Equal(t, tenantnet.PhaseError, status.Phase)
 	assert.Contains(t, status.Message, "the PanFS CSI driver is not installed")
 
 	// The option of the operator names the namespace of a driver that has no annotation.
 	o.Options.CSIDriverNamespace = "storage"
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 	binding, err := kube.RbacV1().RoleBindings(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "storage", binding.Subjects[0].Namespace)
@@ -286,7 +299,7 @@ func TestStorageClassFailsWithoutTheDriver(t *testing.T) {
 	assert.Equal(t, "storage-controller", binding.Subjects[0].Name)
 
 	o.Options.CSIControllerServiceAccount = "custom"
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 	binding, err = kube.RbacV1().RoleBindings(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "custom", binding.Subjects[0].Name)
@@ -294,23 +307,23 @@ func TestStorageClassFailsWithoutTheDriver(t *testing.T) {
 
 func TestStorageClassKeepsWorkingWhenTheTenantNetworkIsNotReady(t *testing.T) {
 	ctx := context.Background()
-	network := readyNetwork(PhaseReady)
+	network := readyNetwork(tenantnet.PhaseReady)
 	o, kube := newClassOperator(network, newClass(testNamespace, map[string]interface{}{"tenantNetwork": "acme"}))
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	// A node restarts: the TenantNetwork is Pending for a while.
-	stored, err := o.Dynamic.Resource(TenantNetworkGVR).Namespace(testNamespace).Get(ctx, "acme", metav1.GetOptions{})
+	stored, err := o.Dynamic.Resource(tenantnet.TenantNetworkGVR).Namespace(testNamespace).Get(ctx, "acme", metav1.GetOptions{})
 	require.NoError(t, err)
-	require.NoError(t, unstructured.SetNestedField(stored.Object, PhasePending, "status", "phase"))
-	_, err = o.Dynamic.Resource(TenantNetworkGVR).Namespace(testNamespace).Update(ctx, stored, metav1.UpdateOptions{})
+	require.NoError(t, unstructured.SetNestedField(stored.Object, tenantnet.PhasePending, "status", "phase"))
+	_, err = o.Dynamic.Resource(tenantnet.TenantNetworkGVR).Namespace(testNamespace).Update(ctx, stored, metav1.UpdateOptions{})
 	require.NoError(t, err)
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Len(t, class.AllowedTopologies, 1)
 	_, status := storedClass(t, o, testNamespace)
-	assert.Equal(t, PhaseReady, status.Phase)
+	assert.Equal(t, tenantnet.PhaseReady, status.Phase)
 	assert.Equal(t, `the StorageClass fast is in place; the TenantNetwork "acme" is not ready `+
 		`(Pending: the tenant network works on 1 of 2 nodes)`, status.Message)
 }
@@ -348,18 +361,18 @@ func TestStorageClassRefusesAChangeOfAFixedField(t *testing.T) {
 			_, err := kube.CoreV1().Secrets(testNamespace).Create(ctx,
 				&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "second", Namespace: testNamespace}}, metav1.CreateOptions{})
 			require.NoError(t, err)
-			o.ReconcileStorageClasses(ctx)
+			o.ReconcileAll(ctx)
 			before, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 			require.NoError(t, err)
 
 			updateClassSpec(t, o, test.spec)
-			o.ReconcileStorageClasses(ctx)
+			o.ReconcileAll(ctx)
 
 			after, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 			require.NoError(t, err)
 			assert.Equal(t, before, after)
 			_, status := storedClass(t, o, testNamespace)
-			assert.Equal(t, PhaseError, status.Phase)
+			assert.Equal(t, tenantnet.PhaseError, status.Phase)
 			assert.Equal(t, test.message, status.Message)
 			assert.Equal(t, testClass, status.StorageClass)
 		})
@@ -369,12 +382,12 @@ func TestStorageClassRefusesAChangeOfAFixedField(t *testing.T) {
 func TestStorageClassAppliesAChangeOfAFreeField(t *testing.T) {
 	ctx := context.Background()
 	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	updateClassSpec(t, o, map[string]interface{}{
 		"realmSecretName": "realm", "allowVolumeExpansion": false, "mountOptions": []interface{}{"noatime"}, "default": true,
 	})
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
@@ -382,7 +395,7 @@ func TestStorageClassAppliesAChangeOfAFreeField(t *testing.T) {
 	assert.Equal(t, []string{"noatime"}, class.MountOptions)
 	assert.Equal(t, "true", class.Annotations[DefaultClassAnnotation])
 	_, status := storedClass(t, o, testNamespace)
-	assert.Equal(t, PhaseReady, status.Phase)
+	assert.Equal(t, tenantnet.PhaseReady, status.Phase)
 }
 
 func TestStorageClassNameIsTakenOnce(t *testing.T) {
@@ -396,20 +409,20 @@ func TestStorageClassNameIsTakenOnce(t *testing.T) {
 		&corev1.Secret{ObjectMeta: metav1.ObjectMeta{Name: "realm", Namespace: "other-ns"}}, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, testNamespace+"/"+testClass, class.Annotations[StorageClassOwnerAnnotation])
 	item, status := storedClass(t, o, "other-ns")
-	assert.Equal(t, PhaseError, status.Phase)
+	assert.Equal(t, tenantnet.PhaseError, status.Phase)
 	assert.Equal(t, `the StorageClass "fast" already belongs to PanfsStorageClass tenant-ns/fast; `+
 		"a StorageClass has no namespace, so the name must be unique in the cluster", status.Message)
 	assert.Empty(t, item.GetFinalizers())
 
 	// Deleting the refused resource leaves the StorageClass of the first one alone.
 	require.NoError(t, o.Dynamic.Resource(PanfsStorageClassGVR).Namespace("other-ns").Delete(ctx, testClass, metav1.DeleteOptions{}))
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 	_, err = kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
 }
@@ -421,18 +434,18 @@ func TestStorageClassOfSomebodyElseIsNotTakenOver(t *testing.T) {
 	_, err := kube.StorageV1().StorageClasses().Create(ctx, foreign, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, "example.com/other", class.Provisioner)
 	_, status := storedClass(t, o, testNamespace)
-	assert.Equal(t, PhaseError, status.Phase)
+	assert.Equal(t, tenantnet.PhaseError, status.Phase)
 	assert.Contains(t, status.Message, "already exists and was not created by the operator")
 }
 
 // deleteClass marks the stored PanfsStorageClass as being deleted, like the API server does while a finalizer is set.
-func deleteClass(t *testing.T, o *Operator) {
+func deleteClass(t *testing.T, o *Controller) {
 	t.Helper()
 	item, _ := storedClass(t, o, testNamespace)
 	now := metav1.Now()
@@ -444,10 +457,10 @@ func deleteClass(t *testing.T, o *Operator) {
 func TestStorageClassIsDeletedWithItsResource(t *testing.T) {
 	ctx := context.Background()
 	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	deleteClass(t, o)
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	_, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	assert.True(t, apierrors.IsNotFound(err))
@@ -462,7 +475,7 @@ func TestStorageClassIsDeletedWithItsResource(t *testing.T) {
 func TestStorageClassLeavesTheSecretReaderToItsVolumes(t *testing.T) {
 	ctx := context.Background()
 	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 	volume := &corev1.PersistentVolume{
 		ObjectMeta: metav1.ObjectMeta{Name: "pvc-1"},
 		Spec: corev1.PersistentVolumeSpec{
@@ -474,7 +487,7 @@ func TestStorageClassLeavesTheSecretReaderToItsVolumes(t *testing.T) {
 	require.NoError(t, err)
 
 	deleteClass(t, o)
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	_, err = kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	assert.True(t, apierrors.IsNotFound(err))
@@ -490,7 +503,7 @@ func TestStorageClassLeavesTheSecretReaderToItsVolumes(t *testing.T) {
 func TestStorageClassOfSomebodyElseSurvivesTheDeletionOfTheResource(t *testing.T) {
 	ctx := context.Background()
 	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 	// Somebody replaced the StorageClass of the operator with one of their own.
 	require.NoError(t, kube.StorageV1().StorageClasses().Delete(ctx, testClass, metav1.DeleteOptions{}))
 	foreign := &storagev1.StorageClass{ObjectMeta: metav1.ObjectMeta{Name: testClass}, Provisioner: "example.com/other"}
@@ -498,7 +511,7 @@ func TestStorageClassOfSomebodyElseSurvivesTheDeletionOfTheResource(t *testing.T
 	require.NoError(t, err)
 
 	deleteClass(t, o)
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
 	require.NoError(t, err)
@@ -510,13 +523,13 @@ func TestStorageClassOfSomebodyElseSurvivesTheDeletionOfTheResource(t *testing.T
 func TestStorageClassFinalizerComesBack(t *testing.T) {
 	ctx := context.Background()
 	o, _ := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 	item, _ := storedClass(t, o, testNamespace)
 	item.SetFinalizers(nil)
 	_, err := o.Dynamic.Resource(PanfsStorageClassGVR).Namespace(testNamespace).Update(ctx, item, metav1.UpdateOptions{})
 	require.NoError(t, err)
 
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	item, _ = storedClass(t, o, testNamespace)
 	assert.Equal(t, []string{StorageClassFinalizer}, item.GetFinalizers())
@@ -525,12 +538,12 @@ func TestStorageClassFinalizerComesBack(t *testing.T) {
 func TestStorageClassSecretReaderIsRemovedWithoutTheStorageClass(t *testing.T) {
 	ctx := context.Background()
 	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 	// Somebody deleted the StorageClass by hand.
 	require.NoError(t, kube.StorageV1().StorageClasses().Delete(ctx, testClass, metav1.DeleteOptions{}))
 
 	deleteClass(t, o)
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	_, err := kube.RbacV1().Roles(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
 	assert.True(t, apierrors.IsNotFound(err))
@@ -556,7 +569,7 @@ func TestStorageClassSecretReaderKeepsTheSecretOfOlderVolumes(t *testing.T) {
 	_, err = kube.RbacV1().Roles(testNamespace).Create(ctx, kept, metav1.CreateOptions{})
 	require.NoError(t, err)
 
-	o.ReconcileStorageClasses(ctx)
+	o.ReconcileAll(ctx)
 
 	role, err := kube.RbacV1().Roles(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
 	require.NoError(t, err)

@@ -12,14 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package tenantnet
+// Package storageclass holds the controller of the PanfsStorageClass custom resource: it creates a StorageClass
+// of the PanFS CSI driver for every resource and lets the CSI controller read the realm Secret.
+package storageclass
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"reflect"
 	"sort"
 	"strings"
+	"time"
 
 	corev1 "k8s.io/api/core/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
@@ -30,7 +34,11 @@ import (
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/client-go/dynamic"
+	"k8s.io/client-go/kubernetes"
 	"k8s.io/klog/v2"
+
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/tenantnet"
 )
 
 // PanfsStorageClassGVR names the PanfsStorageClass custom resource.
@@ -60,6 +68,11 @@ const (
 	secretReaderPrefix = "panfs-storage-class-"
 	// reservedParameterPrefix starts the StorageClass parameters that the operator sets itself.
 	reservedParameterPrefix = "csi.storage.k8s.io/"
+
+	// componentName names the operator as the writer of its events.
+	componentName = "panfs-storageclass-operator"
+	// productLabelValue is the value of the label "product" on the objects of the operator.
+	productLabelValue = "com.vdura.csi.panfs"
 )
 
 // Reasons of the events on a PanfsStorageClass.
@@ -70,6 +83,9 @@ const (
 	ReasonSecretReaderKept     = "SecretReaderKept"
 	ReasonTenantNetworkPending = "TenantNetworkNotReady"
 
+	ReasonInvalidSpec           = "InvalidSpec"
+	ReasonSecretNotFound        = "SecretNotFound"
+	ReasonReconcileFailed       = "ReconcileFailed"
 	ReasonTenantNetworkNotFound = "TenantNetworkNotFound"
 	ReasonStorageClassConflict  = "StorageClassConflict"
 	ReasonImmutableField        = "ImmutableField"
@@ -108,11 +124,79 @@ type PanfsStorageClassStatus struct {
 	ObservedGeneration int64  `json:"observedGeneration,omitempty"`
 }
 
-// ReconcileStorageClasses runs one pass over the PanfsStorageClasses of all namespaces.
-func (o *Operator) ReconcileStorageClasses(ctx context.Context) {
-	list, err := o.Dynamic.Resource(PanfsStorageClassGVR).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
+// Options are the settings of the controller.
+type Options struct {
+	// CSIDriverNamespace is the namespace of the PanFS CSI driver.
+	// Empty means the namespace that the CSIDriver object names.
+	CSIDriverNamespace string
+	// CSIControllerServiceAccount is the ServiceAccount of the CSI controller.
+	// Empty means the name that the driver chart gives it: "<namespace of the driver>-controller".
+	CSIControllerServiceAccount string
+}
+
+// Controller creates one StorageClass for every PanfsStorageClass.
+type Controller struct {
+	Kube    kubernetes.Interface
+	Dynamic dynamic.Interface
+	Options Options
+	// Resync is the time between two passes over all PanfsStorageClasses.
+	Resync time.Duration
+	Log    klog.Logger
+
+	// reported holds the last state event per PanfsStorageClass, so an unchanged state is reported once.
+	reported map[string]string
+}
+
+// reasonedError is an error with the reason of the event that reports it.
+type reasonedError struct {
+	reason string
+	err    error
+}
+
+func (e *reasonedError) Error() string { return e.err.Error() }
+func (e *reasonedError) Unwrap() error { return e.err }
+
+// withReason attaches an event reason to an error.
+func withReason(reason string, err error) error {
+	return &reasonedError{reason: reason, err: err}
+}
+
+// reasonOf returns the event reason of an error.
+func reasonOf(err error) string {
+	var reasoned *reasonedError
+	if errors.As(err, &reasoned) {
+		return reasoned.reason
+	}
+	return ReasonReconcileFailed
+}
+
+// upperFirst returns the text with an upper-case first letter.
+func upperFirst(text string) string {
+	if text == "" {
+		return text
+	}
+	return strings.ToUpper(text[:1]) + text[1:]
+}
+
+// Run reconciles all PanfsStorageClasses until the context is done.
+func (c *Controller) Run(ctx context.Context) {
+	ticker := time.NewTicker(c.Resync)
+	defer ticker.Stop()
+	for {
+		c.ReconcileAll(ctx)
+		select {
+		case <-ticker.C:
+		case <-ctx.Done():
+			return
+		}
+	}
+}
+
+// ReconcileAll runs one pass over the PanfsStorageClasses of all namespaces.
+func (c *Controller) ReconcileAll(ctx context.Context) {
+	list, err := c.Dynamic.Resource(PanfsStorageClassGVR).Namespace(metav1.NamespaceAll).List(ctx, metav1.ListOptions{})
 	if err != nil {
-		o.Log.Error(err, "cannot list the PanfsStorageClasses")
+		c.Log.Error(err, "cannot list the PanfsStorageClasses")
 		return
 	}
 	// A StorageClass has no namespace: the oldest of two resources with one name gets it.
@@ -122,32 +206,32 @@ func (o *Operator) ReconcileStorageClasses(ctx context.Context) {
 	})
 	for i := range list.Items {
 		item := &list.Items[i]
-		log := o.Log.WithValues("panfsStorageClass", item.GetNamespace()+"/"+item.GetName())
-		if err := o.reconcileStorageClass(ctx, item, log); err != nil {
+		log := c.Log.WithValues("panfsStorageClass", item.GetNamespace()+"/"+item.GetName())
+		if err := c.reconcileStorageClass(ctx, item, log); err != nil {
 			log.Error(err, "cannot reconcile")
 		}
 	}
 }
 
 // reconcileStorageClass brings the StorageClass of one resource to the wanted state and reports the result in its status.
-func (o *Operator) reconcileStorageClass(ctx context.Context, item *unstructured.Unstructured, log klog.Logger) error {
+func (c *Controller) reconcileStorageClass(ctx context.Context, item *unstructured.Unstructured, log klog.Logger) error {
 	if item.GetDeletionTimestamp() != nil {
-		return o.removeStorageClass(ctx, item, log)
+		return c.removeStorageClass(ctx, item, log)
 	}
 
-	status, err := o.applyStorageClass(ctx, item, log)
+	status, err := c.applyStorageClass(ctx, item, log)
 	if err != nil {
-		status.Phase, status.Message = PhaseError, err.Error()
-		o.classEventOnce(ctx, item, EventTypeError, reasonOf(err), upperFirst(err.Error()))
+		status.Phase, status.Message = tenantnet.PhaseError, err.Error()
+		c.classEventOnce(ctx, item, tenantnet.EventTypeError, reasonOf(err), upperFirst(err.Error()))
 	} else {
 		reason := status.Phase
-		if status.Phase == PhasePending {
+		if status.Phase == tenantnet.PhasePending {
 			reason = ReasonTenantNetworkPending
 		}
-		o.classEventOnce(ctx, item, corev1.EventTypeNormal, reason, upperFirst(status.Message))
+		c.classEventOnce(ctx, item, corev1.EventTypeNormal, reason, upperFirst(status.Message))
 	}
 	status.ObservedGeneration = item.GetGeneration()
-	if statusErr := o.writeStorageClassStatus(ctx, item, status); statusErr != nil {
+	if statusErr := c.writeStorageClassStatus(ctx, item, status); statusErr != nil {
 		log.Error(statusErr, "cannot write the status")
 	}
 	return err
@@ -157,7 +241,7 @@ func (o *Operator) reconcileStorageClass(ctx context.Context, item *unstructured
 type classSource struct {
 	secretName string
 	// topology is the node label of the tenant network; nil without a tenant network.
-	topology *Topology
+	topology *tenantnet.Topology
 	// waiting says why the StorageClass cannot be created yet; empty when it can.
 	waiting string
 	// note is added to the status message of an existing StorageClass.
@@ -165,7 +249,7 @@ type classSource struct {
 }
 
 // applyStorageClass creates or updates the StorageClass of a resource. The returned status is valid with an error too.
-func (o *Operator) applyStorageClass(ctx context.Context, item *unstructured.Unstructured, log klog.Logger) (PanfsStorageClassStatus, error) {
+func (c *Controller) applyStorageClass(ctx context.Context, item *unstructured.Unstructured, log klog.Logger) (PanfsStorageClassStatus, error) {
 	var status PanfsStorageClassStatus
 	namespace, name := item.GetNamespace(), item.GetName()
 	owner := namespace + "/" + name
@@ -174,20 +258,20 @@ func (o *Operator) applyStorageClass(ctx context.Context, item *unstructured.Uns
 	if err != nil {
 		return status, err
 	}
-	source, err := o.classSource(ctx, namespace, spec)
+	source, err := c.classSource(ctx, namespace, spec)
 	if err != nil {
 		return status, err
 	}
 	wanted := wantedStorageClass(name, owner, namespace, spec, source)
 
-	if _, err := o.Kube.CoreV1().Secrets(namespace).Get(ctx, source.secretName, metav1.GetOptions{}); apierrors.IsNotFound(err) {
+	if _, err := c.Kube.CoreV1().Secrets(namespace).Get(ctx, source.secretName, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		return status, withReason(ReasonSecretNotFound,
 			fmt.Errorf("the Secret %q does not exist in namespace %q", source.secretName, namespace))
 	} else if err != nil {
 		return status, fmt.Errorf("read the Secret %q: %w", source.secretName, err)
 	}
 
-	classes := o.Kube.StorageV1().StorageClasses()
+	classes := c.Kube.StorageV1().StorageClasses()
 	current, err := classes.Get(ctx, name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return status, fmt.Errorf("read the StorageClass: %w", err)
@@ -215,18 +299,18 @@ func (o *Operator) applyStorageClass(ctx context.Context, item *unstructured.Uns
 					"Undo the change, or delete this resource and create it again", strings.Join(changed, " and "), name))
 		}
 	} else if source.waiting != "" {
-		status.Phase, status.Message = PhasePending, source.waiting
+		status.Phase, status.Message = tenantnet.PhasePending, source.waiting
 		return status, nil
 	}
 
 	// The finalizer comes before the first object: a resource that was refused above owns nothing, and one
 	// that owns a Role or a StorageClass is never deleted without its cleanup. A finalizer that was removed
 	// by hand comes back here.
-	if err := o.ensureClassFinalizer(ctx, item); err != nil {
+	if err := c.ensureClassFinalizer(ctx, item); err != nil {
 		return status, err
 	}
 	// The CSI controller must read the Secret before it sees the StorageClass.
-	if err := o.ensureSecretReader(ctx, item, source.secretName); err != nil {
+	if err := c.ensureSecretReader(ctx, item, source.secretName); err != nil {
 		return status, err
 	}
 
@@ -235,7 +319,7 @@ func (o *Operator) applyStorageClass(ctx context.Context, item *unstructured.Uns
 			return status, fmt.Errorf("create the StorageClass: %w", err)
 		}
 		log.Info("the StorageClass was created", "storageClass", name)
-		o.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonStorageClassCreated, "Created StorageClass "+name)
+		c.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonStorageClassCreated, "Created StorageClass "+name)
 	} else if mutableChanged(current, wanted) {
 		updated := current.DeepCopy()
 		updated.AllowVolumeExpansion, updated.MountOptions = wanted.AllowVolumeExpansion, wanted.MountOptions
@@ -246,10 +330,10 @@ func (o *Operator) applyStorageClass(ctx context.Context, item *unstructured.Uns
 			return status, fmt.Errorf("update the StorageClass: %w", err)
 		}
 		log.Info("the StorageClass was updated", "storageClass", name)
-		o.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonStorageClassUpdated, "Updated StorageClass "+name)
+		c.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonStorageClassUpdated, "Updated StorageClass "+name)
 	}
 
-	status.Phase, status.StorageClass = PhaseReady, name
+	status.Phase, status.StorageClass = tenantnet.PhaseReady, name
 	status.Message = fmt.Sprintf("the StorageClass %s is in place", name)
 	if source.note != "" {
 		status.Message += "; " + source.note
@@ -320,12 +404,12 @@ func storageClassSpecOf(item *unstructured.Unstructured) (PanfsStorageClassSpec,
 }
 
 // classSource returns the Secret and the topology of a PanfsStorageClass.
-func (o *Operator) classSource(ctx context.Context, namespace string, spec PanfsStorageClassSpec) (classSource, error) {
+func (c *Controller) classSource(ctx context.Context, namespace string, spec PanfsStorageClassSpec) (classSource, error) {
 	if spec.TenantNetwork == "" {
 		return classSource{secretName: spec.RealmSecretName}, nil
 	}
 
-	network, err := o.Dynamic.Resource(TenantNetworkGVR).Namespace(namespace).Get(ctx, spec.TenantNetwork, metav1.GetOptions{})
+	network, err := c.Dynamic.Resource(tenantnet.TenantNetworkGVR).Namespace(namespace).Get(ctx, spec.TenantNetwork, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return classSource{}, withReason(ReasonTenantNetworkNotFound,
 			fmt.Errorf("the TenantNetwork %q does not exist in namespace %q", spec.TenantNetwork, namespace))
@@ -340,11 +424,14 @@ func (o *Operator) classSource(ctx context.Context, namespace string, spec Panfs
 			fmt.Errorf("the TenantNetwork %q names no Secret in spec.realmSecretName", spec.TenantNetwork))
 	}
 
-	networkStatus := statusOf(network)
+	var networkStatus tenantnet.TenantNetworkStatus
+	if raw, ok := network.Object["status"].(map[string]interface{}); ok {
+		_ = runtime.DefaultUnstructuredConverter.FromUnstructured(raw, &networkStatus)
+	}
 	if topology := networkStatus.ManagedTopology; topology != nil && topology.Key != "" && topology.Value != "" {
 		source.topology = topology
 	}
-	if networkStatus.Phase != PhaseReady || source.topology == nil || network.GetDeletionTimestamp() != nil {
+	if networkStatus.Phase != tenantnet.PhaseReady || source.topology == nil || network.GetDeletionTimestamp() != nil {
 		state := networkStatus.Phase
 		if state == "" {
 			state = "not reconciled yet"
@@ -433,12 +520,12 @@ func mutableChanged(current, wanted *storagev1.StorageClass) bool {
 
 // controllerAccount returns the ServiceAccount of the CSI controller as a subject. Its name is the option of the
 // operator, or the name that the driver chart gives it: "<namespace of the driver>-controller".
-func (o *Operator) controllerAccount(ctx context.Context) (rbacv1.Subject, error) {
-	namespace, err := o.driverNamespace(ctx)
+func (c *Controller) controllerAccount(ctx context.Context) (rbacv1.Subject, error) {
+	namespace, err := c.driverNamespace(ctx)
 	if err != nil {
 		return rbacv1.Subject{}, err
 	}
-	name := o.Options.CSIControllerServiceAccount
+	name := c.Options.CSIControllerServiceAccount
 	if name == "" {
 		name = namespace + controllerAccountSuffix
 	}
@@ -447,11 +534,11 @@ func (o *Operator) controllerAccount(ctx context.Context) (rbacv1.Subject, error
 
 // driverNamespace returns the namespace of the CSI driver: the option of the operator, or the annotation
 // that the driver chart sets on the CSIDriver object.
-func (o *Operator) driverNamespace(ctx context.Context) (string, error) {
-	if o.Options.CSIDriverNamespace != "" {
-		return o.Options.CSIDriverNamespace, nil
+func (c *Controller) driverNamespace(ctx context.Context) (string, error) {
+	if c.Options.CSIDriverNamespace != "" {
+		return c.Options.CSIDriverNamespace, nil
 	}
-	driver, err := o.Kube.StorageV1().CSIDrivers().Get(ctx, Provisioner, metav1.GetOptions{})
+	driver, err := c.Kube.StorageV1().CSIDrivers().Get(ctx, Provisioner, metav1.GetOptions{})
 	if apierrors.IsNotFound(err) {
 		return "", withReason(ReasonDriverNotFound, fmt.Errorf("the PanFS CSI driver is not installed: there is no CSIDriver %s", Provisioner))
 	}
@@ -470,8 +557,8 @@ func (o *Operator) driverNamespace(ctx context.Context) (string, error) {
 // ensureSecretReader lets the CSI controller read the Secret of a PanfsStorageClass, with a Role and a RoleBinding
 // in the namespace of the Secret. The resource does not own them: the volumes of the StorageClass need the Secret
 // for an expansion and for their deletion, also after the resource is gone. See removeStorageClass.
-func (o *Operator) ensureSecretReader(ctx context.Context, item *unstructured.Unstructured, secretName string) error {
-	account, err := o.controllerAccount(ctx)
+func (c *Controller) ensureSecretReader(ctx context.Context, item *unstructured.Unstructured, secretName string) error {
+	account, err := c.controllerAccount(ctx)
 	if err != nil {
 		return err
 	}
@@ -488,7 +575,7 @@ func (o *Operator) ensureSecretReader(ctx context.Context, item *unstructured.Un
 			{APIGroups: []string{""}, Resources: []string{"secrets"}, ResourceNames: []string{secretName}, Verbs: []string{"get"}},
 		},
 	}
-	roles := o.Kube.RbacV1().Roles(namespace)
+	roles := c.Kube.RbacV1().Roles(namespace)
 	if current, err := roles.Get(ctx, name, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		if _, err := roles.Create(ctx, role, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("create the Role: %w", err)
@@ -512,7 +599,7 @@ func (o *Operator) ensureSecretReader(ctx context.Context, item *unstructured.Un
 		Subjects:   []rbacv1.Subject{account},
 		RoleRef:    rbacv1.RoleRef{APIGroup: rbacv1.GroupName, Kind: "Role", Name: name},
 	}
-	bindings := o.Kube.RbacV1().RoleBindings(namespace)
+	bindings := c.Kube.RbacV1().RoleBindings(namespace)
 	if current, err := bindings.Get(ctx, name, metav1.GetOptions{}); apierrors.IsNotFound(err) {
 		if _, err := bindings.Create(ctx, binding, metav1.CreateOptions{}); err != nil {
 			return fmt.Errorf("create the RoleBinding: %w", err)
@@ -548,13 +635,13 @@ func secretNames(rules []rbacv1.PolicyRule, secretName string) []string {
 // removeStorageClass deletes the StorageClass of a resource that is being deleted, and then lets the resource go.
 // Existing volumes keep working without their StorageClass. The Role and the RoleBinding for the Secret stay
 // while a volume of the StorageClass exists: the CSI controller reads the Secret to expand and to delete a volume.
-func (o *Operator) removeStorageClass(ctx context.Context, item *unstructured.Unstructured, log klog.Logger) error {
+func (c *Controller) removeStorageClass(ctx context.Context, item *unstructured.Unstructured, log klog.Logger) error {
 	if !hasFinalizerNamed(item, StorageClassFinalizer) {
 		return nil
 	}
 	namespace, name := item.GetNamespace(), item.GetName()
 
-	classes := o.Kube.StorageV1().StorageClasses()
+	classes := c.Kube.StorageV1().StorageClasses()
 	current, err := classes.Get(ctx, name, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("read the StorageClass: %w", err)
@@ -565,19 +652,19 @@ func (o *Operator) removeStorageClass(ctx context.Context, item *unstructured.Un
 			return fmt.Errorf("delete the StorageClass: %w", err)
 		}
 		log.Info("the StorageClass was deleted", "storageClass", name)
-		o.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonStorageClassDeleted,
+		c.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonStorageClassDeleted,
 			"Deleted StorageClass "+name+"; its volumes keep working")
 	}
 
 	// The Role and the RoleBinding, also when the StorageClass is already gone: they can exist without it,
 	// after a failed creation or after somebody deleted the StorageClass.
 	reader := secretReaderPrefix + name
-	_, err = o.Kube.RbacV1().Roles(namespace).Get(ctx, reader, metav1.GetOptions{})
+	_, err = c.Kube.RbacV1().Roles(namespace).Get(ctx, reader, metav1.GetOptions{})
 	if err != nil && !apierrors.IsNotFound(err) {
 		return fmt.Errorf("read the Role: %w", err)
 	}
 	if err == nil {
-		volumes, err := o.Kube.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
+		volumes, err := c.Kube.CoreV1().PersistentVolumes().List(ctx, metav1.ListOptions{})
 		if err != nil {
 			return fmt.Errorf("list the volumes of the StorageClass: %w", err)
 		}
@@ -591,14 +678,14 @@ func (o *Operator) removeStorageClass(ctx context.Context, item *unstructured.Un
 		if left > 0 {
 			log.Info("the Role and the RoleBinding for the Secret stay: volumes of the StorageClass exist",
 				"role", reader, "volumes", left)
-			o.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonSecretReaderKept, fmt.Sprintf(
+			c.classEvents(item).Event(ctx, corev1.EventTypeNormal, ReasonSecretReaderKept, fmt.Sprintf(
 				"Kept Role and RoleBinding %s: the CSI controller needs the Secret for %s of the StorageClass. "+
 					"Delete them by hand when the volumes are gone", reader, countVolumes(left)))
 		} else {
-			if err := o.Kube.RbacV1().RoleBindings(namespace).Delete(ctx, reader, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			if err := c.Kube.RbacV1().RoleBindings(namespace).Delete(ctx, reader, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return fmt.Errorf("delete the RoleBinding: %w", err)
 			}
-			if err := o.Kube.RbacV1().Roles(namespace).Delete(ctx, reader, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
+			if err := c.Kube.RbacV1().Roles(namespace).Delete(ctx, reader, metav1.DeleteOptions{}); err != nil && !apierrors.IsNotFound(err) {
 				return fmt.Errorf("delete the Role: %w", err)
 			}
 		}
@@ -611,11 +698,11 @@ func (o *Operator) removeStorageClass(ctx context.Context, item *unstructured.Un
 		}
 	}
 	item.SetFinalizers(finalizers)
-	if _, err := o.Dynamic.Resource(PanfsStorageClassGVR).Namespace(namespace).Update(ctx, item, metav1.UpdateOptions{}); err != nil &&
+	if _, err := c.Dynamic.Resource(PanfsStorageClassGVR).Namespace(namespace).Update(ctx, item, metav1.UpdateOptions{}); err != nil &&
 		!apierrors.IsNotFound(err) {
 		return fmt.Errorf("remove the finalizer: %w", err)
 	}
-	delete(o.reported, string(item.GetUID())+"/class")
+	delete(c.reported, string(item.GetUID())+"/class")
 	return nil
 }
 
@@ -638,12 +725,12 @@ func hasFinalizerNamed(item *unstructured.Unstructured, name string) bool {
 }
 
 // ensureClassFinalizer adds the finalizer of the operator to the PanfsStorageClass.
-func (o *Operator) ensureClassFinalizer(ctx context.Context, item *unstructured.Unstructured) error {
+func (c *Controller) ensureClassFinalizer(ctx context.Context, item *unstructured.Unstructured) error {
 	if hasFinalizerNamed(item, StorageClassFinalizer) {
 		return nil
 	}
 	item.SetFinalizers(append(item.GetFinalizers(), StorageClassFinalizer))
-	updated, err := o.Dynamic.Resource(PanfsStorageClassGVR).Namespace(item.GetNamespace()).Update(ctx, item, metav1.UpdateOptions{})
+	updated, err := c.Dynamic.Resource(PanfsStorageClassGVR).Namespace(item.GetNamespace()).Update(ctx, item, metav1.UpdateOptions{})
 	if err != nil {
 		return fmt.Errorf("add the finalizer: %w", err)
 	}
@@ -661,7 +748,7 @@ func storageClassStatusOf(item *unstructured.Unstructured) PanfsStorageClassStat
 }
 
 // writeStorageClassStatus stores the status of a PanfsStorageClass when it differs from the stored one.
-func (o *Operator) writeStorageClassStatus(ctx context.Context, item *unstructured.Unstructured, status PanfsStorageClassStatus) error {
+func (c *Controller) writeStorageClassStatus(ctx context.Context, item *unstructured.Unstructured, status PanfsStorageClassStatus) error {
 	if equality.Semantic.DeepEqual(storageClassStatusOf(item), status) {
 		return nil
 	}
@@ -671,7 +758,7 @@ func (o *Operator) writeStorageClassStatus(ctx context.Context, item *unstructur
 	}
 	updated := item.DeepCopy()
 	updated.Object["status"] = raw
-	_, err = o.Dynamic.Resource(PanfsStorageClassGVR).Namespace(item.GetNamespace()).UpdateStatus(ctx, updated, metav1.UpdateOptions{})
+	_, err = c.Dynamic.Resource(PanfsStorageClassGVR).Namespace(item.GetNamespace()).UpdateStatus(ctx, updated, metav1.UpdateOptions{})
 	if apierrors.IsNotFound(err) {
 		return nil
 	}
@@ -679,27 +766,27 @@ func (o *Operator) writeStorageClassStatus(ctx context.Context, item *unstructur
 }
 
 // classEvents returns the sink for events about a PanfsStorageClass.
-func (o *Operator) classEvents(item *unstructured.Unstructured) *EventSink {
-	return &EventSink{
-		Kube: o.Kube,
+func (c *Controller) classEvents(item *unstructured.Unstructured) *tenantnet.EventSink {
+	return &tenantnet.EventSink{
+		Kube: c.Kube,
 		Ref: corev1.ObjectReference{
 			APIVersion: PanfsStorageClassGVR.GroupVersion().String(), Kind: PanfsStorageClassKind,
 			Namespace: item.GetNamespace(), Name: item.GetName(), UID: item.GetUID(),
 		},
-		Component: "panfs-tenant-network-operator",
-		Log:       o.Log,
+		Component: componentName,
+		Log:       c.Log,
 	}
 }
 
 // classEventOnce writes the state of a PanfsStorageClass as an event unless the last one said the same.
-func (o *Operator) classEventOnce(ctx context.Context, item *unstructured.Unstructured, eventType, reason, message string) {
+func (c *Controller) classEventOnce(ctx context.Context, item *unstructured.Unstructured, eventType, reason, message string) {
 	key, value := string(item.GetUID())+"/class", reason+"\x00"+message
-	if o.reported[key] == value {
+	if c.reported[key] == value {
 		return
 	}
-	if o.reported == nil {
-		o.reported = make(map[string]string)
+	if c.reported == nil {
+		c.reported = make(map[string]string)
 	}
-	o.reported[key] = value
-	o.classEvents(item).Event(ctx, eventType, reason, message)
+	c.reported[key] = value
+	c.classEvents(item).Event(ctx, eventType, reason, message)
 }

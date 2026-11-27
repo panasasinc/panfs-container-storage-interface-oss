@@ -1,0 +1,26 @@
+The PanFS StorageClass operator is installed in namespace {{ .Release.Namespace }}.
+
+Next steps for a StorageClass:
+
+1. Create a PanfsStorageClass in the namespace of the realm Secret. Its name becomes the name of the StorageClass.
+
+   With a tenant network (the PanFS Tenant Network operator must be installed):
+
+   apiVersion: panfs.vdura.com/v1alpha1
+   kind: PanfsStorageClass
+   metadata:
+     name: <STORAGE_CLASS_NAME>
+     namespace: <TENANT_NAMESPACE>
+   spec:
+     tenantNetwork: <TENANT_NETWORK_NAME>
+
+   Without a tenant network, name the Secret instead:
+
+   spec:
+     realmSecretName: <SECRET_NAME>
+
+2. Check the result:
+
+   kubectl get panfsstorageclasses -A
+   kubectl -n <NAMESPACE> describe panfsstorageclass <STORAGE_CLASS_NAME>
+   kubectl get storageclass <STORAGE_CLASS_NAME>

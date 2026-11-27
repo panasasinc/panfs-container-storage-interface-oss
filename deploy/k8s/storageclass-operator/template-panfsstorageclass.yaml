@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Ask the PanFS Tenant Network operator to create a StorageClass of the PanFS CSI driver.
+# Ask the PanFS StorageClass operator to create a StorageClass of the PanFS CSI driver.
 # The StorageClass gets the name of this resource. The operator fills in the provisioner, the references to
 # the realm Secret and allowedTopologies, and it lets the CSI controller read the Secret.
 apiVersion: panfs.vdura.com/v1alpha1

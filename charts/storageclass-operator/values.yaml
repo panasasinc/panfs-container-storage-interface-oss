@@ -1,0 +1,50 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
+# -- Image of the PanFS StorageClass operator
+# @default -- `...`
+image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-storageclass-operator:{{ .Chart.AppVersion }}
+
+# -- Image pull policy
+pullPolicy: IfNotPresent
+
+# -- List of image pull secrets for private registries. Each Secret must exist in the namespace of the operator.
+imagePullSecrets: []
+
+# -- Time between two passes of the operator over the PanfsStorageClass resources
+resync: 15s
+
+# -- Namespace of the PanFS CSI driver: the CSI controller in that namespace gets the permission to read the realm Secret
+# of a StorageClass. Leave it empty to read the namespace from the CSIDriver object `com.vdura.csi.panfs`,
+# where the driver chart writes it.
+csiDriverNamespace: ""
+
+# -- ServiceAccount of the CSI controller in that namespace. Leave it empty to use the name that the driver chart
+# gives it: `<namespace of the driver>-controller`, for example `csi-panfs-controller`.
+csiControllerServiceAccount: ""
+
+# -- Log verbosity (klog level) of the operator
+logLevel: 2
+
+# -- Labels for the operator Deployment and its pod
+labels: {}
+
+# -- Resource requests and limits of the operator container
+resources: {}
+  # requests:
+  #   cpu: 10m
+  #   memory: 32Mi
+  # limits:
+  #   memory: 128Mi
