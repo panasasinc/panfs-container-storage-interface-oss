@@ -50,11 +50,11 @@ rules:
     resources: ["panfsstorageclasses/status", "panfsstorageclasses/finalizers"]
     verbs: ["update", "patch"]
 
-  # Read the TenantNetwork that a PanfsStorageClass names: its Secret and the node label of the tenant network.
+  # Find the TenantNetwork in the namespace of a PanfsStorageClass: its Secret and the node label of the tenant network.
   # The TenantNetwork resource comes with the PanFS Tenant Network operator; without it, this rule is unused
   - apiGroups: ["panfs.vdura.com"]
     resources: ["tenantnetworks"]
-    verbs: ["get"]
+    verbs: ["get", "list"]
 
   # The StorageClass of a PanfsStorageClass
   - apiGroups: ["storage.k8s.io"]

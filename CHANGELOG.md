@@ -53,12 +53,14 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 - PanFS StorageClass operator: the new chart `charts/storageclass-operator`, the manifests in
   `deploy/k8s/storageclass-operator`, and the image `panfs-storageclass-operator`. Install it once per cluster.
   It is a workload of its own, apart from the CSI driver and the PanFS Tenant Network operator.
-  It serves the new resource `PanfsStorageClass`. From a name and the name of
-  a `TenantNetwork`, the operator creates a StorageClass: it fills in the provisioner, the Secret references and
-  `allowedTopologies`, and it lets the CSI controller read the Secret. `spec.realmSecretName` in place of
-  `spec.tenantNetwork` is for a realm without a tenant network. The template is
+  It serves the new resource `PanfsStorageClass`. From a name alone, in the namespace of
+  a `TenantNetwork`, the operator creates a StorageClass: it finds the `TenantNetwork`, fills in the provisioner,
+  the Secret references and `allowedTopologies`, and it lets the CSI controller read the Secret.
+  `spec.realmSecretName` is for a realm without a tenant network. The template is
   `deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml`. The StorageClass chart and its manifests stay.
   See the [operator documentation](charts/storageclass-operator/Readme.md).
+- PanFS Tenant StorageClass chart (`charts/tenant-storageclass`): one Helm release per StorageClass of a tenant.
+  It creates the `PanfsStorageClass`, and it checks that the PanFS StorageClass operator is installed first.
 - PersistentVolume node affinity: the controller returns the `allowedTopologies` of the StorageClass as the
   topology of a new volume. Every pod of a volume of a tenant is placed on a node where the tenant network works,
   without a node selector in the workload.

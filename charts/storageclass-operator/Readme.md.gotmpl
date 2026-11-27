@@ -32,8 +32,6 @@ kind: PanfsStorageClass
 metadata:
   name: acme-storage
   namespace: acme
-spec:
-  tenantNetwork: acme-network
 ```
 
 The operator runs once per cluster, as one pod. It is a workload of its own: it is not a part of the CSI driver
@@ -57,8 +55,8 @@ For every `PanfsStorageClass`:
 
 - The PanFS CSI driver is installed. The operator reads the namespace of the driver from the CSIDriver object
   `com.vdura.csi.panfs`.
-- For `spec.tenantNetwork`: the [PanFS Tenant Network operator](../tenant-network-operator/Readme.md) is installed
-  and the `TenantNetwork` exists. For `spec.realmSecretName` it is not needed.
+- For a tenant network: the [PanFS Tenant Network operator](../tenant-network-operator/Readme.md) is installed
+  and the namespace has a `TenantNetwork`. For `spec.realmSecretName` it is not needed.
 - A Secret with the keys `api` and `token` of the realm, in the namespace of the `PanfsStorageClass`.
   With a tenant network it is the Secret of the `TenantNetwork`.
 
@@ -102,7 +100,7 @@ helm upgrade --install panfs-storageclass-operator ./ \
 
 ### 2. Create a PanfsStorageClass
 
-In the namespace of the `TenantNetwork`, the smallest one is a name and the name of the `TenantNetwork`:
+In the namespace of the `TenantNetwork`, the smallest one is only a name:
 
 ```yaml
 apiVersion: panfs.vdura.com/v1alpha1
@@ -110,16 +108,16 @@ kind: PanfsStorageClass
 metadata:
   name: acme-storage
   namespace: acme
-spec:
-  tenantNetwork: acme-network
 ```
 
-The operator creates the StorageClass `acme-storage`. It fills in the provisioner, the references to the Secret
+The operator finds the `TenantNetwork` by itself, because a namespace holds the network of one tenant.
+It creates the StorageClass `acme-storage`. It fills in the provisioner, the references to the Secret
 of the `TenantNetwork`, and `allowedTopologies` with the ready label of the tenant network. It also lets
 the CSI controller read the Secret.
 
 The template [template-panfsstorageclass.yaml](../../deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml)
-shows all fields.
+shows all fields. The chart [`panfs-tenant-storageclass`](../tenant-storageclass/Readme.md) creates the same
+resource as a Helm release.
 
 ### 3. Check the result
 
@@ -129,7 +127,7 @@ kubectl get panfsstorageclasses -A
 
 ```text
 NAMESPACE   NAME           STORAGECLASS   TENANT-NETWORK   PHASE   AGE
-acme        acme-storage   acme-storage   acme-network     Ready   1m
+acme        acme-storage   acme-storage   acme             Ready   1m
 ```
 
 Every volume of this StorageClass is bound to the nodes where the tenant network works: its PersistentVolume
@@ -140,11 +138,10 @@ A workload needs no node selector.
 
 ### Fields
 
-Exactly one of `tenantNetwork` and `realmSecretName` is required. Every other field is optional.
+Every field is optional in a namespace with a `TenantNetwork`, and `spec` itself can be left out.
 
 | Field                       | Default   | Meaning                                                                        |
 |:----------------------------|:----------|:-------------------------------------------------------------------------------|
-| `spec.tenantNetwork`        |           | Name of a `TenantNetwork` in the same namespace                                |
 | `spec.realmSecretName`      |           | Name of a Secret in the same namespace, for a realm without a tenant network   |
 | `spec.parameters`           | none      | PanFS parameters of new volumes; without them the defaults of the driver apply |
 | `spec.reclaimPolicy`        | `Delete`  | `Delete` or `Retain`                                                           |
@@ -157,6 +154,17 @@ The parameters are the ones of the [StorageClass chart](../storageclass/Readme.m
 `panfs.csi.vdura.com/layout`. They reach the StorageClass unchanged. The parameters that start with
 `csi.storage.k8s.io/` are set by the operator and are refused in the resource.
 
+The operator decides by the namespace of the resource where the Secret and the nodes come from:
+
+| The namespace has  | `spec.realmSecretName` | Result                                                             |
+|:-------------------|:-----------------------|:-------------------------------------------------------------------|
+| a `TenantNetwork`  | not set                | The Secret and the nodes of the `TenantNetwork`                    |
+| a `TenantNetwork`  | set                    | Refused: the volumes would not be bound to the nodes of the tenant |
+| no `TenantNetwork` | set                    | That Secret; the volumes are not bound to nodes                    |
+| no `TenantNetwork` | not set                | Error until a `TenantNetwork` exists or the field is set           |
+
+`status.tenantNetwork` names the `TenantNetwork` that the operator found.
+
 What the operator fills in:
 
 | In the StorageClass                                        | Comes from                                                   |
@@ -167,8 +175,8 @@ What the operator fills in:
 
 ### Volume binding mode
 
-With `tenantNetwork` the mode is always `Immediate`: a volume is created as soon as its PersistentVolumeClaim exists,
-and it is bound to the nodes of the tenant network. `WaitForFirstConsumer` is refused together with `tenantNetwork`.
+With a tenant network the mode is always `Immediate`: a volume is created as soon as its PersistentVolumeClaim exists,
+and it is bound to the nodes of the tenant network. `WaitForFirstConsumer` is refused in a namespace with a `TenantNetwork`.
 The provisioner compares `allowedTopologies` with the labels that the CSI node plugin reported when a node is
 already chosen, and the ready label of the tenant network is not one of them, so no volume would be created.
 
@@ -176,7 +184,7 @@ With `realmSecretName` the default is `WaitForFirstConsumer`, and the StorageCla
 
 ### A realm without a tenant network
 
-When the nodes reach the realm without a tenant network, name the Secret in place of the `TenantNetwork`:
+When the nodes reach the realm without a tenant network, name the Secret. The namespace must have no `TenantNetwork`:
 
 ```yaml
 apiVersion: panfs.vdura.com/v1alpha1
@@ -212,8 +220,8 @@ a name that a StorageClass of somebody else has: it never takes over a StorageCl
 ### Changing a PanfsStorageClass
 
 Kubernetes does not allow a change of the parameters, the reclaim policy or the volume binding mode of a StorageClass.
-The operator therefore refuses a change of `spec.parameters`, `spec.reclaimPolicy`, `spec.volumeBindingMode`,
-`spec.tenantNetwork` or `spec.realmSecretName`: the StorageClass stays as it is, and the resource shows the phase
+The operator therefore refuses a change of `spec.parameters`, `spec.reclaimPolicy`, `spec.volumeBindingMode`
+or `spec.realmSecretName`, and a change of the Secret that the `TenantNetwork` names: the StorageClass stays as it is, and the resource shows the phase
 `Error` with the name of the field. Undo the change, or delete the resource and create it again.
 Existing volumes keep what they were created with.
 
@@ -270,7 +278,7 @@ the operator uses them. To move a StorageClass of the chart to a `PanfsStorageCl
    - `allowVolumeExpansion` → `spec.allowVolumeExpansion`
    - `mountOptions` → `spec.mountOptions`
    - `setAsDefaultStorageClass` → `spec.default`
-   - `allowedTopologies` → not needed: `spec.tenantNetwork` sets it
+   - `allowedTopologies` → not needed: the operator takes it from the `TenantNetwork` of the namespace
    - `realm.*` → the Secret
    - `csiPanFSDriver.namespace` → not needed: the operator reads it from the CSIDriver object
 4. Use the new name in `storageClassName` of new PersistentVolumeClaims.

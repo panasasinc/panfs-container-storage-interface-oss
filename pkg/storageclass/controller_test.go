@@ -51,14 +51,25 @@ func newTenantNetwork(spec map[string]interface{}) *unstructured.Unstructured {
 	}}
 }
 
-// newClass returns a PanfsStorageClass named fast in the given namespace.
+// newClass returns a PanfsStorageClass named fast in the given namespace. A nil spec gives a resource without one.
 func newClass(namespace string, spec map[string]interface{}) *unstructured.Unstructured {
-	return &unstructured.Unstructured{Object: map[string]interface{}{
+	item := &unstructured.Unstructured{Object: map[string]interface{}{
 		"apiVersion": PanfsStorageClassGVR.GroupVersion().String(),
 		"kind":       PanfsStorageClassKind,
 		"metadata":   map[string]interface{}{"name": testClass, "namespace": namespace, "uid": "class-" + namespace},
-		"spec":       spec,
 	}}
+	if spec != nil {
+		item.Object["spec"] = spec
+	}
+	return item
+}
+
+// secondNetwork returns a TenantNetwork named other in the namespace of acme, with the Secret other.
+func secondNetwork() *unstructured.Unstructured {
+	network := newTenantNetwork(map[string]interface{}{"realmSecretName": "other"})
+	network.SetName("other")
+	network.SetUID("uid-2")
+	return network
 }
 
 // readyNetwork returns the TenantNetwork acme with the Secret realm, in the given phase.
@@ -121,7 +132,7 @@ func assertNoStorageClass(t *testing.T, kube *fake.Clientset) {
 
 func TestStorageClassFromATenantNetwork(t *testing.T) {
 	ctx := context.Background()
-	o, kube := newClassOperator(readyNetwork(tenantnet.PhaseReady), newClass(testNamespace, map[string]interface{}{"tenantNetwork": "acme"}))
+	o, kube := newClassOperator(readyNetwork(tenantnet.PhaseReady), newClass(testNamespace, map[string]interface{}{}))
 
 	o.ReconcileAll(ctx)
 
@@ -165,7 +176,6 @@ func TestStorageClassFromATenantNetwork(t *testing.T) {
 func TestStorageClassParametersAndSettingsReachTheStorageClass(t *testing.T) {
 	ctx := context.Background()
 	o, kube := newClassOperator(readyNetwork(tenantnet.PhaseReady), newClass(testNamespace, map[string]interface{}{
-		"tenantNetwork": "acme",
 		"parameters": map[string]interface{}{
 			"panfs.csi.vdura.com/layout":   "raid6+",
 			"panfs.csi.vdura.com/maxwidth": int64(3),
@@ -213,15 +223,22 @@ func TestStorageClassIsNotCreatedWithoutItsSources(t *testing.T) {
 		message string
 	}{
 		{
-			name:    "the TenantNetwork is missing",
-			spec:    map[string]interface{}{"tenantNetwork": "acme"},
-			phase:   tenantnet.PhaseError,
-			message: `the TenantNetwork "acme" does not exist in namespace "tenant-ns"`,
+			name:  "the namespace has no TenantNetwork and the spec names no Secret",
+			spec:  map[string]interface{}{},
+			phase: tenantnet.PhaseError,
+			message: `namespace "tenant-ns" has no TenantNetwork; create one, or set spec.realmSecretName ` +
+				`for a realm that is reachable without a tenant network`,
+		},
+		{
+			name:  "the resource has no spec at all",
+			phase: tenantnet.PhaseError,
+			message: `namespace "tenant-ns" has no TenantNetwork; create one, or set spec.realmSecretName ` +
+				`for a realm that is reachable without a tenant network`,
 		},
 		{
 			name:    "the TenantNetwork is not ready",
 			objects: []runtime.Object{readyNetwork(tenantnet.PhasePending)},
-			spec:    map[string]interface{}{"tenantNetwork": "acme"},
+			spec:    map[string]interface{}{},
 			phase:   tenantnet.PhasePending,
 			message: `waiting for the TenantNetwork "acme" to be ready (Pending: the tenant network works on 1 of 2 nodes)`,
 		},
@@ -232,24 +249,27 @@ func TestStorageClassIsNotCreatedWithoutItsSources(t *testing.T) {
 			message: `the Secret "other" does not exist in namespace "tenant-ns"`,
 		},
 		{
-			name:    "both sources are set",
+			name:    "the spec names a Secret in a namespace with a TenantNetwork",
 			objects: []runtime.Object{readyNetwork(tenantnet.PhaseReady)},
-			spec:    map[string]interface{}{"tenantNetwork": "acme", "realmSecretName": "realm"},
+			spec:    map[string]interface{}{"realmSecretName": "realm"},
 			phase:   tenantnet.PhaseError,
-			message: "exactly one of spec.tenantNetwork and spec.realmSecretName is required",
+			message: `spec.realmSecretName cannot be used in namespace "tenant-ns", which has the TenantNetwork "acme"; ` +
+				`remove it: the StorageClass uses the Secret and the nodes of the TenantNetwork`,
 		},
 		{
-			name:    "no source is set",
+			name:    "the namespace has two TenantNetworks and none is served",
+			objects: []runtime.Object{readyNetwork(tenantnet.PhaseReady), secondNetwork()},
 			spec:    map[string]interface{}{},
 			phase:   tenantnet.PhaseError,
-			message: "exactly one of spec.tenantNetwork and spec.realmSecretName is required",
+			message: `namespace "tenant-ns" has 2 TenantNetworks, and it is not clear which one is served; ` +
+				`a namespace holds the network of one tenant: delete the others`,
 		},
 		{
 			name:    "the binding mode does not work with a tenant network",
 			objects: []runtime.Object{readyNetwork(tenantnet.PhaseReady)},
-			spec:    map[string]interface{}{"tenantNetwork": "acme", "volumeBindingMode": "WaitForFirstConsumer"},
+			spec:    map[string]interface{}{"volumeBindingMode": "WaitForFirstConsumer"},
 			phase:   tenantnet.PhaseError,
-			message: "spec.volumeBindingMode WaitForFirstConsumer cannot be used with spec.tenantNetwork; " +
+			message: "spec.volumeBindingMode WaitForFirstConsumer cannot be used in a namespace with a TenantNetwork; " +
 				"use Immediate, which is the default: the volume is bound to the nodes of the tenant network",
 		},
 		{
@@ -308,7 +328,7 @@ func TestStorageClassFailsWithoutTheDriver(t *testing.T) {
 func TestStorageClassKeepsWorkingWhenTheTenantNetworkIsNotReady(t *testing.T) {
 	ctx := context.Background()
 	network := readyNetwork(tenantnet.PhaseReady)
-	o, kube := newClassOperator(network, newClass(testNamespace, map[string]interface{}{"tenantNetwork": "acme"}))
+	o, kube := newClassOperator(network, newClass(testNamespace, map[string]interface{}{}))
 	o.ReconcileAll(ctx)
 
 	// A node restarts: the TenantNetwork is Pending for a while.
@@ -350,7 +370,7 @@ func TestStorageClassRefusesAChangeOfAFixedField(t *testing.T) {
 		{
 			name: "the Secret",
 			spec: map[string]interface{}{"realmSecretName": "second"},
-			message: "the Secret (spec.tenantNetwork or spec.realmSecretName) cannot change after the StorageClass was created; " +
+			message: "the Secret (of the TenantNetwork, or spec.realmSecretName) cannot change after the StorageClass was created; " +
 				`the StorageClass "fast" is unchanged. Undo the change, or delete this resource and create it again`,
 		},
 	}
@@ -574,4 +594,37 @@ func TestStorageClassSecretReaderKeepsTheSecretOfOlderVolumes(t *testing.T) {
 	role, err := kube.RbacV1().Roles(testNamespace).Get(ctx, testReader, metav1.GetOptions{})
 	require.NoError(t, err)
 	assert.Equal(t, []string{"realm", "second"}, role.Rules[0].ResourceNames)
+}
+
+func TestStorageClassUsesTheServedTenantNetworkOfTwo(t *testing.T) {
+	ctx := context.Background()
+	served := readyNetwork(tenantnet.PhaseReady)
+	require.NoError(t, unstructured.SetNestedField(served.Object, "panfs-tenant-network-acme", "status", "daemonSet"))
+	o, kube := newClassOperator(secondNetwork(), served, newClass(testNamespace, nil))
+
+	o.ReconcileAll(ctx)
+
+	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Equal(t, "realm", class.Parameters["csi.storage.k8s.io/provisioner-secret-name"])
+	_, status := storedClass(t, o, testNamespace)
+	assert.Equal(t, tenantnet.PhaseReady, status.Phase)
+	assert.Equal(t, "acme", status.TenantNetwork)
+}
+
+func TestStorageClassStaysWhenATenantNetworkAppearsLater(t *testing.T) {
+	ctx := context.Background()
+	o, kube := newClassOperator(newClass(testNamespace, map[string]interface{}{"realmSecretName": "realm"}))
+	o.ReconcileAll(ctx)
+
+	_, err := o.Dynamic.Resource(tenantnet.TenantNetworkGVR).Namespace(testNamespace).Create(ctx, readyNetwork(tenantnet.PhaseReady), metav1.CreateOptions{})
+	require.NoError(t, err)
+	o.ReconcileAll(ctx)
+
+	class, err := kube.StorageV1().StorageClasses().Get(ctx, testClass, metav1.GetOptions{})
+	require.NoError(t, err)
+	assert.Empty(t, class.AllowedTopologies, "the StorageClass is unchanged")
+	_, status := storedClass(t, o, testNamespace)
+	assert.Equal(t, tenantnet.PhaseError, status.Phase)
+	assert.Contains(t, status.Message, "spec.realmSecretName cannot be used in namespace")
 }

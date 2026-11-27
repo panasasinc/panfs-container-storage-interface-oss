@@ -141,8 +141,7 @@ A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`.
 - **StorageClass manifest:** `storageclass-operator/template-panfsstorageclass.yaml`, once per StorageClass of the tenant.
   The StorageClass operator creates the StorageClass from it and binds every volume to the ready nodes.
   - Replace `<STORAGE_CLASS_NAME>` with the name of the StorageClass
-  - Replace `<TENANT_NAMESPACE>` with the namespace of the `TenantNetwork`
-  - Replace `<TENANT_NETWORK_NAME>` with the name of the `TenantNetwork`
+  - Replace `<TENANT_NAMESPACE>` with the namespace of the `TenantNetwork`; the operator finds the `TenantNetwork` there
   - Remove the optional fields that you do not need
 
 ```bash

@@ -4,20 +4,20 @@ Next steps for a StorageClass:
 
 1. Create a PanfsStorageClass in the namespace of the realm Secret. Its name becomes the name of the StorageClass.
 
-   With a tenant network (the PanFS Tenant Network operator must be installed):
+   In the namespace of a TenantNetwork, nothing else is needed: the operator finds the TenantNetwork.
 
    apiVersion: panfs.vdura.com/v1alpha1
    kind: PanfsStorageClass
    metadata:
      name: <STORAGE_CLASS_NAME>
      namespace: <TENANT_NAMESPACE>
-   spec:
-     tenantNetwork: <TENANT_NETWORK_NAME>
 
-   Without a tenant network, name the Secret instead:
+   In a namespace without a tenant network, name the Secret:
 
    spec:
      realmSecretName: <SECRET_NAME>
+
+   The chart panfs-tenant-storageclass creates the same resource as a Helm release.
 
 2. Check the result:
 

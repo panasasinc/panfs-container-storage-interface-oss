@@ -16,6 +16,7 @@ For more details on specific topics, refer to the following documents:
 | [Tenant Network Operator](./charts/tenant-network-operator/Readme.md) | Putting worker nodes on the network of a PanFS tenant, and marking the nodes that are ready: the `TenantNetwork` resource, its status and events, VXLAN and VLAN segments |
 | [StorageClass Operator](./charts/storageclass-operator/Readme.md) | Creating a StorageClass from a small `PanfsStorageClass` resource: the Secret references, the permission of the CSI controller and, for a tenant network, the binding of volumes to the ready nodes |
 | [Tenant Chart](./charts/tenant/Readme.md) | Setting up one PanFS tenant with Helm: the Secret with the realm connection and the `TenantNetwork` in one release |
+| [Tenant StorageClass Chart](./charts/tenant-storageclass/Readme.md) | Creating the StorageClass of a tenant with Helm: one `PanfsStorageClass` per release |
 | [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
 | [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
 | [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
@@ -396,14 +397,14 @@ and the events say what happened on each node. A ready node has the label
 
 Install the PanFS StorageClass operator, once per cluster. It is a workload of its own, apart from the
 PanFS Tenant Network operator. Then create the StorageClass of the tenant with a `PanfsStorageClass` in the
-namespace of the `TenantNetwork`. Only a name and the name of the `TenantNetwork` are required:
+namespace of the `TenantNetwork`. Only a name is required: the operator finds the `TenantNetwork` of the namespace.
 
 ```bash
 # Once per cluster: the StorageClass operator, in the namespace of the driver (csi-panfs)
 kubectl apply -f deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
 
-# In deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml, replace <STORAGE_CLASS_NAME>,
-# <TENANT_NAMESPACE> and <TENANT_NETWORK_NAME> first, and remove the optional fields that you do not need.
+# In deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml, replace <STORAGE_CLASS_NAME>
+# and <TENANT_NAMESPACE> first, and remove the optional fields that you do not need.
 kubectl apply -f deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml
 kubectl get panfsstorageclasses -A
 ```
@@ -463,11 +464,16 @@ helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
 The requirements (Calico setting, namespace, token permissions), the VXLAN and VLAN segment types, the status
 and the events are described in the [operator documentation](./charts/tenant-network-operator/Readme.md).
 
-Step 4.4 has its own chart, the [StorageClass operator chart](./charts/storageclass-operator/Readme.md), installed once:
+Step 4.4 has two charts: the [StorageClass operator chart](./charts/storageclass-operator/Readme.md), installed once,
+and the [tenant StorageClass chart](./charts/tenant-storageclass/Readme.md), one release per StorageClass.
+The name of the release is the name of the StorageClass:
 
 ```bash
 helm upgrade --install panfs-storageclass-operator charts/storageclass-operator \
     --namespace csi-panfs
+
+helm upgrade --install <STORAGE_CLASS_NAME> charts/tenant-storageclass \
+    --namespace <TENANT_NAMESPACE>
 ```
 
 ## Deploying Workloads

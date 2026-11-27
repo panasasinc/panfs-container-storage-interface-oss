@@ -343,7 +343,7 @@ The ready label is `panfs.vdura.com/tenant-network=<NAMESPACE>`, with the namesp
 The status of the `TenantNetwork` names it in `status.managedTopology`.
 
 The [PanFS StorageClass operator](../storageclass-operator/Readme.md) is a separate chart. With it, a StorageClass
-of the tenant is a small `PanfsStorageClass` resource that names the `TenantNetwork`:
+of the tenant is a small `PanfsStorageClass` resource in the namespace of the `TenantNetwork`:
 
 ```yaml
 apiVersion: panfs.vdura.com/v1alpha1
@@ -351,8 +351,6 @@ kind: PanfsStorageClass
 metadata:
   name: acme-storage
   namespace: acme
-spec:
-  tenantNetwork: acme-network
 ```
 
 That operator creates the StorageClass with the Secret of the `TenantNetwork` and with the ready label

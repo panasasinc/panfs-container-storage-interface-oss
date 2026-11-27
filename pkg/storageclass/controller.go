@@ -87,18 +87,19 @@ const (
 	ReasonSecretNotFound        = "SecretNotFound"
 	ReasonReconcileFailed       = "ReconcileFailed"
 	ReasonTenantNetworkNotFound = "TenantNetworkNotFound"
+	ReasonTenantNetworkUnclear  = "TenantNetworkUnclear"
 	ReasonStorageClassConflict  = "StorageClassConflict"
 	ReasonImmutableField        = "ImmutableField"
 	ReasonDriverNotFound        = "DriverNotFound"
 )
 
-// PanfsStorageClassSpec is the spec of a PanfsStorageClass. Exactly one of TenantNetwork and RealmSecretName is required.
+// PanfsStorageClassSpec is the spec of a PanfsStorageClass. No field is required in a namespace that has a
+// TenantNetwork: a namespace holds the network of one tenant, so the operator finds it. The StorageClass then
+// uses the Secret of that TenantNetwork, and its volumes are bound to the nodes where the network of the tenant works.
 type PanfsStorageClassSpec struct {
-	// TenantNetwork names a TenantNetwork in the namespace of the resource. The StorageClass uses its Secret,
-	// and its volumes are bound to the nodes where the network of the tenant works.
-	TenantNetwork string `json:"tenantNetwork,omitempty"`
-	// RealmSecretName names a Secret in the namespace of the resource with the keys api and token,
-	// for a realm that is reachable without a tenant network.
+	// RealmSecretName names a Secret in the namespace of the resource with the keys api and token, for a realm
+	// that is reachable without a tenant network. It is required in a namespace without a TenantNetwork,
+	// and refused in a namespace that has one.
 	RealmSecretName string `json:"realmSecretName,omitempty"`
 	// Parameters are the PanFS parameters of new volumes. They reach the StorageClass unchanged.
 	Parameters map[string]string `json:"-"`
@@ -120,7 +121,9 @@ type PanfsStorageClassStatus struct {
 	Phase   string `json:"phase"`
 	Message string `json:"message,omitempty"`
 	// StorageClass is the name of the StorageClass that the operator created for the resource.
-	StorageClass       string `json:"storageClass,omitempty"`
+	StorageClass string `json:"storageClass,omitempty"`
+	// TenantNetwork is the name of the TenantNetwork of the namespace, which the StorageClass uses; empty without one.
+	TenantNetwork      string `json:"tenantNetwork,omitempty"`
 	ObservedGeneration int64  `json:"observedGeneration,omitempty"`
 }
 
@@ -237,8 +240,10 @@ func (c *Controller) reconcileStorageClass(ctx context.Context, item *unstructur
 	return err
 }
 
-// classSource is what a PanfsStorageClass takes from its TenantNetwork, or from its own spec without one.
+// classSource is what a PanfsStorageClass takes from the TenantNetwork of its namespace, or from its own spec without one.
 type classSource struct {
+	// network is the name of the TenantNetwork of the namespace; empty without one.
+	network    string
 	secretName string
 	// topology is the node label of the tenant network; nil without a tenant network.
 	topology *tenantnet.Topology
@@ -260,6 +265,10 @@ func (c *Controller) applyStorageClass(ctx context.Context, item *unstructured.U
 	}
 	source, err := c.classSource(ctx, namespace, spec)
 	if err != nil {
+		return status, err
+	}
+	status.TenantNetwork = source.network
+	if err := setBindingMode(&spec, source); err != nil {
 		return status, err
 	}
 	wanted := wantedStorageClass(name, owner, namespace, spec, source)
@@ -289,7 +298,7 @@ func (c *Controller) applyStorageClass(ctx context.Context, item *unstructured.U
 					"so the name must be unique in the cluster", name, currentOwner))
 		}
 		status.StorageClass = name
-		if source.topology == nil && spec.TenantNetwork != "" {
+		if source.topology == nil && source.network != "" {
 			// The TenantNetwork does not report its topology at the moment: keep what the StorageClass has.
 			wanted.AllowedTopologies = current.AllowedTopologies
 		}
@@ -348,10 +357,6 @@ func storageClassSpecOf(item *unstructured.Unstructured) (PanfsStorageClassSpec,
 	if err := runtime.DefaultUnstructuredConverter.FromUnstructured(raw, &spec); err != nil {
 		return spec, withReason(ReasonInvalidSpec, fmt.Errorf("the spec is not valid: %w", err))
 	}
-	if (spec.TenantNetwork == "") == (spec.RealmSecretName == "") {
-		return spec, withReason(ReasonInvalidSpec,
-			fmt.Errorf("exactly one of spec.tenantNetwork and spec.realmSecretName is required"))
-	}
 
 	// A parameter value may be written as a number; a StorageClass holds strings.
 	parameters, _ := raw["parameters"].(map[string]interface{})
@@ -373,21 +378,7 @@ func storageClassSpecOf(item *unstructured.Unstructured) (PanfsStorageClassSpec,
 	}
 
 	switch storagev1.VolumeBindingMode(spec.VolumeBindingMode) {
-	case "":
-		spec.VolumeBindingMode = string(storagev1.VolumeBindingWaitForFirstConsumer)
-		if spec.TenantNetwork != "" {
-			spec.VolumeBindingMode = string(storagev1.VolumeBindingImmediate)
-		}
-	case storagev1.VolumeBindingImmediate:
-	case storagev1.VolumeBindingWaitForFirstConsumer:
-		if spec.TenantNetwork != "" {
-			// The provisioner compares allowedTopologies with the labels that the node plugin reported, when a
-			// node is already selected. The label of the tenant network is not one of them, so no volume
-			// would be created.
-			return spec, withReason(ReasonInvalidSpec, fmt.Errorf(
-				"spec.volumeBindingMode WaitForFirstConsumer cannot be used with spec.tenantNetwork; "+
-					"use Immediate, which is the default: the volume is bound to the nodes of the tenant network"))
-		}
+	case "", storagev1.VolumeBindingImmediate, storagev1.VolumeBindingWaitForFirstConsumer:
 	default:
 		return spec, withReason(ReasonInvalidSpec, fmt.Errorf(
 			"spec.volumeBindingMode %q is not Immediate or WaitForFirstConsumer", spec.VolumeBindingMode))
@@ -403,25 +394,86 @@ func storageClassSpecOf(item *unstructured.Unstructured) (PanfsStorageClassSpec,
 	return spec, nil
 }
 
+// setBindingMode fills in the default volume binding mode, which depends on the tenant network,
+// and refuses the mode that does not work with one.
+func setBindingMode(spec *PanfsStorageClassSpec, source classSource) error {
+	switch storagev1.VolumeBindingMode(spec.VolumeBindingMode) {
+	case "":
+		spec.VolumeBindingMode = string(storagev1.VolumeBindingWaitForFirstConsumer)
+		if source.network != "" {
+			spec.VolumeBindingMode = string(storagev1.VolumeBindingImmediate)
+		}
+	case storagev1.VolumeBindingWaitForFirstConsumer:
+		if source.network != "" {
+			// The provisioner compares allowedTopologies with the labels that the node plugin reported, when a
+			// node is already selected. The label of the tenant network is not one of them, so no volume
+			// would be created.
+			return withReason(ReasonInvalidSpec, fmt.Errorf(
+				"spec.volumeBindingMode WaitForFirstConsumer cannot be used in a namespace with a TenantNetwork; "+
+					"use Immediate, which is the default: the volume is bound to the nodes of the tenant network"))
+		}
+	}
+	return nil
+}
+
+// tenantNetworkOf returns the TenantNetwork of a namespace, or nil when the namespace has none. A namespace holds
+// the network of one tenant: when it has several TenantNetworks, the tenant network operator serves one of them
+// and refuses the others, and the one with a DaemonSet is the one that is served.
+func (c *Controller) tenantNetworkOf(ctx context.Context, namespace string) (*unstructured.Unstructured, error) {
+	list, err := c.Dynamic.Resource(tenantnet.TenantNetworkGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
+	if apierrors.IsNotFound(err) {
+		// The cluster has no tenant network operator, so it has no such resource.
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("list the TenantNetworks of namespace %q: %w", namespace, err)
+	}
+	switch len(list.Items) {
+	case 0:
+		return nil, nil
+	case 1:
+		return &list.Items[0], nil
+	}
+	var served []*unstructured.Unstructured
+	for i := range list.Items {
+		if daemonSet, _, _ := unstructured.NestedString(list.Items[i].Object, "status", "daemonSet"); daemonSet != "" {
+			served = append(served, &list.Items[i])
+		}
+	}
+	if len(served) != 1 {
+		return nil, withReason(ReasonTenantNetworkUnclear, fmt.Errorf(
+			"namespace %q has %d TenantNetworks, and it is not clear which one is served; "+
+				"a namespace holds the network of one tenant: delete the others", namespace, len(list.Items)))
+	}
+	return served[0], nil
+}
+
 // classSource returns the Secret and the topology of a PanfsStorageClass.
 func (c *Controller) classSource(ctx context.Context, namespace string, spec PanfsStorageClassSpec) (classSource, error) {
-	if spec.TenantNetwork == "" {
+	network, err := c.tenantNetworkOf(ctx, namespace)
+	if err != nil {
+		return classSource{}, err
+	}
+	if network == nil {
+		if spec.RealmSecretName == "" {
+			return classSource{}, withReason(ReasonTenantNetworkNotFound, fmt.Errorf(
+				"namespace %q has no TenantNetwork; create one, or set spec.realmSecretName "+
+					"for a realm that is reachable without a tenant network", namespace))
+		}
 		return classSource{secretName: spec.RealmSecretName}, nil
 	}
 
-	network, err := c.Dynamic.Resource(tenantnet.TenantNetworkGVR).Namespace(namespace).Get(ctx, spec.TenantNetwork, metav1.GetOptions{})
-	if apierrors.IsNotFound(err) {
-		return classSource{}, withReason(ReasonTenantNetworkNotFound,
-			fmt.Errorf("the TenantNetwork %q does not exist in namespace %q", spec.TenantNetwork, namespace))
+	source := classSource{network: network.GetName()}
+	if spec.RealmSecretName != "" {
+		// A StorageClass without the topology of the tenant network would give volumes without node affinity.
+		return source, withReason(ReasonInvalidSpec, fmt.Errorf(
+			"spec.realmSecretName cannot be used in namespace %q, which has the TenantNetwork %q; "+
+				"remove it: the StorageClass uses the Secret and the nodes of the TenantNetwork", namespace, source.network))
 	}
-	if err != nil {
-		return classSource{}, fmt.Errorf("read the TenantNetwork %q: %w", spec.TenantNetwork, err)
-	}
-	source := classSource{}
 	source.secretName, _, _ = unstructured.NestedString(network.Object, "spec", "realmSecretName")
 	if source.secretName == "" {
-		return classSource{}, withReason(ReasonInvalidSpec,
-			fmt.Errorf("the TenantNetwork %q names no Secret in spec.realmSecretName", spec.TenantNetwork))
+		return source, withReason(ReasonInvalidSpec,
+			fmt.Errorf("the TenantNetwork %q names no Secret in spec.realmSecretName", source.network))
 	}
 
 	var networkStatus tenantnet.TenantNetworkStatus
@@ -439,8 +491,8 @@ func (c *Controller) classSource(ctx context.Context, namespace string, spec Pan
 		if networkStatus.Message != "" {
 			state += ": " + networkStatus.Message
 		}
-		source.waiting = fmt.Sprintf("waiting for the TenantNetwork %q to be ready (%s)", spec.TenantNetwork, state)
-		source.note = fmt.Sprintf("the TenantNetwork %q is not ready (%s)", spec.TenantNetwork, state)
+		source.waiting = fmt.Sprintf("waiting for the TenantNetwork %q to be ready (%s)", source.network, state)
+		source.note = fmt.Sprintf("the TenantNetwork %q is not ready (%s)", source.network, state)
 	}
 	return source, nil
 }
@@ -495,7 +547,7 @@ func immutableChanges(current, wanted *storagev1.StorageClass) []string {
 		// The Secret is part of the parameters.
 		secretKey := reservedParameterPrefix + "provisioner-secret-name"
 		if current.Parameters[secretKey] != wanted.Parameters[secretKey] {
-			changed = append(changed, "the Secret (spec.tenantNetwork or spec.realmSecretName)")
+			changed = append(changed, "the Secret (of the TenantNetwork, or spec.realmSecretName)")
 		} else {
 			changed = append(changed, "spec.parameters")
 		}

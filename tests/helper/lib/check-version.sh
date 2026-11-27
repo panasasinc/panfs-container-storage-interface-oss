@@ -95,6 +95,7 @@ check_chart "charts/storageclass/Chart.yaml"
 check_chart "charts/tenant-network-operator/Chart.yaml"
 check_chart "charts/tenant/Chart.yaml"
 check_chart "charts/storageclass-operator/Chart.yaml"
+check_chart "charts/tenant-storageclass/Chart.yaml"
 
 for manifest in deploy/k8s/csi-driver/*.yaml examples/k8s/base/csi-panfs-driver.yaml; do
     check_image_tags "$manifest"
@@ -113,7 +114,7 @@ check_contains "Makefile" "^CSI_IMAGE[[:space:]]*\?=.*/${IMAGE_NAME}:${version_r
     "the default CSI_IMAGE is not '${IMAGE_NAME}:${version}'"
 
 for readme in charts/panfs/Readme.md charts/storageclass/Readme.md charts/tenant-network-operator/Readme.md charts/tenant/Readme.md \
-    charts/storageclass-operator/Readme.md; do
+    charts/storageclass-operator/Readme.md charts/tenant-storageclass/Readme.md; do
     check_contains "$readme" "Version: ${version_re}\]" "no 'Version: ${version}' badge; run 'make manifests'"
     check_contains "$readme" "AppVersion: ${version_re}\]" "no 'AppVersion: ${version}' badge; run 'make manifests'"
 done

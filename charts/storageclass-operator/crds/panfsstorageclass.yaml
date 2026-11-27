@@ -45,7 +45,7 @@ spec:
           jsonPath: .status.storageClass
         - name: Tenant-Network
           type: string
-          jsonPath: .spec.tenantNetwork
+          jsonPath: .status.tenantNetwork
         - name: Phase
           type: string
           jsonPath: .status.phase
@@ -59,28 +59,20 @@ spec:
       schema:
         openAPIV3Schema:
           type: object
-          required: ["spec"]
           properties:
             spec:
+              description: >-
+                Optional. In a namespace with a TenantNetwork no field is needed: the operator finds the TenantNetwork
+                of the namespace, the StorageClass uses its Secret, and the volumes are bound to the nodes where
+                the network of the tenant works.
               type: object
-              x-kubernetes-validations:
-                - rule: "has(self.tenantNetwork) != has(self.realmSecretName)"
-                  message: exactly one of spec.tenantNetwork and spec.realmSecretName is required
-                - rule: "!has(self.tenantNetwork) || !has(self.volumeBindingMode) || self.volumeBindingMode == 'Immediate'"
-                  message: spec.volumeBindingMode must be Immediate, or left out, with spec.tenantNetwork
               properties:
-                tenantNetwork:
-                  description: >-
-                    Name of a TenantNetwork in the namespace of this resource. The StorageClass uses the Secret of
-                    that TenantNetwork, and its volumes are bound to the nodes where the network of the tenant works.
-                    Exactly one of tenantNetwork and realmSecretName is required.
-                  type: string
-                  minLength: 1
                 realmSecretName:
                   description: >-
-                    For a realm that is reachable without a tenant network: name of a Secret in the namespace of this
-                    resource with the keys api (PanAPI address of the realm), token (PanAPI service account token)
-                    and, optionally, ca_cert. Exactly one of tenantNetwork and realmSecretName is required.
+                    Only for a realm that is reachable without a tenant network: name of a Secret in the namespace of
+                    this resource with the keys api (PanAPI address of the realm), token (PanAPI service account token)
+                    and, optionally, ca_cert. It is required in a namespace without a TenantNetwork,
+                    and refused in a namespace that has one.
                   type: string
                   minLength: 1
                 parameters:
@@ -102,7 +94,7 @@ spec:
                   enum: ["Delete", "Retain"]
                 volumeBindingMode:
                   description: >-
-                    Optional. Immediate or WaitForFirstConsumer. With tenantNetwork it is always Immediate: the volume
+                    Optional. Immediate or WaitForFirstConsumer. With a tenant network it is always Immediate: the volume
                     is created at once and bound to the nodes of the tenant network. With realmSecretName the default
                     is WaitForFirstConsumer. It cannot change after the StorageClass was created.
                   type: string
@@ -127,6 +119,9 @@ spec:
                   type: string
                 storageClass:
                   description: Name of the StorageClass that the operator created for this resource. It is the name of the resource.
+                  type: string
+                tenantNetwork:
+                  description: Name of the TenantNetwork of the namespace, which the StorageClass uses. Empty without a tenant network.
                   type: string
                 observedGeneration:
                   type: integer
