@@ -7,6 +7,13 @@ Check the result:
    kubectl -n {{ .Release.Namespace }} describe panfsstorageclass {{ .Release.Name }}
    kubectl get storageclass {{ .Release.Name }}
 
+{{- if .Values.test.enabled }}
+
+Or let Helm check it; the command fails when the phase does not become Ready in {{ .Values.test.timeout }}:
+
+   helm test {{ .Release.Name }} --namespace {{ .Release.Namespace }}
+
+{{ end -}}
 The phase must become Ready. The phase Pending means that the TenantNetwork of the namespace is not ready yet.
 A resource that stays without a status means that the operator is not running;
 look at its pod in the namespace where the chart panfs-tenant-operator is installed.

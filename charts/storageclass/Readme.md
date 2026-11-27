@@ -35,6 +35,8 @@ The namespace of the release is the namespace of the tenant, or of the realm Sec
 ### Resources Created by the Helm Chart
 
 - A `PanfsStorageClass` with the name of the release.
+- A `ServiceAccount`, a `Role` and a `RoleBinding` named `<release>-test`, for the pod of `helm test`;
+  see [Testing the release](#testing-the-release).
 
 The operator then creates the StorageClass, and a `Role` and a `RoleBinding` in the same namespace;
 see the [operator documentation](../panfs-tenant-operator/Readme.md#resources-created-by-the-operator).
@@ -123,6 +125,27 @@ kubectl get storageclass acme-storage
 The phase must become `Ready`. The phase `Pending` means that the `TenantNetwork` is not ready yet.
 The status and the events are described in the [operator documentation](../panfs-tenant-operator/Readme.md#status).
 
+### Testing the release
+
+The install succeeds as soon as the `PanfsStorageClass` is created; it does not wait for the operator.
+`helm test` checks the result: it runs a pod that waits until the resource has the phase `Ready`.
+
+```bash
+helm test acme-storage --namespace acme
+```
+
+The command fails when the phase is not `Ready` after `test.timeout` (120 seconds by default), for example in a namespace
+without a `TenantNetwork`. The status of the resource then says why:
+`kubectl -n acme describe panfsstorageclass acme-storage`.
+
+- The test pod uses the image `test.image`, which must have `kubectl`. For a private registry, set `test.image`
+  and `test.imagePullSecrets`.
+- The release holds a `ServiceAccount`, a `Role` and a `RoleBinding` named `<release>-test` for the pod.
+  The `Role` allows reading the `PanfsStorageClass` of the release, and nothing else.
+  Set `test.enabled=false` to leave them out; `helm test` then has no test.
+- A test pod that passed is deleted. A pod that failed stays, so that its log can be read, and `helm uninstall`
+  does not remove it: `kubectl -n acme delete pod acme-storage-test`.
+
 ### Rendering the chart without a cluster
 
 `helm template` has no cluster to ask, so the check for the operator fails there. Tell Helm that the kind exists:
@@ -154,6 +177,10 @@ see [Deleting a PanfsStorageClass](../panfs-tenant-operator/Readme.md#deleting-a
 | parameters | object | `{}` | PanFS parameters of new volumes, for example `panfs.csi.vdura.com/layout`. Without them the defaults of the driver apply. They cannot change after the StorageClass was created. |
 | realmSecretName | string | `""` | Only for a realm that is reachable without a tenant network, in a namespace without a `TenantNetwork`: name of a Secret in the namespace of the release with the keys `api` and `token`, and optionally `ca_cert`. Leave it empty in the namespace of a `TenantNetwork`: the operator uses the Secret of the `TenantNetwork`. |
 | reclaimPolicy | string | `""` | `Delete` or `Retain`. Empty means the default of the operator: `Delete`. It cannot change after the StorageClass was created. |
+| test.enabled | bool | `true` | Create the ServiceAccount, the Role and the RoleBinding of the test pod with the release. The Role allows reading the PanfsStorageClass of the release only. With `false`, `helm test` has no test. |
+| test.image | string | `"registry.k8s.io/kubectl:v1.33.1"` | Image of the test pod. It must have `kubectl` |
+| test.imagePullSecrets | list | `[]` | List of image pull secrets of the test pod, for an image in a private registry |
+| test.timeout | string | `"120s"` | How long the test waits for the phase `Ready` |
 | volumeBindingMode | string | `""` | `Immediate` or `WaitForFirstConsumer`. Empty means the default of the operator: `Immediate` with a tenant network, `WaitForFirstConsumer` without one. It cannot change after the StorageClass was created. |
 
 ### PanFS Specific Volume Parameters

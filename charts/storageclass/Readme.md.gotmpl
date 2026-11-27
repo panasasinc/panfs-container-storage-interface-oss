@@ -35,6 +35,8 @@ The namespace of the release is the namespace of the tenant, or of the realm Sec
 ### Resources Created by the Helm Chart
 
 - A `PanfsStorageClass` with the name of the release.
+- A `ServiceAccount`, a `Role` and a `RoleBinding` named `<release>-test`, for the pod of `helm test`;
+  see [Testing the release](#testing-the-release).
 
 The operator then creates the StorageClass, and a `Role` and a `RoleBinding` in the same namespace;
 see the [operator documentation](../panfs-tenant-operator/Readme.md#resources-created-by-the-operator).
@@ -122,6 +124,27 @@ kubectl get storageclass acme-storage
 
 The phase must become `Ready`. The phase `Pending` means that the `TenantNetwork` is not ready yet.
 The status and the events are described in the [operator documentation](../panfs-tenant-operator/Readme.md#status).
+
+### Testing the release
+
+The install succeeds as soon as the `PanfsStorageClass` is created; it does not wait for the operator.
+`helm test` checks the result: it runs a pod that waits until the resource has the phase `Ready`.
+
+```bash
+helm test acme-storage --namespace acme
+```
+
+The command fails when the phase is not `Ready` after `test.timeout` (120 seconds by default), for example in a namespace
+without a `TenantNetwork`. The status of the resource then says why:
+`kubectl -n acme describe panfsstorageclass acme-storage`.
+
+- The test pod uses the image `test.image`, which must have `kubectl`. For a private registry, set `test.image`
+  and `test.imagePullSecrets`.
+- The release holds a `ServiceAccount`, a `Role` and a `RoleBinding` named `<release>-test` for the pod.
+  The `Role` allows reading the `PanfsStorageClass` of the release, and nothing else.
+  Set `test.enabled=false` to leave them out; `helm test` then has no test.
+- A test pod that passed is deleted. A pod that failed stays, so that its log can be read, and `helm uninstall`
+  does not remove it: `kubectl -n acme delete pod acme-storage-test`.
 
 ### Rendering the chart without a cluster
 
