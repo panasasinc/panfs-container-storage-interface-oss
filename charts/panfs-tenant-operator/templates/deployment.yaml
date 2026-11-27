@@ -16,8 +16,8 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Deployment of the PanFS StorageClass operator: one pod that watches the PanfsStorageClass resources
-# and creates a StorageClass of the PanFS CSI driver for each of them.
+# Deployment of the PanFS Tenant operator: one pod that watches the TenantNetwork and the PanfsStorageClass resources.
+# The operator itself creates the node pods later, as one DaemonSet per TenantNetwork, in the namespace of that resource.
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -62,20 +62,33 @@ spec:
 
       containers:
         - name: operator
-          image: {{ .Values.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
+          image: &image {{ .Values.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
           imagePullPolicy: {{ .Values.pullPolicy }}
           args:
+            - "--operator"
             - "--v={{ .Values.logLevel }}"
             - "--resync={{ .Values.resync }}"
+            - "--node-image-pull-policy={{ .Values.pullPolicy }}"
+            - "--node-image-pull-secrets={{ join "," .Values.imagePullSecrets }}"
+            - "--node-cluster-role={{ .Release.Namespace }}-{{ .Release.Name }}-node"
+            - "--node-priority-class={{ .Values.nodePriorityClassName }}"
+            - "--interval={{ .Values.interval }}"
+            - "--firewalld-zone={{ .Values.firewalldZone }}"
+            - "--detach-on-removal={{ .Values.detachOnRemoval }}"
+            - "--vlan-parent={{ .Values.vlanParentInterface }}"
             - "--csi-driver-namespace={{ .Values.csiDriverNamespace }}"
             - "--csi-controller-service-account={{ .Values.csiControllerServiceAccount }}"
+          env:
+            # The node pods run the same image as the operator
+            - name: NODE_IMAGE
+              value: *image
           {{- if .Values.resources }}
 
           resources:
             {{- toYaml .Values.resources | nindent 12 }}
           {{- end }}
 
-          # The operator only talks to the Kubernetes API
+          # The operator only talks to the Kubernetes API and to PanAPI
           securityContext:
             runAsNonRoot: true
             runAsUser: 65534

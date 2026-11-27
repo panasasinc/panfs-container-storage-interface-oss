@@ -17,6 +17,6 @@ jobs:
       - uses: dataaxiom/ghcr-cleanup-action@v1
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          packages: ${{ github.event.repository.name }}/panfs-csi-driver,${{ github.event.repository.name }}/panfs-tenant-network,${{ github.event.repository.name }}/panfs-storageclass-operator
+          packages: ${{ github.event.repository.name }}/panfs-csi-driver,${{ github.event.repository.name }}/panfs-tenant-operator
           delete-untagged: true
           dry-run: false

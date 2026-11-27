@@ -14,17 +14,17 @@
   # limitations under the License.
 */}}
 {{- /*
-  A TenantNetwork can be created only when the PanFS Tenant Network operator has installed its resource definition.
+  A TenantNetwork can be created only when the PanFS Tenant operator has installed its resource definition.
   Stop here with a clear message, before anything is created. "helm template" has no cluster: pass
   --api-versions panfs.vdura.com/v1alpha1/TenantNetwork there. "helm lint" cannot take that flag: set checkOperator=false.
 */}}
 {{- if and .Values.checkOperator (not (.Capabilities.APIVersions.Has "panfs.vdura.com/v1alpha1/TenantNetwork")) }}
-{{- fail "The PanFS Tenant Network operator is not installed in this cluster: the resource kind TenantNetwork (panfs.vdura.com/v1alpha1) is unknown. Install the chart panfs-tenant-network-operator first. To render the chart without a cluster, pass --api-versions panfs.vdura.com/v1alpha1/TenantNetwork or set checkOperator=false." }}
+{{- fail "The PanFS Tenant operator is not installed in this cluster: the resource kind TenantNetwork (panfs.vdura.com/v1alpha1) is unknown. Install the chart panfs-tenant-operator first. To render the chart without a cluster, pass --api-versions panfs.vdura.com/v1alpha1/TenantNetwork or set checkOperator=false." }}
 {{- end }}
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Ask the PanFS Tenant Network operator to put the nodes of the tenant on the tenant network.
+# Ask the PanFS Tenant operator to put the nodes of the tenant on the tenant network.
 # The operator reads the tenant from the token in the Secret, and it runs a pod on every selected node.
 # A pod sets the label panfs.vdura.com/tenant-network={{ .Release.Namespace }} on its node when the network works.
 apiVersion: panfs.vdura.com/v1alpha1

@@ -1,14 +1,14 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Ask the PanFS StorageClass operator to create a StorageClass of the PanFS CSI driver.
+# Ask the PanFS Tenant operator to create a StorageClass of the PanFS CSI driver.
 # The StorageClass gets the name of this resource. The operator fills in the provisioner, the references to
 # the realm Secret and allowedTopologies, and it lets the CSI controller read the Secret.
 apiVersion: panfs.vdura.com/v1alpha1
 kind: PanfsStorageClass
 metadata:
   name: <STORAGE_CLASS_NAME>
-  namespace: <TENANT_NAMESPACE>
+  namespace: <NAMESPACE>
 spec:
   # Every field is optional. Remove what you do not need.
 
@@ -20,6 +20,8 @@ spec:
 
   # PanFS parameters of new volumes. Without them the defaults of the driver apply.
   parameters:
+    # Storageset that holds new volumes: its id or its name. Without it, the first storageset of the tenant is used.
+    # panfs.csi.vdura.com/storageset: "<STORAGESET>"
     panfs.csi.vdura.com/layout: "raid6+"
     panfs.csi.vdura.com/stripeunit: "64k"
 

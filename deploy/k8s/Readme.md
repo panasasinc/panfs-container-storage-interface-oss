@@ -30,42 +30,34 @@ Once configured, deploy the driver and KMM module:
 kubectl apply -f <selected-driver-manifest>.yaml
 ```
 
-## 2. Deploying the StorageClass and Secret
+## 2. Deploying the PanFS Tenant Operator
 
-Choose the manifest that matches your namespace and topology requirements:
+The PanFS Tenant operator creates the StorageClasses of the driver, and it puts the nodes on the network of a tenant.
+Deploy it once per cluster, after the driver.
 
-### 1. Dedicated Namespace
-- **Manifest:** `storage-class/template-secret-in-dedicated-ns.yaml` (more placeholders to change)
-- **Configuration:**
-  - Creates a StorageClass
-    - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class`)
-    - Set the same name for storage class, secret name and its namespace
-  - Creates a Secret with PanFS Realm credentials in the provided namespace
-    - Replace these placeholders with your actual credentials:
-      - `<REALM_API>`
-      - `<REALM_TOKEN>`
-    - Replace `<STORAGESET>` with the id or the name of the storageset, or remove the line
-      to use the first storageset that is assigned to the tenant
-  - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
-  - Configures Role and RoleBinding to allow the CSI Driver ServiceAccount to read the Secret
-    - Update namespace or permissions if needed (`<CSI_NAMESPACE>`)
+- **Operator manifest:** `tenant-operator/panfs-tenant-operator.yaml`.
+  It holds the resource definitions of `TenantNetwork` and `PanfsStorageClass`, and the operator,
+  for `csi-panfs`, the namespace of the driver.
 
-### 2. CSI Driver Namespace
-- **Manifest:** `storage-class/template-secret-in-driver-ns.yaml`
-- **Configuration:**
-  - Change `<STORAGE_CLASS_NAME>` to your custom name (e.g., `csi-panfs-storage-class`)
-  - Creates a Secret (same name as StorageClass) with PanFS Realm credentials in the `csi-panfs` namespace
-    - Replace these placeholders with your actual credentials:
-      - `<REALM_API>`
-      - `<REALM_TOKEN>`
-    - Replace `<STORAGESET>` with the id or the name of the storageset, or remove the line
-      to use the first storageset that is assigned to the tenant
-  - To set this StorageClass as default, set `storageclass.kubernetes.io/is-default-class` to `"true"`
-  - Update namespace or permissions if your CSI Driver namespace differs
-
-Apply the selected manifest:
 ```bash
-kubectl apply -f <selected-storageclass-manifest>.yaml
+kubectl apply --server-side -f tenant-operator/panfs-tenant-operator.yaml
+kubectl -n csi-panfs rollout status deployment/panfs-tenant-operator
+```
+
+## 3. Deploying the Tenant Network (optional)
+
+A volume of a tenant is reachable only from the network of that tenant.
+Deploy the tenant network when the worker nodes are not on that network yet.
+Skip this section when the nodes reach the realm without a tenant network.
+
+Create a namespace for the tenant, and in it a Secret with the PanAPI address and the token of the tenant:
+
+```bash
+kubectl create namespace <TENANT_NAMESPACE>
+kubectl label namespace <TENANT_NAMESPACE> pod-security.kubernetes.io/enforce=privileged
+kubectl -n <TENANT_NAMESPACE> create secret generic <SECRET_NAME> \
+    --from-literal=api=<REALM_API> \
+    --from-literal=token=<REALM_TOKEN>
 ```
 
 `<REALM_API>` is the PanAPI address of the realm and `<REALM_TOKEN>` is a PanAPI service account token.
@@ -76,7 +68,67 @@ If the certificate cannot be verified at all, for example a self-signed certific
 add the key `insecure_skip_tls_verify` with the value `"true"`. The driver then does not verify the realm certificate,
 so a host that poses as the realm can read the token. Use it for test realms only.
 
-## 3. Example: Creating a PersistentVolumeClaim (PVC)
+- **Tenant manifest:** `tenant-operator/template-tenantnetwork.yaml`, once per tenant.
+  - Replace `<NAME>` with a name for the resource
+  - Replace `<TENANT_NAMESPACE>` with the namespace of the Secret
+  - Replace `<SECRET_NAME>` with the name of that Secret (keys `api` and `token`)
+  - Replace `<LABEL_KEY>` and `<LABEL_VALUE>` with a label of the nodes that mount volumes of the tenant.
+    Any label works. Without `nodeSelector`, all nodes of the cluster are put on the tenant network
+
+```bash
+# Label the nodes with a label of your choice, then ask for the tenant network
+kubectl label node <NODE_NAME> <LABEL_KEY>=<LABEL_VALUE>
+kubectl apply -f tenant-operator/template-tenantnetwork.yaml
+
+# The TenantNetwork must be Ready; its status lists the nodes, and its events say what happened
+kubectl get tenantnetworks -A
+kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
+```
+
+A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`.
+
+To take a node off the tenant network, remove the label that `nodeSelector` names. The pod of the node then removes
+the tenant interface and detaches the node from the subnet in the realm:
+
+```bash
+kubectl label node <NODE_NAME> <LABEL_KEY>-
+```
+
+To remove the network of a tenant, delete its `TenantNetwork` while the operator runs.
+The delete waits until every pod has cleaned up its node:
+
+```bash
+kubectl delete -f tenant-operator/template-tenantnetwork.yaml
+```
+
+## 4. Deploying the StorageClass
+
+A StorageClass is a `PanfsStorageClass` resource. The operator creates the StorageClass from it: it fills in
+the provisioner and the references to the realm Secret, and it lets the CSI controller read that Secret.
+
+- **StorageClass manifest:** `storage-class/template-panfsstorageclass.yaml`, once per StorageClass.
+  - Replace `<STORAGE_CLASS_NAME>` with the name of the StorageClass
+  - Replace `<NAMESPACE>` with the namespace of the `TenantNetwork`; the operator finds the `TenantNetwork` there,
+    uses its Secret, and binds every volume to the ready nodes
+  - Only for a realm without a tenant network: `<NAMESPACE>` is a namespace with a Secret like the one of section 3
+    and without a `TenantNetwork`. Remove the `#` before `realmSecretName` and replace `<SECRET_NAME>`
+  - To choose the storageset, remove the `#` before `panfs.csi.vdura.com/storageset` and replace `<STORAGESET>`
+    with its id or its name. Without the line, the first storageset that is assigned to the tenant is used
+  - To set this StorageClass as default, set `default` to `true`
+  - Remove the optional fields that you do not need
+
+```bash
+kubectl apply -f storage-class/template-panfsstorageclass.yaml
+
+# The phase must become Ready
+kubectl get panfsstorageclasses -A
+kubectl get storageclass <STORAGE_CLASS_NAME>
+```
+
+A StorageClass that you write yourself with `allowedTopologies` on the ready label must have
+`volumeBindingMode: Immediate`. With `WaitForFirstConsumer` no volume is provisioned.
+
+## 5. Example: Creating a PersistentVolumeClaim (PVC)
 
 After deploying the StorageClass, you can create PVCs referencing your StorageClass. Example:
 
@@ -99,76 +151,10 @@ Apply with:
 kubectl apply -f <your-pvc-manifest>.yaml
 ```
 
-## 4. Additional Notes
+## 6. Additional Notes
 
 - Review all comments in the manifests for guidance on configuration and permissions.
-- Ensure that any referenced ServiceAccounts, Roles, and RoleBindings are created and configured as described.
-- For troubleshooting, check the logs of the CSI driver pods and verify that secrets and StorageClass parameters are correct.
-
-## 3. Deploying the Tenant Network (optional)
-
-A volume of a tenant is reachable only from the network of that tenant.
-Deploy the tenant network when the worker nodes are not on that network yet.
-
-- **Operator manifest:** `tenant-network/panfs-tenant-network-operator.yaml`, once per cluster.
-  It holds the resource definition of `TenantNetwork` and the operator, for the namespace `panfs-tenant-network`.
-- **Tenant manifest:** `tenant-network/template-tenantnetwork.yaml`, once per tenant.
-  - Replace `<NAME>` with a name for the resource
-  - Replace `<TENANT_NAMESPACE>` with the namespace of the Secret that holds the PanAPI address and the token of the tenant
-  - Replace `<SECRET_NAME>` with the name of that Secret (keys `api` and `token`)
-  - Replace `<LABEL_KEY>` and `<LABEL_VALUE>` with a label of the nodes that mount volumes of the tenant.
-    Any label works. Without `nodeSelector`, all nodes of the cluster are put on the tenant network
-
-```bash
-# Once per cluster: the operator
-kubectl create namespace panfs-tenant-network
-kubectl apply -f tenant-network/panfs-tenant-network-operator.yaml
-
-# Per tenant: label the nodes with a label of your choice, then ask for the tenant network
-kubectl label node <NODE_NAME> <LABEL_KEY>=<LABEL_VALUE>
-kubectl apply -f tenant-network/template-tenantnetwork.yaml
-
-# The TenantNetwork must be Ready; its status lists the nodes, and its events say what happened
-kubectl get tenantnetworks -A
-kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
-```
-
-A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`.
-
-- **StorageClass operator manifest:** `storageclass-operator/panfs-storageclass-operator.yaml`, once per cluster.
-  It holds the resource definition of `PanfsStorageClass` and the PanFS StorageClass operator,
-  for `csi-panfs`, the namespace of the driver. It is a workload of its own, apart from the tenant network operator.
-- **StorageClass manifest:** `storageclass-operator/template-panfsstorageclass.yaml`, once per StorageClass of the tenant.
-  The StorageClass operator creates the StorageClass from it and binds every volume to the ready nodes.
-  - Replace `<STORAGE_CLASS_NAME>` with the name of the StorageClass
-  - Replace `<TENANT_NAMESPACE>` with the namespace of the `TenantNetwork`; the operator finds the `TenantNetwork` there
-  - Remove the optional fields that you do not need
-
-```bash
-# Once per cluster: the StorageClass operator, in the namespace of the driver (csi-panfs)
-kubectl apply -f storageclass-operator/panfs-storageclass-operator.yaml
-
-# Per StorageClass
-kubectl apply -f storageclass-operator/template-panfsstorageclass.yaml
-kubectl get panfsstorageclasses -A
-```
-
-A StorageClass that you write yourself with `allowedTopologies` on the ready label must have
-`volumeBindingMode: Immediate`. With `WaitForFirstConsumer` no volume is provisioned.
-
-To take a node off the tenant network, remove its label. The pod of the node then removes the tenant interface
-and detaches the node from the subnet in the realm:
-
-```bash
-kubectl label node <NODE_NAME> panfs.vdura.com/tenant-
-```
-
-To remove the network of a tenant, delete its `TenantNetwork` while the operator runs.
-The delete waits until every pod has cleaned up its node:
-
-```bash
-kubectl delete -f tenant-network/template-tenantnetwork.yaml
-```
-
-The requirements and the details are in the [documentation of the tenant network operator](../../charts/tenant-network-operator/Readme.md)
-and of the [StorageClass operator](../../charts/storageclass-operator/Readme.md).
+- For troubleshooting, check the logs of the CSI driver pods and of the operator, and the status and the events
+  of the `TenantNetwork` and the `PanfsStorageClass`.
+- The requirements and the details are in the
+  [documentation of the PanFS Tenant operator](../../charts/panfs-tenant-operator/Readme.md).

@@ -42,6 +42,7 @@ help:
 	@printf "  $(BOLD)$(GREEN)[Build/Deploy Settings]$(RESET)\n"
 	@printf "    TEST_IMAGE                               Full image name for the test image (for sanity tests).\n"
 	@printf "    CSI_IMAGE                                Full image name for the PanFS CSI Driver (default: $(CSI_IMAGE)).\n"
+	@printf "    TENANT_OPERATOR_IMAGE                    Full image name for the PanFS Tenant Operator (default: $(TENANT_OPERATOR_IMAGE)).\n"
 	@printf "    DFC_IMAGE                                Full image name for the Kernel Module Management image.\n"
 	@printf "    DFC_VERSION                              Version of the DFC to deploy.\n"
 	@printf "    USE_HELM                                 Use Helm for deployment (true) or manifest (false) (default: $(USE_HELM)).\n"
@@ -68,8 +69,7 @@ endif
 
 CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
 TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
-TENANT_NETWORK_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-tenant-network:2.0.0
-STORAGECLASS_OPERATOR_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-storageclass-operator:2.0.0
+TENANT_OPERATOR_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-tenant-operator:2.0.0
 
 ## [Build Driver and DFC Images]
 
@@ -99,37 +99,21 @@ build-driver-image: ## Build the PanFS CSI Driver Docker image
 		.
 	@printf "$(GREEN)Successfully built PanFS CSI Driver Docker image: $(CSI_IMAGE)$(RESET)\n\n"
 
-.PHONY: build-tenant-network-image
-build-tenant-network-image: ## Build the PanFS Tenant Network Docker image
-	@if [ -z "$(TENANT_NETWORK_IMAGE)" ]; then \
-		printf "$(RED)TENANT_NETWORK_IMAGE is not set$(RESET)\n"; \
+.PHONY: build-tenant-operator-image
+build-tenant-operator-image: ## Build the PanFS Tenant Operator Docker image
+	@if [ -z "$(TENANT_OPERATOR_IMAGE)" ]; then \
+		printf "$(RED)TENANT_OPERATOR_IMAGE is not set$(RESET)\n"; \
 		exit 1; \
 	fi
-	docker build -t $(TENANT_NETWORK_IMAGE) \
-		-f Dockerfile.tenant-network \
+	docker build -t $(TENANT_OPERATOR_IMAGE) \
+		-f Dockerfile.tenant-operator \
 		--platform linux/amd64 \
 		--build-arg BUILD_DATE=$(BUILD_DATE) \
 		--build-arg APP_VERSION=$(APP_VERSION) \
 		--build-arg VERSION=$(APP_VERSION) \
 		--build-arg GIT_COMMIT=$(shell git rev-parse --short HEAD) \
 		.
-	@printf "$(GREEN)Successfully built PanFS Tenant Network Docker image: $(TENANT_NETWORK_IMAGE)$(RESET)\n\n"
-
-.PHONY: build-storageclass-operator-image
-build-storageclass-operator-image: ## Build the PanFS StorageClass Operator Docker image
-	@if [ -z "$(STORAGECLASS_OPERATOR_IMAGE)" ]; then \
-		printf "$(RED)STORAGECLASS_OPERATOR_IMAGE is not set$(RESET)\n"; \
-		exit 1; \
-	fi
-	docker build -t $(STORAGECLASS_OPERATOR_IMAGE) \
-		-f Dockerfile.storageclass-operator \
-		--platform linux/amd64 \
-		--build-arg BUILD_DATE=$(BUILD_DATE) \
-		--build-arg APP_VERSION=$(APP_VERSION) \
-		--build-arg VERSION=$(APP_VERSION) \
-		--build-arg GIT_COMMIT=$(shell git rev-parse --short HEAD) \
-		.
-	@printf "$(GREEN)Successfully built PanFS StorageClass Operator Docker image: $(STORAGECLASS_OPERATOR_IMAGE)$(RESET)\n\n"
+	@printf "$(GREEN)Successfully built PanFS Tenant Operator Docker image: $(TENANT_OPERATOR_IMAGE)$(RESET)\n\n"
 
 .PHONY: build-dfc-image
 build-dfc-image: ## Build the Kernel Module Management Docker image
@@ -304,44 +288,69 @@ deploy-storageclass-info: ## Display information about the PanFS CSI Storage Cla
 		exit 1; \
 	fi
 
+.PHONY: deploy-tenant-operator
+deploy-tenant-operator: ## Deploy the PanFS Tenant Operator into the namespace of the driver
+	@printf "$(BOLD)Deploying PanFS Tenant Operator ($(TENANT_OPERATOR_IMAGE))...$(RESET)\n"
+	@if [ "$(USE_HELM)" = "true" ]; then \
+		helm upgrade --install panfs-tenant-operator charts/panfs-tenant-operator \
+			--namespace csi-panfs \
+			--set image="$(TENANT_OPERATOR_IMAGE)" \
+			$(if $(IMAGE_PULL_SECRET_NAME),--set imagePullSecrets[0]="$(IMAGE_PULL_SECRET_NAME)") \
+			--wait; \
+	else \
+		sed 's@[^ ]*panfs-tenant-operator:.*@$(TENANT_OPERATOR_IMAGE)@g' deploy/k8s/tenant-operator/panfs-tenant-operator.yaml | \
+		kubectl apply --server-side -f -; \
+	fi
+	@kubectl -n csi-panfs rollout status deployment/panfs-tenant-operator --timeout=5m
+	@printf "$(GREEN)Successfully deployed PanFS Tenant Operator$(RESET)\n\n"
+
+# The realm Secret of the StorageClass. The values are read from the environment by the shell, so that the token
+# and a certificate of several lines are never part of a command line that make expands.
+.PHONY: deploy-storageclass-secret
+deploy-storageclass-secret:
+	@printf "$(BOLD)Creating namespace '$(STORAGE_CLASS_NAME)' and the realm Secret '$(STORAGE_CLASS_NAME)'...$(RESET)\n"
+	@kubectl create namespace $(STORAGE_CLASS_NAME) --dry-run=client -o yaml | kubectl apply -f -
+	@set -e; \
+	set -- --from-literal=api="$${REALM_API}" --from-literal=token="$${REALM_TOKEN}"; \
+	if [ -n "$${REALM_CA_CERT:-}" ]; then set -- "$$@" --from-literal=ca_cert="$${REALM_CA_CERT}"; fi; \
+	if [ "$${REALM_INSECURE_SKIP_TLS_VERIFY:-}" = "true" ]; then set -- "$$@" --from-literal=insecure_skip_tls_verify=true; fi; \
+	kubectl -n $(STORAGE_CLASS_NAME) create secret generic $(STORAGE_CLASS_NAME) "$$@" --dry-run=client -o yaml | \
+	kubectl apply -f -
+
 .PHONY: deploy-storageclass-with-helm
 deploy-storageclass-with-helm:
-	@printf "$(BOLD)Deploying PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)' with Helm since USE_HELM is set...$(RESET)\n"
+	@printf "$(BOLD)Deploying PanfsStorageClass '$(STORAGE_CLASS_NAME)' with Helm since USE_HELM is set...$(RESET)\n"
 	@helm upgrade --install $(STORAGE_CLASS_NAME) charts/storageclass \
 		--namespace $(STORAGE_CLASS_NAME) \
-		--create-namespace \
-		--set csiPanFSDriver.namespace="csi-panfs" \
-		--set setAsDefaultStorageClass=$(SET_STORAGECLASS_DEFAULT) \
-		--set realm.api="${REALM_API}" \
-		--set realm.token="${REALM_TOKEN}" \
-		--set-string realm.caCert="$(REALM_CA_CERT)" \
-		--set realm.insecureSkipTLSVerify=$(or $(REALM_INSECURE_SKIP_TLS_VERIFY),false) \
-		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=$(STORAGESET)' \
+		--set realmSecretName=$(STORAGE_CLASS_NAME) \
+		--set default=$(SET_STORAGECLASS_DEFAULT) \
+		$(if $(STORAGESET),--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=$(STORAGESET)') \
 		--wait
-	@printf "$(GREEN)Successfully deployed PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)'$(RESET)\n\n"
 
 .PHONY: deploy-storageclass-with-manifest
 deploy-storageclass-with-manifest:
-	@printf "$(BOLD)Deploying PanFS CSI Storage Class using manifest file...$(RESET)\n"
-	@export STORAGE_CLASS_NAME=$(STORAGE_CLASS_NAME); \
-	export REALM_API=$(REALM_API); \
-	export REALM_TOKEN=$(REALM_TOKEN); \
-	export STORAGESET='$(STORAGESET)'; \
-	export CSI_CONTROLLER_SA=csi-panfs-controller; \
-	export CSI_NAMESPACE=csi-panfs; \
-	kubectl create namespace $(STORAGE_CLASS_NAME) --dry-run=client -o yaml | kubectl apply -f -; \
-	cat deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml | \
-	sed 's|<|$$|;s/\([^ ]\)>/\1/;s|is-default-class: "false"|is-default-class: "$(SET_STORAGECLASS_DEFAULT)"|' | \
-	sed 's|csi-panfs-storage-class|$(STORAGE_CLASS_NAME)|' | envsubst | kubectl apply --server-side -f -
-	@printf "$(GREEN)Successfully deployed PanFS CSI Storage Class using manifest file deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml$(RESET)\n\n"
+	@printf "$(BOLD)Deploying PanfsStorageClass '$(STORAGE_CLASS_NAME)' using manifest file...$(RESET)\n"
+	@sed -e 's|<STORAGE_CLASS_NAME>|$(STORAGE_CLASS_NAME)|g' \
+		-e 's|<NAMESPACE>|$(STORAGE_CLASS_NAME)|g' \
+		-e 's|# realmSecretName: <SECRET_NAME>|realmSecretName: $(STORAGE_CLASS_NAME)|' \
+		-e 's|default: false|default: $(SET_STORAGECLASS_DEFAULT)|' \
+		$(if $(STORAGESET),-e 's|# \(panfs.csi.vdura.com/storageset: \)"<STORAGESET>"|\1"$(STORAGESET)"|') \
+		deploy/k8s/storage-class/template-panfsstorageclass.yaml | \
+	kubectl apply -f -
 
 .PHONY: deploy-storageclass
-deploy-storageclass: deploy-storageclass-info ## Deploy PanFS CSI Storage Class
+deploy-storageclass: deploy-storageclass-info deploy-storageclass-secret ## Deploy a PanFS StorageClass: a realm Secret and a PanfsStorageClass (needs the PanFS Tenant Operator)
 	@if [ "$(USE_HELM)" = "true" ]; then \
 		make deploy-storageclass-with-helm; \
 	else \
 		make deploy-storageclass-with-manifest; \
 	fi
+	@printf "$(BOLD)Waiting for the PanFS Tenant Operator to create StorageClass '$(STORAGE_CLASS_NAME)'...$(RESET)\n"
+	@kubectl -n $(STORAGE_CLASS_NAME) wait panfsstorageclass/$(STORAGE_CLASS_NAME) \
+		--for=jsonpath='{.status.phase}'=Ready --timeout=2m || { \
+		kubectl -n $(STORAGE_CLASS_NAME) describe panfsstorageclass/$(STORAGE_CLASS_NAME); \
+		exit 1; \
+	}
 
 	@printf "$(BOLD)kubectl get storageclass $(STORAGE_CLASS_NAME)$(RESET)\n"
 	@kubectl get storageclass $(STORAGE_CLASS_NAME) | \
@@ -375,14 +384,20 @@ uninstall-driver: ## Uninstall the PanFS CSI Driver
 
 .PHONY: uninstall-storageclass
 uninstall-storageclass: ## Uninstall the PanFS CSI Storage Class
-	@kubectl delete -f deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml --ignore-not-found
+	@kubectl -n $(STORAGE_CLASS_NAME) delete panfsstorageclass $(STORAGE_CLASS_NAME) --ignore-not-found
 	@kubectl delete namespace $(STORAGE_CLASS_NAME) --ignore-not-found
 	@printf "$(GREEN)Successfully uninstalled PanFS CSI Storage Class '$(STORAGE_CLASS_NAME)'$(RESET)\n\n"
 
+.PHONY: uninstall-tenant-operator
+uninstall-tenant-operator: ## Uninstall the PanFS Tenant Operator; delete the TenantNetworks and the PanfsStorageClasses first
+	@kubectl delete -f deploy/k8s/tenant-operator/panfs-tenant-operator.yaml --ignore-not-found
+	@printf "$(GREEN)Successfully uninstalled PanFS Tenant Operator$(RESET)\n\n"
+
 .PHONY: uninstall
-uninstall: uninstall-check ## Uninstall both the PanFS CSI Driver and Storage Class
-	@make uninstall-driver
+uninstall: uninstall-check ## Uninstall the PanFS Storage Class, the Tenant Operator and the CSI Driver
 	@make uninstall-storageclass
+	@make uninstall-tenant-operator
+	@make uninstall-driver
 
 .PHONY: uninstall-kmm
 uninstall-kmm: ## Uninstall the Kernel Module Management Engine
@@ -407,65 +422,24 @@ manifest-driver: ## Generate manifests for the PanFS CSI Driver
 	sed -i $(shell sed -h 2>&1 | grep GNU >/dev/null || echo "''") '/^# Source:/d' deploy/k8s/csi-driver/*.yaml
 	@printf "$(GREEN)Successfully generated manifests for the PanFS CSI Driver$(RESET)\n\n"
 
-.PHONY: manifest-storageclass
-manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
-	@printf "$(BOLD)Generating manifests for the PanFS CSI Storage Class...$(RESET)\n"
-	@mkdir -p deploy/k8s/storage-class/
-	helm template csi-panfs-storage-class charts/storageclass \
-		--namespace csi-panfs-storage-class \
-		--set csiPanFSDriver.namespace="csi-panfs" \
-		--set setAsDefaultStorageClass=false \
-		--set realm.api="panfs-dummy.com" \
-		--set realm.token="dummy-token" \
-		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1' | \
-		grep -v '^# Source:' > deploy/k8s/storage-class/example-csi-panfs-storage-class.yaml
-	helm template csi-panfs-storage-class charts/storageclass \
-		--namespace csi-panfs-storage-class \
-		--set csiPanFSDriver.namespace="<CSI_NAMESPACE>" \
-		--set setAsDefaultStorageClass=false \
-		--set realm.api="<REALM_API>" \
-		--set realm.token="<REALM_TOKEN>" \
-		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=<STORAGESET>' | \
-		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
-		grep -v '^# Source:' > deploy/k8s/storage-class/template-secret-in-dedicated-ns.yaml
-	helm template csi-panfs-storage-class-name charts/storageclass \
-		--namespace csi-panfs \
-		--set setAsDefaultStorageClass=false \
-		--set realm.api="<REALM_API>" \
-		--set realm.token="<REALM_TOKEN>" \
-		--set-string 'parameters.panfs\.csi\.vdura\.com/storageset=<STORAGESET>' | \
-		sed 's|csi-panfs-storage-class-name|<STORAGE_CLASS_NAME>|' | \
-		grep -v '^# Source:' | \
-		sed 's|csi-panfs|<CSI_NAMESPACE>|' > deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
-	@printf "$(GREEN)Successfully generated manifests for the PanFS CSI Storage Class$(RESET)\n\n"
-
-.PHONY: manifest-tenant-network
-manifest-tenant-network: ## Generate manifests for the PanFS Tenant Network
-	@printf "$(BOLD)Generating manifests for the PanFS Tenant Network...$(RESET)\n"
-	@mkdir -p deploy/k8s/tenant-network/
-	helm template panfs-tenant-network-operator charts/tenant-network-operator --include-crds \
-		--namespace panfs-tenant-network | \
-		grep -v '^# Source:' > deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
-	@printf "$(GREEN)Successfully generated manifests for the PanFS Tenant Network$(RESET)\n\n"
-
-.PHONY: manifest-storageclass-operator
-manifest-storageclass-operator: ## Generate manifests for the PanFS StorageClass Operator
-	@printf "$(BOLD)Generating manifests for the PanFS StorageClass Operator...$(RESET)\n"
-	@mkdir -p deploy/k8s/storageclass-operator/
-	helm template panfs-storageclass-operator charts/storageclass-operator --include-crds \
+.PHONY: manifest-tenant-operator
+manifest-tenant-operator: ## Generate manifests for the PanFS Tenant Operator
+	@printf "$(BOLD)Generating manifests for the PanFS Tenant Operator...$(RESET)\n"
+	@mkdir -p deploy/k8s/tenant-operator/
+	helm template panfs-tenant-operator charts/panfs-tenant-operator --include-crds \
 		--namespace csi-panfs | \
-		grep -v '^# Source:' > deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
-	@printf "$(GREEN)Successfully generated manifests for the PanFS StorageClass Operator$(RESET)\n\n"
+		grep -v '^# Source:' > deploy/k8s/tenant-operator/panfs-tenant-operator.yaml
+	@printf "$(GREEN)Successfully generated manifests for the PanFS Tenant Operator$(RESET)\n\n"
 
 .PHONY: manifests
-manifests: manifest-driver manifest-storageclass manifest-tenant-network manifest-storageclass-operator ## Generate manifests for the PanFS CSI Driver, Storage Class, Tenant Network and StorageClass Operator
+manifests: manifest-driver manifest-tenant-operator ## Generate manifests for the PanFS CSI Driver and the Tenant Operator, and the chart readmes
 	@if command -v helm-docs >/dev/null 2>&1; then \
 		helm-docs --template-files Readme.md.gotmpl --output-file Readme.md; \
 	else \
 		printf "$(RED)Error: helm-docs not found, skipping documentation generation$(RESET)\n"; \
 		exit 1; \
 	fi
-	@printf "$(GREEN)Successfully generated documentation for the PanFS CSI Driver and Storage Class$(RESET)\n\n"
+	@printf "$(GREEN)Successfully generated documentation for the charts$(RESET)\n\n"
 
 .PHONY: check-version
 check-version: ## Check that charts, manifests and docs use one driver version (VERSION=X.Y.Z, default: chart appVersion)

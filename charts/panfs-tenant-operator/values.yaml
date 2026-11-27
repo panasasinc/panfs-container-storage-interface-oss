@@ -12,9 +12,9 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# -- Image of the PanFS Tenant Network program. The operator and the pods it creates on the nodes use the same image.
+# -- Image of the PanFS Tenant operator. The operator and the pods it creates on the nodes of a tenant network use the same image.
 # @default -- `...`
-image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-tenant-network:{{ .Chart.AppVersion }}
+image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-tenant-operator:{{ .Chart.AppVersion }}
 
 # -- Image pull policy
 pullPolicy: IfNotPresent
@@ -23,8 +23,17 @@ pullPolicy: IfNotPresent
 # and in the namespace of every TenantNetwork, because the operator creates the node pods there.
 imagePullSecrets: []
 
-# -- Time between two passes of the operator over the TenantNetwork resources
+# -- Time between two passes of the operator over the TenantNetwork and the PanfsStorageClass resources
 resync: 15s
+
+# -- Namespace of the PanFS CSI driver: the CSI controller in that namespace gets the permission to read the realm Secret
+# of a StorageClass. Leave it empty to read the namespace from the CSIDriver object `com.vdura.csi.panfs`,
+# where the driver chart writes it.
+csiDriverNamespace: ""
+
+# -- ServiceAccount of the CSI controller in that namespace. Leave it empty to use the name that the driver chart
+# gives it: `<namespace of the driver>-controller`, for example `csi-panfs-controller`.
+csiControllerServiceAccount: ""
 
 # -- Default time between two checks of the tenant network on a node
 interval: 30s

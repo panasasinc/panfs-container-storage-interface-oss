@@ -13,17 +13,17 @@
   # See the License for the specific language governing permissions and
   # limitations under the License.
 {{- /*
-  A PanfsStorageClass can be created only when the PanFS StorageClass operator has installed its resource definition.
+  A PanfsStorageClass can be created only when the PanFS Tenant operator has installed its resource definition.
   Stop here with a clear message, before anything is created. "helm template" has no cluster: pass
   --api-versions panfs.vdura.com/v1alpha1/PanfsStorageClass there. "helm lint" cannot take that flag: set checkOperator=false.
 */}}
 {{- if and .Values.checkOperator (not (.Capabilities.APIVersions.Has "panfs.vdura.com/v1alpha1/PanfsStorageClass")) }}
-{{- fail "The PanFS StorageClass operator is not installed in this cluster: the resource kind PanfsStorageClass (panfs.vdura.com/v1alpha1) is unknown. Install the chart panfs-storageclass-operator first. To render the chart without a cluster, pass --api-versions panfs.vdura.com/v1alpha1/PanfsStorageClass or set checkOperator=false." }}
+{{- fail "The PanFS Tenant operator is not installed in this cluster: the resource kind PanfsStorageClass (panfs.vdura.com/v1alpha1) is unknown. Install the chart panfs-tenant-operator first. To render the chart without a cluster, pass --api-versions panfs.vdura.com/v1alpha1/PanfsStorageClass or set checkOperator=false." }}
 {{- end }}
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Ask the PanFS StorageClass operator for a StorageClass with the name {{ .Release.Name }}.
+# Ask the PanFS Tenant operator for a StorageClass with the name {{ .Release.Name }}.
 # In the namespace of a TenantNetwork, the operator takes the Secret and the nodes of the tenant from that TenantNetwork.
 apiVersion: panfs.vdura.com/v1alpha1
 kind: PanfsStorageClass

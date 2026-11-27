@@ -924,7 +924,7 @@ func (o *Operator) events(item *unstructured.Unstructured) *EventSink {
 	return &EventSink{
 		Kube:      o.Kube,
 		Ref:       tenantNetworkRef(item.GetNamespace(), item.GetName(), item.GetUID()),
-		Component: "panfs-tenant-network-operator",
+		Component: "panfs-tenant-operator",
 		Log:       o.Log,
 	}
 }

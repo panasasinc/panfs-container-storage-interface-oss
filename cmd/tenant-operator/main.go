@@ -12,13 +12,16 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// Command panfs-tenant-network puts the Kubernetes node it runs on onto the network of a PanFS tenant.
+// Command panfs-tenant-operator is the PanFS tenant operator. It has two modes.
 //
-// It attaches the node to the tenant subnet through PanAPI, builds the tenant interface, and sets the
-// node label panfs.vdura.com/tenant-network while a tenant director answers.
+// With --operator it runs once per cluster and serves two resources. For every TenantNetwork it creates a
+// DaemonSet that runs this program, in the other mode, on the nodes of the tenant. For every PanfsStorageClass
+// it creates a StorageClass of the PanFS CSI driver, and lets the CSI controller read the realm Secret that
+// the StorageClass names.
 //
-// With --operator the same program runs once per cluster instead: it watches the TenantNetwork resources
-// and creates, for each of them, a DaemonSet that runs this program on the nodes of the tenant.
+// Without --operator it puts the Kubernetes node it runs on onto the network of a PanFS tenant: it attaches
+// the node to the tenant subnet through PanAPI, builds the tenant interface, and sets the node label
+// panfs.vdura.com/tenant-network while a tenant director answers.
 package main
 
 import (
@@ -27,10 +30,12 @@ import (
 	"os"
 	"os/signal"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/panapi"
+	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/storageclass"
 	"github.com/panasasinc/panfs-container-storage-interface-oss/pkg/tenantnet"
 	"k8s.io/client-go/dynamic"
 	"k8s.io/client-go/kubernetes"
@@ -69,7 +74,7 @@ func main() {
 	flag.BoolVar(&cfg.DetachOnRemoval, "detach-on-removal", true,
 		"Remove the tenant interface and detach the node from the subnet when the node leaves the tenant")
 	operator := flag.Bool("operator", false,
-		"Run as the operator: create one DaemonSet of this program for every TenantNetwork resource")
+		"Run as the operator: serve the TenantNetwork and the PanfsStorageClass resources of the cluster")
 	var options tenantnet.NodeOptions
 	var pullSecrets string
 	flag.StringVar(&options.Image, "node-image", os.Getenv("NODE_IMAGE"),
@@ -80,12 +85,19 @@ func main() {
 	flag.StringVar(&options.ClusterRole, "node-cluster-role", "",
 		"Operator: name of the ClusterRole that lets a pod read and patch nodes")
 	flag.StringVar(&options.PriorityClassName, "node-priority-class", "", "Operator: priority class of the pods")
-	resync := flag.Duration("resync", 15*time.Second, "Operator: time between two passes over the TenantNetwork resources")
+	var storageClassOptions storageclass.Options
+	flag.StringVar(&storageClassOptions.CSIDriverNamespace, "csi-driver-namespace", "",
+		"Operator: namespace of the PanFS CSI driver; the default is the namespace that the CSIDriver object names")
+	flag.StringVar(&storageClassOptions.CSIControllerServiceAccount, "csi-controller-service-account", "",
+		"Operator: ServiceAccount of the CSI controller, which reads the realm Secret of a StorageClass; "+
+			"the default is <namespace of the driver>-controller")
+	resync := flag.Duration("resync", 15*time.Second,
+		"Operator: time between two passes over the TenantNetwork and the PanfsStorageClass resources")
 	flag.Parse()
 	defer klog.Flush()
 
 	log := klog.NewKlogr()
-	log.Info("starting panfs-tenant-network", "version", version, "tenant", cfg.Tenant, "node", cfg.NodeName,
+	log.Info("starting panfs-tenant-operator", "version", version, "operator", *operator, "tenant", cfg.Tenant, "node", cfg.NodeName,
 		"hostIP", cfg.HostIP, "interval", cfg.Interval.String())
 
 	kubeConfig, err := rest.InClusterConfig()
@@ -120,15 +132,32 @@ func main() {
 		options.VLANParent = cfg.VLANParent
 		options.LogLevel = flag.Lookup("v").Value.String()
 		log.Info("running as the operator", "nodeImage", options.Image, "resync", resync.String())
-		(&tenantnet.Operator{
-			Kube:      kube,
-			Dynamic:   dynamicClient,
-			API:       panapi.NewClient(),
-			Options:   options,
-			Resync:    *resync,
-			TenantTTL: 5 * time.Minute,
-			Log:       log,
-		}).Run(ctx)
+		// The two controllers share nothing but the clients: each runs its own passes until the context ends.
+		var controllers sync.WaitGroup
+		controllers.Add(2)
+		go func() {
+			defer controllers.Done()
+			(&tenantnet.Operator{
+				Kube:      kube,
+				Dynamic:   dynamicClient,
+				API:       panapi.NewClient(),
+				Options:   options,
+				Resync:    *resync,
+				TenantTTL: 5 * time.Minute,
+				Log:       log.WithName("tenantnetwork"),
+			}).Run(ctx)
+		}()
+		go func() {
+			defer controllers.Done()
+			(&storageclass.Controller{
+				Kube:    kube,
+				Dynamic: dynamicClient,
+				Options: storageClassOptions,
+				Resync:  *resync,
+				Log:     log.WithName("storageclass"),
+			}).Run(ctx)
+		}()
+		controllers.Wait()
 		return
 	}
 

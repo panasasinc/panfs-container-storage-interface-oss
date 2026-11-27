@@ -51,7 +51,7 @@ firewalldZone:
 # @default -- `null`
 detachOnRemoval:
 
-# -- Stop the install when the PanFS Tenant Network operator is not installed in the cluster.
+# -- Stop the install when the PanFS Tenant operator is not installed in the cluster.
 # Set it to `false` for tools that render the chart without a cluster and cannot pass
 # `--api-versions panfs.vdura.com/v1alpha1/TenantNetwork`, for example `helm lint`.
 checkOperator: true

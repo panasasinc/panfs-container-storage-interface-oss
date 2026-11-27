@@ -9,19 +9,18 @@ The official CSI Driver for integrating **PanFS** storage with Container Orchest
 
 For more details on specific topics, refer to the following documents:
 
-| Document | Description |
-|:---------|:------------|
-| [Overview](./docs/Overview.md) | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow |
-| [Usage Guide](./docs/Usage-Guide.md) | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples |
-| [Tenant Network Operator](./charts/tenant-network-operator/Readme.md) | Putting worker nodes on the network of a PanFS tenant, and marking the nodes that are ready: the `TenantNetwork` resource, its status and events, VXLAN and VLAN segments |
-| [StorageClass Operator](./charts/storageclass-operator/Readme.md) | Creating a StorageClass from a small `PanfsStorageClass` resource: the Secret references, the permission of the CSI controller and, for a tenant network, the binding of volumes to the ready nodes |
-| [Tenant Chart](./charts/tenant/Readme.md) | Setting up one PanFS tenant with Helm: the Secret with the realm connection and the `TenantNetwork` in one release |
-| [Tenant StorageClass Chart](./charts/tenant-storageclass/Readme.md) | Creating the StorageClass of a tenant with Helm: one `PanfsStorageClass` per release |
-| [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
-| [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
-| [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
-| [Troubleshooting](./docs/Troubleshooting.md) | Diagnosing and resolving common issues: installation, volume mounting, KMM, authentication, and networking |
-| [Diagnostic](./docs/Diagnostic.md) | Collecting diagnostic data to submit to VDURA Technical Support |
+| Document                                                    | Description                                                                                                                             |
+|:------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------|
+| [Overview](./docs/Overview.md)                              | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow                           |
+| [Usage Guide](./docs/Usage-Guide.md)                        | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples                             |
+| [Tenant Operator](./charts/panfs-tenant-operator/Readme.md) | The operator of the `TenantNetwork` and `PanfsStorageClass` resources: tenant networks (VXLAN, VLAN), StorageClasses, status and events |
+| [Tenant Chart](./charts/tenant/Readme.md)                   | Setting up one PanFS tenant with Helm: the Secret with the realm connection and the `TenantNetwork` in one release                      |
+| [StorageClass Chart](./charts/storageclass/Readme.md)       | Creating a StorageClass with Helm: one `PanfsStorageClass` per release, and the PanFS volume parameters                                 |
+| [KMM](./docs/KMM.md)                                        | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes                    |
+| [SELinux](./docs/SELinux.md)                                | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers                                                 |
+| [Upgrade](./docs/Upgrade.md)                                | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures                                    |
+| [Troubleshooting](./docs/Troubleshooting.md)                | Diagnosing and resolving common issues: installation, volume mounting, KMM, authentication, and networking                              |
+| [Diagnostic](./docs/Diagnostic.md)                          | Collecting diagnostic data to submit to VDURA Technical Support                                                                         |
 
 ## Contents
 
@@ -44,12 +43,11 @@ For more details on specific topics, refer to the following documents:
     * [2. Deploy CSI driver with KMM Module](#2-deploy-csi-driver-with-kmm-module)
       * [2.1 Prerequisites](#21-prerequisites)
       * [2.2 Configure and Deploy](#22-configure-and-deploy)
-    * [3. Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)
+    * [3. Install the PanFS Tenant operator](#3-install-the-panfs-tenant-operator)
     * [4. Put the nodes on the tenant network](#4-put-the-nodes-on-the-tenant-network)
-      * [4.1 Install the operator](#41-install-the-operator)
-      * [4.2 Set up the tenant](#42-set-up-the-tenant)
-      * [4.3 Check the result](#43-check-the-result)
-      * [4.4 Keep volumes on the ready nodes](#44-keep-volumes-on-the-ready-nodes)
+      * [4.1 Set up the tenant](#41-set-up-the-tenant)
+      * [4.2 Check the result](#42-check-the-result)
+    * [5. Create the StorageClass](#5-create-the-storageclass)
       * [With Helm](#with-helm)
 * [Deploying Workloads](#deploying-workloads)
 * [CSI Driver Uninstallation](#csi-driver-uninstallation)
@@ -159,17 +157,17 @@ The driver talks to the realm through PanAPI. It does not use SSH.
 - **Storageset**: At least one storageset must be assigned to the tenant.
 - **Token permissions**, all for its own tenant:
 
-  | Permission                                         | Used for                                          |
-  |:---------------------------------------------------|:--------------------------------------------------|
-  | Read the tenant and its storageset assignments     | Choosing the storageset of a new volume           |
-  | List, read, create, update and delete volumes      | Volume provisioning, expansion and deletion       |
-  | List subnets, read the mount recipe of a subnet    | Finding the address that the nodes mount from     |
+| Permission                                      | Used for                                      |
+|:------------------------------------------------|:----------------------------------------------|
+| Read the tenant and its storageset assignments  | Choosing the storageset of a new volume       |
+| List, read, create, update and delete volumes   | Volume provisioning, expansion and deletion   |
+| List subnets, read the mount recipe of a subnet | Finding the address that the nodes mount from |
 
   When the token may not read the subnets, the volume is still created, and the nodes mount from the host of the PanAPI address.
 - **Tenant network**: A volume of a tenant is reachable only from the network of that tenant.
   Every worker node must be attached to that network before it mounts a volume.
   The driver finds the mount address of the network, but it does not attach the nodes.
-  The [PanFS Tenant Network operator](./charts/tenant-network-operator/Readme.md) attaches the nodes that you label for the tenant,
+  The [PanFS Tenant operator](./charts/panfs-tenant-operator/Readme.md) attaches the nodes that you label for the tenant,
   and it marks the nodes that are ready; see [Tenant network](#4-put-the-nodes-on-the-tenant-network).
   It needs these permissions too: list, read, create and delete attachments of a subnet.
 
@@ -275,75 +273,30 @@ Check the status of the deployed components:
 
 ---
 
-#### 3. Configure and deploy StorageClass
+#### 3. Install the PanFS Tenant operator
 
-The StorageClass defines the provisioned volume properties and provides PanFS Realm access credentials.
+The PanFS Tenant operator runs once per cluster, in the namespace of the driver. It serves two small resources:
 
-##### 3.1 Configure PanFS Realm Access Secret
-
-Edit [deploy/k8s/storage-class/template-secret-in-driver-ns.yaml](deploy/k8s/storage-class/template-secret-in-driver-ns.yaml) to replace the following placeholders with your PanFS Realm details.
-
-  * `<STORAGE_CLASS_NAME>`: The desired name for your StorageClass (e.g., `csi-panfs-storage-class`).
-  * `<REALM_API>`: The PanAPI address of the PanFS realm: a host name (HTTPS is used) or a full `https://` or `http://` URL
-    (e.g., `panfs.example.com`).
-  * `<REALM_TOKEN>`: The PanAPI service account token. See [PanFS Realm Requirements](#panfs-realm-requirements) for its permissions.
-  * `<STORAGESET>`: The id or the name of the storageset that holds the new volumes. Remove the line to use the first storageset that is assigned to the tenant.
-
-If the realm certificate is signed by a private CA, add the key `ca_cert` with the PEM certificate of that CA to the Secret.
-Without it, the driver uses the system trust store. For a self-signed certificate, `ca_cert` is that certificate itself.
-If the certificate cannot be verified at all, for example a self-signed certificate that does not name the realm address,
-add the key `insecure_skip_tls_verify` with the value `"true"`. The driver then does not verify the realm certificate,
-so a host that poses as the realm can read the token. Use it for test realms only.
-
-##### 3.2 Setting the Default StorageClass
-
-To designate this StorageClass as the default option for volume provisioning in your Kubernetes cluster, add the following annotation to the metadata section of its manifest:
-
-```yaml
-metadata:
-  annotations:
-    storageclass.kubernetes.io/is-default-class: "true"
-```
-
-##### 3.3 Deployment and Validation
-
-**Deploy PanFS Storage Class:**
+| Resource            | What the operator does for it                                                 |
+|:--------------------|:------------------------------------------------------------------------------|
+| `TenantNetwork`     | Puts the nodes that you choose on the network of a tenant (step 4)            |
+| `PanfsStorageClass` | Creates a StorageClass of the driver and gives the driver its Secret (step 5) |
 
 ```bash
-kubectl apply -f deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
+kubectl apply --server-side -f deploy/k8s/tenant-operator/panfs-tenant-operator.yaml
+kubectl -n csi-panfs rollout status deployment/panfs-tenant-operator
 ```
-
-The expected output will look like this:
-```bash
-namespace/csi-panfs-storage-class created
-secret/csi-panfs-storage-class created
-storageclass.storage.k8s.io/csi-panfs-storage-class created
-```
-
-**Validate StorageClass**:
-
-```bash
-kubectl get sc csi-panfs-storage-class
-```
-Expected output:
-```
-NAME                      PROVISIONER           RECLAIMPOLICY   VOLUMEBINDINGMODE      ALLOWVOLUMEEXPANSION   AGE
-csi-panfs-storage-class   com.vdura.csi.panfs   Delete          WaitForFirstConsumer   true                   2m
-```
-
-If the StorageClass is missing or misconfigured, verify the configuration variables and check `kubectl logs` for errors.
 
 ---
 
 #### 4. Put the nodes on the tenant network
 
-Skip this step when the worker nodes already reach the mount address of the tenant.
+Skip this step when the worker nodes already reach the mount address of the realm without a tenant network.
 
 A volume of a tenant is reachable only from the network of that tenant.
-The PanFS Tenant Network operator puts the nodes that you choose on that network, and it marks the nodes that are ready.
-You install the operator once per cluster. For each tenant you then create one small resource, a `TenantNetwork`,
-that names the Secret with the PanAPI address and the token of the tenant. You do not name the tenant:
-the operator reads it from the token.
+The operator puts the nodes that you choose on that network, and it marks the nodes that are ready.
+For each tenant you create one small resource, a `TenantNetwork`, that names the Secret with the PanAPI address
+and the token of the tenant. You do not name the tenant: the operator reads it from the token.
 
 Two node labels are involved:
 
@@ -352,32 +305,38 @@ Two node labels are involved:
 | A label of your choice                       | You                | The node is meant for this tenant            |
 | `panfs.vdura.com/tenant-network=<namespace>` | Tenant network pod | The network of the tenant works on this node |
 
-##### 4.1 Install the operator
-
-Once per cluster:
+##### 4.1 Set up the tenant
 
 ```bash
-kubectl create namespace panfs-tenant-network
-kubectl apply -f deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
-```
+# The namespace of the tenant. The tenant network pods need the Pod Security level privileged there.
+kubectl create namespace <TENANT_NAMESPACE>
+kubectl label namespace <TENANT_NAMESPACE> pod-security.kubernetes.io/enforce=privileged
 
-##### 4.2 Set up the tenant
+# The Secret with the PanAPI address and the service account token of the tenant
+kubectl -n <TENANT_NAMESPACE> create secret generic <SECRET_NAME> \
+    --from-literal=api=<REALM_API> \
+    --from-literal=token=<REALM_TOKEN>
 
-```bash
 # Label the nodes of the tenant, with a label of your choice.
 # Without a node selector in the next step, all nodes of the cluster are used, the control plane nodes included.
 kubectl label node <NODE_NAME> <LABEL_KEY>=<LABEL_VALUE>
 
-# Ask for the tenant network, in the namespace of the Secret that holds the PanAPI address and the token.
-# In deploy/k8s/tenant-network/template-tenantnetwork.yaml, replace <NAME>, <TENANT_NAMESPACE>,
-# <SECRET_NAME>, <LABEL_KEY> and <LABEL_VALUE> first.
-kubectl apply -f deploy/k8s/tenant-network/template-tenantnetwork.yaml
+# Ask for the tenant network. In deploy/k8s/tenant-operator/template-tenantnetwork.yaml, replace <NAME>,
+# <TENANT_NAMESPACE>, <SECRET_NAME>, <LABEL_KEY> and <LABEL_VALUE> first.
+kubectl apply -f deploy/k8s/tenant-operator/template-tenantnetwork.yaml
 ```
 
-The Secret that step 3 created for the StorageClass has the keys that the operator needs (`api` and `token`),
-so the `TenantNetwork` can name it and live in its namespace.
+  * `<REALM_API>`: The PanAPI address of the PanFS realm: a host name (HTTPS is used) or a full `https://` or `http://` URL
+    (e.g., `panfs.example.com`).
+  * `<REALM_TOKEN>`: The PanAPI service account token. See [PanFS Realm Requirements](#panfs-realm-requirements) for its permissions.
 
-##### 4.3 Check the result
+If the realm certificate is signed by a private CA, add the key `ca_cert` with the PEM certificate of that CA to the Secret.
+Without it, the driver uses the system trust store. For a self-signed certificate, `ca_cert` is that certificate itself.
+If the certificate cannot be verified at all, for example a self-signed certificate that does not name the realm address,
+add the key `insecure_skip_tls_verify` with the value `"true"`. The driver then does not verify the realm certificate,
+so a host that poses as the realm can read the token. Use it for test realms only.
+
+##### 4.2 Check the result
 
 ```bash
 kubectl get tenantnetworks -A
@@ -393,45 +352,75 @@ The phase must become `Ready`. The status lists every node with its state and it
 and the events say what happened on each node. A ready node has the label
 `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`: the value is the namespace of the `TenantNetwork`.
 
-##### 4.4 Keep volumes on the ready nodes
+---
 
-Install the PanFS StorageClass operator, once per cluster. It is a workload of its own, apart from the
-PanFS Tenant Network operator. Then create the StorageClass of the tenant with a `PanfsStorageClass` in the
-namespace of the `TenantNetwork`. Only a name is required: the operator finds the `TenantNetwork` of the namespace.
+#### 5. Create the StorageClass
+
+A StorageClass of the driver is a `PanfsStorageClass` resource. The operator creates the StorageClass with the name
+of the resource. It fills in the provisioner and the references to the realm Secret, and it lets the CSI controller
+read the Secret.
+
+**With a tenant network**, create the resource in the namespace of the `TenantNetwork`. Only a name is required:
+the operator finds the `TenantNetwork` of the namespace and uses its Secret.
 
 ```bash
-# Once per cluster: the StorageClass operator, in the namespace of the driver (csi-panfs)
-kubectl apply -f deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
-
-# In deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml, replace <STORAGE_CLASS_NAME>
-# and <TENANT_NAMESPACE> first, and remove the optional fields that you do not need.
-kubectl apply -f deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml
-kubectl get panfsstorageclasses -A
+# In deploy/k8s/storage-class/template-panfsstorageclass.yaml, replace <STORAGE_CLASS_NAME> and <NAMESPACE>
+# first, and remove the optional fields that you do not need.
+kubectl apply -f deploy/k8s/storage-class/template-panfsstorageclass.yaml
 ```
 
-The StorageClass operator creates a StorageClass with the name of the resource.
-It fills in the provisioner, the Secret of the `TenantNetwork` and `allowedTopologies`,
-and it lets the CSI controller read the Secret. Every volume of this StorageClass is bound to the nodes
-where the tenant network works, so Kubernetes places every pod that uses the volume on a ready node.
-A workload needs no node selector.
+Every volume of this StorageClass is bound to the nodes where the tenant network works, so Kubernetes places
+every pod that uses the volume on a ready node. A workload needs no node selector.
 
-This replaces the StorageClass of step 3 for the tenant; the Secret of step 3 stays in use.
-The fields, the status and the migration from the StorageClass chart are described in the
-[documentation of the StorageClass operator](./charts/storageclass-operator/Readme.md#panfsstorageclass).
+**Without a tenant network**, create a namespace and a Secret as in step 4.1, without the `TenantNetwork`.
+In the template, also remove the `#` before `realmSecretName` and replace `<SECRET_NAME>`.
+The volumes are then not bound to nodes.
+
+In both cases:
+
+  * To choose the storageset of new volumes, remove the `#` before `panfs.csi.vdura.com/storageset` in the template
+    and replace `<STORAGESET>` with its id or its name. Without the line, the first storageset that is assigned
+    to the tenant is used.
+  * To make the StorageClass the default one of the cluster, set `default: true` in the template.
+
+**Validate StorageClass**:
+
+```bash
+kubectl get panfsstorageclasses -A
+kubectl get sc <STORAGE_CLASS_NAME>
+```
+Expected output:
+```
+NAMESPACE   NAME                      STORAGECLASS              TENANT-NETWORK   PHASE   AGE
+acme        csi-panfs-storage-class   csi-panfs-storage-class   acme             Ready   1m
+
+NAME                      PROVISIONER           RECLAIMPOLICY   VOLUMEBINDINGMODE   ALLOWVOLUMEEXPANSION   AGE
+csi-panfs-storage-class   com.vdura.csi.panfs   Delete          Immediate           true                   1m
+```
+
+If the phase is not `Ready`, the status and the events of the resource say why:
+`kubectl -n <NAMESPACE> describe panfsstorageclass <STORAGE_CLASS_NAME>`.
+The fields and the status are described in the
+[documentation of the operator](./charts/panfs-tenant-operator/Readme.md#panfsstorageclass).
 
 > **Note:** a StorageClass that you write yourself with `allowedTopologies` on the ready label must have
 > `volumeBindingMode: Immediate`. With `WaitForFirstConsumer` no volume is provisioned.
 
+> **Note:** up to version 1.2.6 a StorageClass was a plain manifest or a release of the chart `csi-panfs-storageclass`,
+> without an operator. Such a StorageClass keeps working; see
+> [Moving a StorageClass of the old StorageClass chart](./charts/panfs-tenant-operator/Readme.md#moving-a-storageclass-of-the-old-storageclass-chart).
+
 ##### With Helm
 
-Two charts do steps 4.1 and 4.2: the [operator chart](./charts/tenant-network-operator/Readme.md), installed once,
-and the [tenant chart](./charts/tenant/Readme.md), one release per tenant. The tenant chart creates the Secret
-and the `TenantNetwork`, and it checks first that the operator is installed.
+Three charts do steps 3 to 5: the [operator chart](./charts/panfs-tenant-operator/Readme.md), installed once;
+the [tenant chart](./charts/tenant/Readme.md), one release per tenant, which creates the Secret and the `TenantNetwork`;
+and the [StorageClass chart](./charts/storageclass/Readme.md), one release per StorageClass.
+The tenant chart and the StorageClass chart check first that the operator is installed.
+The name of a StorageClass release is the name of the StorageClass.
 
 ```bash
-helm upgrade --install panfs-tenant-network-operator charts/tenant-network-operator \
-    --namespace panfs-tenant-network \
-    --create-namespace
+helm upgrade --install panfs-tenant-operator charts/panfs-tenant-operator \
+    --namespace csi-panfs
 
 helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
     --namespace <TENANT_NAMESPACE> \
@@ -439,6 +428,9 @@ helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
     --set realm.api=<PANAPI_ADDRESS> \
     --set realm.token=<TOKEN> \
     --set nodeSelector.<LABEL_KEY>=<LABEL_VALUE>
+
+helm upgrade --install <STORAGE_CLASS_NAME> charts/storageclass \
+    --namespace <TENANT_NAMESPACE>
 ```
 
 With an `https://` address, the operator and the node pods check the certificate of the realm. For a certificate
@@ -461,20 +453,12 @@ helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
 > between the cluster and the realm is trusted; see
 > [Realm with a certificate that the cluster does not trust](./charts/tenant/Readme.md#realm-with-a-certificate-that-the-cluster-does-not-trust).
 
+Without a tenant network, leave out the tenant chart, create the Secret yourself, and name it:
+`--set realmSecretName=<SECRET_NAME>`; see
+[Realm without a tenant network](./charts/storageclass/Readme.md#realm-without-a-tenant-network).
+
 The requirements (Calico setting, namespace, token permissions), the VXLAN and VLAN segment types, the status
-and the events are described in the [operator documentation](./charts/tenant-network-operator/Readme.md).
-
-Step 4.4 has two charts: the [StorageClass operator chart](./charts/storageclass-operator/Readme.md), installed once,
-and the [tenant StorageClass chart](./charts/tenant-storageclass/Readme.md), one release per StorageClass.
-The name of the release is the name of the StorageClass:
-
-```bash
-helm upgrade --install panfs-storageclass-operator charts/storageclass-operator \
-    --namespace csi-panfs
-
-helm upgrade --install <STORAGE_CLASS_NAME> charts/tenant-storageclass \
-    --namespace <TENANT_NAMESPACE>
-```
+and the events are described in the [operator documentation](./charts/panfs-tenant-operator/Readme.md).
 
 ## Deploying Workloads
 
@@ -502,39 +486,28 @@ Before deleting the driver, you must ensure no running applications are actively
 
     > ⚠️ **Important:** Deleting the PVCs will trigger the deletion of the associated **PersistentVolumes (PVs)**, which in turn will cause the CSI Controller to delete the corresponding volume data on the backend PanFS storage, based on the `reclaimPolicy` defined in your StorageClass (typically **`Delete`**).
 
-### Remove the Tenant Network
+### Remove the StorageClasses, the Tenant Networks and the Operator
 
-Skip this step when you did not set up a tenant network.
-
-Delete every `TenantNetwork` before the Secret that it names, and while the operator runs. The delete waits until
-the pods have taken the nodes off the tenant network: the ready label and the tenant interface are removed,
-and the nodes are detached from the subnet in the realm.
+Delete every `PanfsStorageClass` and every `TenantNetwork` while the operator runs, and a `TenantNetwork` before
+the Secret that it names. The delete of a `TenantNetwork` waits until the pods have taken the nodes off the tenant
+network: the ready label and the tenant interface are removed, and the nodes are detached from the subnet in the realm.
 
 ```bash
-# Per tenant: the StorageClasses first, while the StorageClass operator runs, then the network
-kubectl -n <TENANT_NAMESPACE> delete panfsstorageclass --all
-kubectl -n <TENANT_NAMESPACE> delete tenantnetwork <NAME>
+# Per namespace: the StorageClasses first, then the network, then the Secret with the realm credentials
+kubectl -n <NAMESPACE> delete panfsstorageclass --all
+kubectl -n <NAMESPACE> delete tenantnetwork --all
+kubectl -n <NAMESPACE> delete secret <SECRET_NAME>
 
-# After the last tenant: the operator and the resource definition
-kubectl delete -f deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
-kubectl delete namespace panfs-tenant-network
-
-# The StorageClass operator and its resource definition, when no PanfsStorageClass is left
-kubectl delete -f deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml
+# After the last one: the operator and the two resource definitions
+kubectl delete -f deploy/k8s/tenant-operator/panfs-tenant-operator.yaml
 ```
 
-With Helm, uninstall the tenant releases first, then the operator release, and delete the resource definition
-(`kubectl delete crd tenantnetworks.panfs.vdura.com`), which Helm does not remove.
+With Helm, uninstall the StorageClass releases and the tenant releases first, then the operator release, and delete
+the resource definitions, which Helm does not remove:
+`kubectl delete crd tenantnetworks.panfs.vdura.com panfsstorageclasses.panfs.vdura.com`.
 
-### Remove StorageClass and Credentials
-
-Delete the StorageClass(es) and the associated Secret containing the PanFS Realm credentials.
-
-```bash
-# Delete the StorageClass and the Secret containing the Realm credentials.
-# Replace 'panfs-storage-class.yaml' with the actual file name you used.
-kubectl delete -f panfs-storage-class.yaml
-```
+A StorageClass that was created without the operator, from a plain manifest of an earlier version, is deleted
+with that manifest: `kubectl delete -f <your-storage-class-manifest>.yaml`.
 
 ### Uninstall CSI Driver Components and KMM Module
 

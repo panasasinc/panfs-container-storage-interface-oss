@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Ask the PanFS Tenant Network operator to put the nodes of one tenant on the tenant network.
+# Ask the PanFS Tenant operator to put the nodes of one tenant on the tenant network.
 # The operator reads the tenant from the token in the Secret, and it runs a pod on every node that nodeSelector selects.
 # A pod sets the label panfs.vdura.com/tenant-network=<TENANT_NAMESPACE> on its node when the network works.
 apiVersion: panfs.vdura.com/v1alpha1

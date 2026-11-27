@@ -25,7 +25,7 @@ PanFS Tenant Chart
 The PanFS Tenant chart holds what one PanFS tenant needs in a Kubernetes cluster, in one Helm release:
 
 - a Secret with the connection of the tenant to the realm: the PanAPI address and the token,
-- a `TenantNetwork` resource, which asks the [PanFS Tenant Network operator](../tenant-network-operator/Readme.md)
+- a `TenantNetwork` resource, which asks the [PanFS Tenant operator](../panfs-tenant-operator/Readme.md)
   to put the nodes of the tenant on the network of that tenant.
 
 It replaces three manual steps: create the namespace, create the Secret, and apply the `TenantNetwork`.
@@ -40,18 +40,18 @@ Install one release per tenant, each in its own namespace.
 - A `TenantNetwork` with the name of the release, which names that Secret.
 
 The operator then creates the DaemonSet of node pods and its permissions in the same namespace;
-see the [operator documentation](../tenant-network-operator/Readme.md#resources-created-by-the-operator).
+see the [operator documentation](../panfs-tenant-operator/Readme.md#resources-created-by-the-operator).
 
 ## Requirements
 
-- **The PanFS Tenant Network operator is installed** (chart [`panfs-tenant-network-operator`](../tenant-network-operator/Readme.md)).
+- **The PanFS Tenant operator is installed** (chart [`panfs-tenant-operator`](../panfs-tenant-operator/Readme.md)).
   The chart checks this before it creates anything, and it stops with a message when the operator is missing.
   The check looks for the resource kind `TenantNetwork`, so it proves that the operator chart is installed,
   not that the operator pod runs at this moment.
 - **One release per namespace.** A namespace holds one `TenantNetwork`, because its name is the value of the node label
   `panfs.vdura.com/tenant-network`.
 - The requirements of the tenant network itself (realm, token permissions, namespace, Calico) are in the
-  [operator documentation](../tenant-network-operator/Readme.md#requirements).
+  [operator documentation](../panfs-tenant-operator/Readme.md#requirements).
 
 ## Usage
 
@@ -173,11 +173,11 @@ kubectl -n acme describe tenantnetwork acme
 ```
 
 The phase must become `Ready`. A resource that stays without a status means that the operator is not running.
-The status and the events are described in the [operator documentation](../tenant-network-operator/Readme.md#4-check-the-result).
+The status and the events are described in the [operator documentation](../panfs-tenant-operator/Readme.md#4-check-the-result).
 
 A ready node has the label `panfs.vdura.com/tenant-network=acme`, with the namespace of the release as its value.
 Use it in `allowedTopologies` of the StorageClass of the tenant and in the node selector of its workloads;
-see [Create the StorageClass of the tenant](../tenant-network-operator/Readme.md#5-create-the-storageclass-of-the-tenant).
+see [Create the StorageClass of the tenant](../panfs-tenant-operator/Readme.md#5-create-the-storageclass-of-the-tenant).
 
 ### Rendering the chart without a cluster
 
@@ -207,7 +207,7 @@ The command returns before that is finished; `kubectl -n acme get tenantnetwork`
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| checkOperator | bool | `true` | Stop the install when the PanFS Tenant Network operator is not installed in the cluster. Set it to `false` for tools that render the chart without a cluster and cannot pass `--api-versions panfs.vdura.com/v1alpha1/TenantNetwork`, for example `helm lint`. |
+| checkOperator | bool | `true` | Stop the install when the PanFS Tenant operator is not installed in the cluster. Set it to `false` for tools that render the chart without a cluster and cannot pass `--api-versions panfs.vdura.com/v1alpha1/TenantNetwork`, for example `helm lint`. |
 | detachOnRemoval | string | `null` | Whether a pod removes the tenant interface and detaches its node from the subnet when the node leaves the tenant. Leave it unset (`null`) to use the default of the operator. |
 | existingSecret | string | `""` | Name of an existing Secret in the release namespace with the keys `api` and `token`, and optionally `ca_cert`. When it is set, the chart creates no Secret and `realm` is not used. Use it to keep the token out of the Helm values. |
 | firewalldZone | string | `null` | firewalld zone of the tenant interface on nodes that run firewalld; an empty string leaves firewalld alone. Leave it unset (`null`) to use the default of the operator. |

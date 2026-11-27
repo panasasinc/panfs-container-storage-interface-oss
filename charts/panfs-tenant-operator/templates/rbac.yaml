@@ -19,7 +19,7 @@
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# ServiceAccount of the PanFS Tenant Network operator
+# ServiceAccount of the PanFS Tenant operator
 apiVersion: v1
 kind: ServiceAccount
 metadata:
@@ -32,7 +32,7 @@ metadata:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# ClusterRole of the node pods: read a node and patch its labels.
+# ClusterRole of the node pods of a tenant network: read a node and patch its labels.
 # The operator binds it to the ServiceAccount it creates for every TenantNetwork.
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
@@ -49,7 +49,8 @@ rules:
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# ClusterRole of the operator. TenantNetworks can be in any namespace, so the permissions are cluster-wide.
+# ClusterRole of the operator. TenantNetworks and PanfsStorageClasses can be in any namespace, and a StorageClass
+# has no namespace, so the permissions are cluster-wide.
 kind: ClusterRole
 apiVersion: rbac.authorization.k8s.io/v1
 metadata:
@@ -66,7 +67,17 @@ rules:
     resources: ["tenantnetworks/status", "tenantnetworks/finalizers"]
     verbs: ["update", "patch"]
 
-  # Read the Secret a TenantNetwork names: the operator asks PanAPI which tenant its token belongs to
+  # Read the PanfsStorageClasses, hold them with a finalizer, and report their status
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses/status", "panfsstorageclasses/finalizers"]
+    verbs: ["update", "patch"]
+
+  # Read the Secret a TenantNetwork names: the operator asks PanAPI which tenant its token belongs to.
+  # The operator also checks that the Secret of a PanfsStorageClass exists, and it gives the CSI controller
+  # the permission to read that Secret. It can give only a permission that it holds itself
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get"]
@@ -77,7 +88,8 @@ rules:
     resources: ["nodes"]
     verbs: ["list", "patch"]
 
-  # Report changes as events on a TenantNetwork; the node pods get the same permission in their namespace
+  # Report changes as events on a TenantNetwork or a PanfsStorageClass;
+  # the node pods get the same permission in their namespace
   - apiGroups: [""]
     resources: ["events"]
     verbs: ["create"]
@@ -87,16 +99,34 @@ rules:
     resources: ["daemonsets"]
     verbs: ["get", "create", "update", "delete"]
 
-  # The ServiceAccount of the node pods and its permissions
+  # The ServiceAccount of the node pods and its permissions.
+  # Roles and RoleBindings: also the pair that lets the CSI controller read the Secret of a PanfsStorageClass,
+  # which the operator deletes when nothing needs it any more
   - apiGroups: [""]
     resources: ["serviceaccounts"]
     verbs: ["get", "create"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]
-    verbs: ["get", "create", "update"]
+    verbs: ["get", "create", "update", "delete"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterrolebindings"]
     verbs: ["get", "create", "delete"]
+
+  # The StorageClass of a PanfsStorageClass
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "create", "update", "delete"]
+
+  # Read the namespace of the PanFS CSI driver from its CSIDriver object
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csidrivers"]
+    resourceNames: ["com.vdura.csi.panfs"]
+    verbs: ["get"]
+
+  # Find out whether a deleted PanfsStorageClass left volumes that still need its Secret
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["list"]
 
   # Allow binding the ClusterRole of the node pods, and nothing else
   - apiGroups: ["rbac.authorization.k8s.io"]

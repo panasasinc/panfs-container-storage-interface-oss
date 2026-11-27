@@ -14,7 +14,7 @@
 
 # Chart.yaml
 apiVersion: v2
-name: panfs-tenant-storageclass
-description: PanFS Tenant StorageClass Chart
+name: panfs-tenant-operator
+description: PanFS Tenant Operator Chart
 version: "2.0.0"
 appVersion: "2.0.0"

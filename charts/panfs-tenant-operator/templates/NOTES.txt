@@ -1,0 +1,33 @@
+The PanFS Tenant operator is installed in namespace {{ .Release.Namespace }}.
+It serves two resources: TenantNetwork and PanfsStorageClass (panfs.vdura.com/v1alpha1).
+
+A tenant, whose volumes are reachable only from the network of that tenant:
+
+1. Create a namespace for the tenant and install the chart panfs-tenant there.
+   It creates the Secret with the PanAPI address and the token of the tenant, and the TenantNetwork:
+
+   helm install <NAME> charts/tenant \
+       --namespace <TENANT_NAMESPACE> --create-namespace \
+       --set realm.api=<REALM_API> \
+       --set realm.token=<TENANT_TOKEN> \
+       --set nodeSelector.<LABEL_KEY>=<LABEL_VALUE>
+
+   Without nodeSelector, all nodes of the cluster are put on the tenant network.
+   A ready node has the label panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>.
+
+2. Install the chart panfs-storageclass in the same namespace. The name of the release is the name of the StorageClass:
+
+   helm install <STORAGE_CLASS_NAME> charts/storageclass --namespace <TENANT_NAMESPACE>
+
+A realm that is reachable without a tenant network: skip step 1, create a Secret with the keys api and token, and run
+
+   helm install <STORAGE_CLASS_NAME> charts/storageclass \
+       --namespace <NAMESPACE> \
+       --set realmSecretName=<SECRET_NAME>
+
+Check the result:
+
+   kubectl get tenantnetworks,panfsstorageclasses -A
+   kubectl -n <NAMESPACE> describe tenantnetwork <NAME>
+   kubectl -n <NAMESPACE> describe panfsstorageclass <STORAGE_CLASS_NAME>
+   kubectl get storageclass <STORAGE_CLASS_NAME>

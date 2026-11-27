@@ -445,12 +445,26 @@ StorageClass is not a namespaced resource, but a Namespace with the same name is
 #### 3.3.2 Apply StorageClass Configuration:
 
 ```bash
-# Update the StorageClass manifest with your chosen parameters
-# Edit deploy/k8s/storage-class/template-secret-in-driver-ns.yaml with appropriate values
+# From version 2.0.0 on, the PanFS Tenant operator creates the StorageClass from a PanfsStorageClass resource.
+# Install the operator once per cluster, after the driver:
+kubectl apply --server-side -f deploy/k8s/tenant-operator/panfs-tenant-operator.yaml
+
+# Create the namespace and the Secret with the realm credentials (keys api and token):
+kubectl create namespace <STORAGE_CLASS_NAME>
+kubectl -n <STORAGE_CLASS_NAME> create secret generic <STORAGE_CLASS_NAME> \
+    --from-literal=api=<REALM_API> \
+    --from-literal=token=<REALM_TOKEN>
+
+# Edit deploy/k8s/storage-class/template-panfsstorageclass.yaml with your chosen parameters:
+# the name, the namespace, realmSecretName (without a tenant network), the parameters and the reclaim policy
 
 # Apply the updated configuration
-kubectl apply -f deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
+kubectl apply -f deploy/k8s/storage-class/template-panfsstorageclass.yaml
+kubectl get panfsstorageclasses -A
 ```
+
+With a tenant network, the Secret and the `TenantNetwork` come first, and `realmSecretName` is left out; see
+[Put the nodes on the tenant network](../README.md#4-put-the-nodes-on-the-tenant-network).
 
 #### 3.3.3 Validate StorageClass:
 
