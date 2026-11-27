@@ -23,6 +23,7 @@ import (
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -50,6 +51,9 @@ const (
 )
 
 var llog klog.Logger = klog.NewKlogr()
+
+// plainHTTPWarned holds the hosts the plain HTTP warning was logged for, so it is logged once per host.
+var plainHTTPWarned sync.Map
 
 // Client talks to PanAPI on behalf of the CSI controller.
 // The realm address and the credentials come from the secrets of each call, so one Client serves many realms.
@@ -153,8 +157,10 @@ func endpointFromSecrets(secrets map[string]string) (endpoint, error) {
 		return endpoint{}, fmt.Errorf("%w: %v", ErrorInvalidArgument, err)
 	}
 	if parsed.Scheme == "http" {
-		llog.Info("WARNING: PanAPI is reached over plain HTTP; the API token crosses the network in clear text",
-			"host", parsed.Host)
+		if _, warned := plainHTTPWarned.LoadOrStore(parsed.Host, true); !warned {
+			llog.Info("WARNING: PanAPI is reached over plain HTTP; the API token crosses the network in clear text",
+				"host", parsed.Host)
+		}
 	}
 
 	settings := tlsSettings{caCert: secrets[keys.CACert]}
@@ -201,6 +207,21 @@ func (c *Client) httpClient(settings tlsSettings) (*http.Client, error) {
 	return hc, nil
 }
 
+// certificateHint returns advice for an error that is a failed check of the realm certificate, and "" for
+// every other error. The reader of the error is the person who can change the Secret, so name its keys.
+func certificateHint(err error) string {
+	var verification *tls.CertificateVerificationError
+	if !errors.As(err, &verification) {
+		return ""
+	}
+	keys := utils.RealmConnectionContext
+	return fmt.Sprintf(". Hint: the certificate of the realm cannot be verified. If a private CA signed it and it "+
+		"names the address of the realm, add the certificate of that CA to the realm credentials Secret as the key %q. "+
+		"Otherwise add the key %q with the value \"true\" to that Secret: the connection stays encrypted, "+
+		"but the identity of the realm is not checked",
+		keys.CACert, keys.InsecureSkipTLSVerify)
+}
+
 // do sends one authenticated request and decodes a JSON response into out when out is not nil.
 func (c *Client) do(ctx context.Context, secrets map[string]string, method, path string, in, out any) error {
 	ep, err := endpointFromSecrets(secrets)
@@ -238,7 +259,7 @@ func (c *Client) do(ctx context.Context, secrets map[string]string, method, path
 	llog.V(5).Info("PanAPI request", "method", method, "path", path)
 	resp, err := hc.Do(req)
 	if err != nil {
-		return fmt.Errorf("%w: %s %s: %v", ErrorUnavailable, method, path, err)
+		return fmt.Errorf("%w: %s %s: %v%s", ErrorUnavailable, method, path, err, certificateHint(err))
 	}
 	defer func() { _ = resp.Body.Close() }()
 

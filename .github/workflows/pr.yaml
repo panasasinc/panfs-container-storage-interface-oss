@@ -32,6 +32,7 @@ on:
 
       # Build files changes
       - 'Dockerfile'
+      - 'Dockerfile.tenant-network'
       - 'Makefile'
 
       # Sanity tests changes
@@ -58,6 +59,25 @@ jobs:
       ref: "${{ github.ref }}"
       trivy-scan: true
       sanity-tests: true
+      push: true
+    secrets: inherit
+
+  tenant-network-image:
+    name: Tenant Network
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/build-reusable.yaml
+    with:
+      runner-label: "ubuntu-latest"
+      app-version: "${{ github.ref_name }}"
+      build-target: "tenant-network"
+      image-name: "panfs-tenant-network"
+      image-tags: "pr${{ github.event.pull_request.number }}"
+      repo-url: "ghcr.io/${{ github.repository }}"
+      ref: "${{ github.ref }}"
+      trivy-scan: true
       push: true
     secrets: inherit
 

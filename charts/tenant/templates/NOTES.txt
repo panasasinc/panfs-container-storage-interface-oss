@@ -1,0 +1,13 @@
+The PanFS tenant {{ .Release.Name }} is set up in namespace {{ .Release.Namespace }}.
+
+The PanFS Tenant Network operator now puts the {{ if .Values.nodeSelector }}selected nodes{{ else }}nodes of the cluster{{ end }} on the network of the tenant.
+Check the result:
+
+   kubectl -n {{ .Release.Namespace }} get tenantnetwork {{ .Release.Name }}
+   kubectl -n {{ .Release.Namespace }} describe tenantnetwork {{ .Release.Name }}
+
+The phase must become Ready. A resource that stays without a status means that the operator is not running;
+look at its pod in the namespace where the chart panfs-tenant-network-operator is installed.
+
+A ready node has the label panfs.vdura.com/tenant-network={{ .Release.Namespace }}.
+Use it in `allowedTopologies` of the StorageClass of the tenant and in the node selector of its workloads.

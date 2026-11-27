@@ -13,6 +13,8 @@ For more details on specific topics, refer to the following documents:
 |:---------|:------------|
 | [Overview](./docs/Overview.md) | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow |
 | [Usage Guide](./docs/Usage-Guide.md) | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples |
+| [Tenant Network Operator](./charts/tenant-network-operator/Readme.md) | Putting worker nodes on the network of a PanFS tenant, and marking the nodes that are ready: the `TenantNetwork` resource, its status and events, VXLAN and VLAN segments |
+| [Tenant Chart](./charts/tenant/Readme.md) | Setting up one PanFS tenant with Helm: the Secret with the realm connection and the `TenantNetwork` in one release |
 | [KMM](./docs/KMM.md) | Installing and configuring the Kernel Module Management (KMM) engine to load the PanFS kernel module on worker nodes |
 | [SELinux](./docs/SELinux.md) | Configuring SELinux across the OS, container runtime, Kubernetes, and CSI driver layers |
 | [Upgrade](./docs/Upgrade.md) | Upgrading the CSI driver, KMM module, and StorageClass, including validation and rollback procedures |
@@ -41,6 +43,12 @@ For more details on specific topics, refer to the following documents:
       * [2.1 Prerequisites](#21-prerequisites)
       * [2.2 Configure and Deploy](#22-configure-and-deploy)
     * [3. Configure and deploy StorageClass](#3-configure-and-deploy-storageclass)
+    * [4. Put the nodes on the tenant network](#4-put-the-nodes-on-the-tenant-network)
+      * [4.1 Install the operator](#41-install-the-operator)
+      * [4.2 Set up the tenant](#42-set-up-the-tenant)
+      * [4.3 Check the result](#43-check-the-result)
+      * [4.4 Keep volumes on the ready nodes](#44-keep-volumes-on-the-ready-nodes)
+      * [With Helm](#with-helm)
 * [Deploying Workloads](#deploying-workloads)
 * [CSI Driver Uninstallation](#csi-driver-uninstallation)
 * [API Documentation](#api-documentation)
@@ -158,6 +166,9 @@ The driver talks to the realm through PanAPI. It does not use SSH.
 - **Tenant network**: A volume of a tenant is reachable only from the network of that tenant.
   Every worker node must be attached to that network before it mounts a volume.
   The driver finds the mount address of the network, but it does not attach the nodes.
+  The [PanFS Tenant Network operator](./charts/tenant-network-operator/Readme.md) attaches the nodes that you label for the tenant,
+  and it marks the nodes that are ready; see [Tenant network](#4-put-the-nodes-on-the-tenant-network).
+  It needs these permissions too: list, read, create and delete attachments of a subnet.
 
 ### CSI Driver Installation - Quick Start
 
@@ -321,6 +332,127 @@ If the StorageClass is missing or misconfigured, verify the configuration variab
 
 ---
 
+#### 4. Put the nodes on the tenant network
+
+Skip this step when the worker nodes already reach the mount address of the tenant.
+
+A volume of a tenant is reachable only from the network of that tenant.
+The PanFS Tenant Network operator puts the nodes that you choose on that network, and it marks the nodes that are ready.
+You install the operator once per cluster. For each tenant you then create one small resource, a `TenantNetwork`,
+that names the Secret with the PanAPI address and the token of the tenant. You do not name the tenant:
+the operator reads it from the token.
+
+Two node labels are involved:
+
+| Label                                        | Who sets it        | Meaning                                      |
+|:---------------------------------------------|:-------------------|:---------------------------------------------|
+| A label of your choice                       | You                | The node is meant for this tenant            |
+| `panfs.vdura.com/tenant-network=<namespace>` | Tenant network pod | The network of the tenant works on this node |
+
+##### 4.1 Install the operator
+
+Once per cluster:
+
+```bash
+kubectl create namespace panfs-tenant-network
+kubectl apply -f deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
+```
+
+##### 4.2 Set up the tenant
+
+```bash
+# Label the nodes of the tenant, with a label of your choice.
+# Without a node selector in the next step, all nodes of the cluster are used, the control plane nodes included.
+kubectl label node <NODE_NAME> <LABEL_KEY>=<LABEL_VALUE>
+
+# Ask for the tenant network, in the namespace of the Secret that holds the PanAPI address and the token.
+# In deploy/k8s/tenant-network/template-tenantnetwork.yaml, replace <NAME>, <TENANT_NAMESPACE>,
+# <SECRET_NAME>, <LABEL_KEY> and <LABEL_VALUE> first.
+kubectl apply -f deploy/k8s/tenant-network/template-tenantnetwork.yaml
+```
+
+The Secret that step 3 created for the StorageClass has the keys that the operator needs (`api` and `token`),
+so the `TenantNetwork` can name it and live in its namespace.
+
+##### 4.3 Check the result
+
+```bash
+kubectl get tenantnetworks -A
+kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
+```
+
+```text
+NAMESPACE   NAME           TENANT   NODES   READY   PHASE   AGE
+acme        acme-network   acme     3       3       Ready   1m
+```
+
+The phase must become `Ready`. The status lists every node with its state and its address on the tenant network,
+and the events say what happened on each node. A ready node has the label
+`panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`: the value is the namespace of the `TenantNetwork`.
+
+##### 4.4 Keep volumes on the ready nodes
+
+Add the ready label to the StorageClass of the tenant, so that a new volume is provisioned only for a pod
+on a node where the tenant network works. `allowedTopologies` can be added to an existing StorageClass:
+
+```yaml
+allowedTopologies:
+  - matchLabelExpressions:
+      - key: panfs.vdura.com/tenant-network
+        values:
+          - "<TENANT_NAMESPACE>"
+```
+
+Kubernetes checks `allowedTopologies` when it places the first pod that uses a new volume.
+For every other pod that uses the volume, add a node selector to the workload:
+
+```yaml
+nodeSelector:
+  panfs.vdura.com/tenant-network: "<TENANT_NAMESPACE>"
+```
+
+##### With Helm
+
+Two charts do steps 4.1 and 4.2: the [operator chart](./charts/tenant-network-operator/Readme.md), installed once,
+and the [tenant chart](./charts/tenant/Readme.md), one release per tenant. The tenant chart creates the Secret
+and the `TenantNetwork`, and it checks first that the operator is installed.
+
+```bash
+helm upgrade --install panfs-tenant-network-operator charts/tenant-network-operator \
+    --namespace panfs-tenant-network \
+    --create-namespace
+
+helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
+    --namespace <TENANT_NAMESPACE> \
+    --create-namespace \
+    --set realm.api=<PANAPI_ADDRESS> \
+    --set realm.token=<TOKEN> \
+    --set nodeSelector.<LABEL_KEY>=<LABEL_VALUE>
+```
+
+With an `https://` address, the operator and the node pods check the certificate of the realm. For a certificate
+that is signed by a private CA, add `--set-file realm.caCert=ca.pem`. For a realm whose certificate cannot be
+verified at all, for example because it has no subject alternative name, the `TenantNetwork` shows the phase `Error`
+with the reason and a hint. Switch the check off then:
+
+```bash
+helm upgrade --install <TENANT_NAMESPACE> charts/tenant \
+    --namespace <TENANT_NAMESPACE> \
+    --create-namespace \
+    --set realm.api=https://<PANAPI_ADDRESS> \
+    --set realm.token=<TOKEN> \
+    --set realm.insecureSkipTLSVerify=true \
+    --set nodeSelector.<LABEL_KEY>=<LABEL_VALUE>
+```
+
+> **Note:** with `realm.insecureSkipTLSVerify=true` the connection is still encrypted, but the identity of the realm
+> is not checked: a host on the network that poses as the realm can read the token. Use it when the network
+> between the cluster and the realm is trusted; see
+> [Realm with a certificate that the cluster does not trust](./charts/tenant/Readme.md#realm-with-a-certificate-that-the-cluster-does-not-trust).
+
+The requirements (Calico setting, namespace, token permissions), the VXLAN and VLAN segment types, the status
+and the events are described in the [operator documentation](./charts/tenant-network-operator/Readme.md).
+
 ## Deploying Workloads
 
 Refer to [Usage-Guide.md](./docs/Usage-Guide.md) for YAML manifests and examples of deploying workloads with the PanFS CSI Driver.
@@ -346,6 +478,26 @@ Before deleting the driver, you must ensure no running applications are actively
     **Manually delete** all **PersistentVolumeClaims (PVCs)** and the **workloads** (Pods, Deployments, StatefulSets) that rely on the identified PVs.
 
     > ⚠️ **Important:** Deleting the PVCs will trigger the deletion of the associated **PersistentVolumes (PVs)**, which in turn will cause the CSI Controller to delete the corresponding volume data on the backend PanFS storage, based on the `reclaimPolicy` defined in your StorageClass (typically **`Delete`**).
+
+### Remove the Tenant Network
+
+Skip this step when you did not set up a tenant network.
+
+Delete every `TenantNetwork` before the Secret that it names, and while the operator runs. The delete waits until
+the pods have taken the nodes off the tenant network: the ready label and the tenant interface are removed,
+and the nodes are detached from the subnet in the realm.
+
+```bash
+# Per tenant
+kubectl -n <TENANT_NAMESPACE> delete tenantnetwork <NAME>
+
+# After the last tenant: the operator and the resource definition
+kubectl delete -f deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
+kubectl delete namespace panfs-tenant-network
+```
+
+With Helm, uninstall the tenant releases first, then the operator release, and delete the resource definition
+(`kubectl delete crd tenantnetworks.panfs.vdura.com`), which Helm does not remove.
 
 ### Remove StorageClass and Credentials
 

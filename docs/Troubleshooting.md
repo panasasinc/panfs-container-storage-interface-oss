@@ -339,7 +339,16 @@ kubectl get secret -n $NAMESPACE $SECRET_NAME
   # Test that the node reaches this address
   kubectl debug node/<node-name> -it --image=nicolaka/netshoot -- ping -c 3 <mount-address>
   ```
-  - If the address does not answer, attach the node to the network of the tenant. The driver does not do this.
+  - If the address does not answer, attach the node to the network of the tenant. The driver does not do this;
+    the [PanFS Tenant Network operator](../charts/tenant-network-operator/Readme.md) does.
+    With the operator, check the resource of the tenant; its status lists the nodes, and its events say what happened:
+    ```bash
+    kubectl get tenantnetworks -A -o wide
+    kubectl -n <tenant-namespace> describe tenantnetwork <name>
+    kubectl -n <tenant-namespace> logs <pod-of-the-node> --tail=20
+    ```
+    A `TenantNetwork` in the phase `Error` shows the reason in the column `MESSAGE`.
+    A node in the state `NotReady` shows the failing step in its `Message`, and the log of its pod has the details.
   - If the PV has no `rmlist` attribute, the token may not read the subnets of the tenant, or the tenant has no subnet.
     The node then mounts from the host of the PanAPI address, and the realm can refuse that mount.
 

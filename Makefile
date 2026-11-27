@@ -68,6 +68,7 @@ endif
 
 CSI_IMAGE  ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-driver:2.0.0
 TEST_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-csi-sanity:stable
+TENANT_NETWORK_IMAGE ?= ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-tenant-network:2.0.0
 
 ## [Build Driver and DFC Images]
 
@@ -96,6 +97,22 @@ build-driver-image: ## Build the PanFS CSI Driver Docker image
 		--build-arg GIT_COMMIT=$(shell git rev-parse --short HEAD) \
 		.
 	@printf "$(GREEN)Successfully built PanFS CSI Driver Docker image: $(CSI_IMAGE)$(RESET)\n\n"
+
+.PHONY: build-tenant-network-image
+build-tenant-network-image: ## Build the PanFS Tenant Network Docker image
+	@if [ -z "$(TENANT_NETWORK_IMAGE)" ]; then \
+		printf "$(RED)TENANT_NETWORK_IMAGE is not set$(RESET)\n"; \
+		exit 1; \
+	fi
+	docker build -t $(TENANT_NETWORK_IMAGE) \
+		-f Dockerfile.tenant-network \
+		--platform linux/amd64 \
+		--build-arg BUILD_DATE=$(BUILD_DATE) \
+		--build-arg APP_VERSION=$(APP_VERSION) \
+		--build-arg VERSION=$(APP_VERSION) \
+		--build-arg GIT_COMMIT=$(shell git rev-parse --short HEAD) \
+		.
+	@printf "$(GREEN)Successfully built PanFS Tenant Network Docker image: $(TENANT_NETWORK_IMAGE)$(RESET)\n\n"
 
 .PHONY: build-dfc-image
 build-dfc-image: ## Build the Kernel Module Management Docker image
@@ -405,8 +422,17 @@ manifest-storageclass: ## Generate manifests for the PanFS CSI Storage Class
 		sed 's|csi-panfs|<CSI_NAMESPACE>|' > deploy/k8s/storage-class/template-secret-in-driver-ns.yaml
 	@printf "$(GREEN)Successfully generated manifests for the PanFS CSI Storage Class$(RESET)\n\n"
 
+.PHONY: manifest-tenant-network
+manifest-tenant-network: ## Generate manifests for the PanFS Tenant Network
+	@printf "$(BOLD)Generating manifests for the PanFS Tenant Network...$(RESET)\n"
+	@mkdir -p deploy/k8s/tenant-network/
+	helm template panfs-tenant-network-operator charts/tenant-network-operator --include-crds \
+		--namespace panfs-tenant-network | \
+		grep -v '^# Source:' > deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml
+	@printf "$(GREEN)Successfully generated manifests for the PanFS Tenant Network$(RESET)\n\n"
+
 .PHONY: manifests
-manifests: manifest-driver manifest-storageclass ## Generate manifests for the PanFS CSI Driver and Storage Class
+manifests: manifest-driver manifest-storageclass manifest-tenant-network ## Generate manifests for the PanFS CSI Driver, Storage Class and Tenant Network
 	@if command -v helm-docs >/dev/null 2>&1; then \
 		helm-docs --template-files Readme.md.gotmpl --output-file Readme.md; \
 	else \

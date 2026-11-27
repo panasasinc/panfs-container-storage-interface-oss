@@ -144,3 +144,22 @@ jobs:
       trivy-scan: false
       push: true
     secrets: inherit
+
+  tenant-network-image-ghcr:
+    needs: create-release
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+    uses: ./.github/workflows/build-reusable.yaml
+    with:
+      runner-label: "ubuntu-latest"
+      app-version: "${{ needs.create-release.outputs.version }}"
+      build-target: "tenant-network"
+      image-name: "panfs-tenant-network"
+      image-tags: "${{ needs.create-release.outputs.version }}"
+      repo-url: "ghcr.io/${{ github.repository }}"
+      ref: "refs/tags/${{ needs.create-release.outputs.version }}"
+      trivy-scan: false
+      push: true
+    secrets: inherit
