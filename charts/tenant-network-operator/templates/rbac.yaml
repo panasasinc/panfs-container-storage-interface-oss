@@ -66,7 +66,33 @@ rules:
     resources: ["tenantnetworks/status", "tenantnetworks/finalizers"]
     verbs: ["update", "patch"]
 
-  # Read the Secret a TenantNetwork names: the operator asks PanAPI which tenant its token belongs to
+  # Read the PanfsStorageClasses, hold them with a finalizer, and report their status
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses/status", "panfsstorageclasses/finalizers"]
+    verbs: ["update", "patch"]
+
+  # The StorageClass of a PanfsStorageClass
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "create", "update", "delete"]
+
+  # Read the namespace of the PanFS CSI driver from its CSIDriver object
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csidrivers"]
+    resourceNames: ["com.vdura.csi.panfs"]
+    verbs: ["get"]
+
+  # Find out whether a deleted PanfsStorageClass left volumes that still need its Secret
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["list"]
+
+  # Read the Secret a TenantNetwork names: the operator asks PanAPI which tenant its token belongs to.
+  # The operator also gives the CSI controller the permission to read the Secret of a PanfsStorageClass,
+  # and it can give only a permission that it holds itself
   - apiGroups: [""]
     resources: ["secrets"]
     verbs: ["get"]
@@ -91,9 +117,10 @@ rules:
   - apiGroups: [""]
     resources: ["serviceaccounts"]
     verbs: ["get", "create"]
+  # Also the Role and the RoleBinding that let the CSI controller read the Secret of a PanfsStorageClass
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["roles", "rolebindings"]
-    verbs: ["get", "create", "update"]
+    verbs: ["get", "create", "update", "delete"]
   - apiGroups: ["rbac.authorization.k8s.io"]
     resources: ["clusterrolebindings"]
     verbs: ["get", "create", "delete"]

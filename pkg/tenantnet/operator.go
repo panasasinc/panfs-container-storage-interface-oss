@@ -149,6 +149,9 @@ type NodeOptions struct {
 	PriorityClassName string
 	// ClusterRole names an existing ClusterRole that lets a pod read and patch nodes.
 	ClusterRole string
+	// CSIDriverNamespace is the namespace of the PanFS CSI driver, for the StorageClasses the operator creates.
+	// Empty means the namespace that the CSIDriver object names.
+	CSIDriverNamespace string
 }
 
 // TenantResolver tells which tenant a token belongs to.
@@ -247,6 +250,8 @@ func (o *Operator) ReconcileAll(ctx context.Context) {
 		}
 	}
 	o.cleanNodes(ctx, list.Items)
+	// After the TenantNetworks: a PanfsStorageClass reads the status that this pass wrote.
+	o.ReconcileStorageClasses(ctx)
 }
 
 // reconcile brings the objects of one TenantNetwork to the wanted state and reports the result in its status.

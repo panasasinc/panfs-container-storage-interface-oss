@@ -147,7 +147,7 @@ func (d *Driver) CreateVolume(ctx context.Context, in *csi.CreateVolumeRequest) 
 	}
 
 	llog.Info("volume created", "volume_name", volumeName, "volume_id", vol.CSIID(), "capacity", vol.SoftQuota())
-	return d.createVolumeResponse(ctx, llog, vol, secrets), nil
+	return d.createVolumeResponse(ctx, llog, in, vol), nil
 }
 
 // existingVolumeResponse answers CreateVolume for a volume that already exists.
@@ -159,14 +159,16 @@ func (d *Driver) existingVolumeResponse(ctx context.Context, llog klog.Logger, i
 	}
 
 	llog.Info("volume already exists", "volume_name", in.GetName(), "volume_id", vol.CSIID(), "capacity", vol.SoftQuota())
-	return d.createVolumeResponse(ctx, llog, vol, in.GetSecrets()), nil
+	return d.createVolumeResponse(ctx, llog, in, vol), nil
 }
 
 // createVolumeResponse builds the CreateVolume response for a volume.
 // The volume context carries what the node needs for the mount: the volume name, and the mount address
 // when PanAPI names one. Without a mount address the node mounts from the host of the PanAPI address.
-func (d *Driver) createVolumeResponse(ctx context.Context, llog klog.Logger, vol *panapi.Volume, secrets map[string]string) *csi.CreateVolumeResponse {
+// The accessible topology of the volume becomes the node affinity of its PersistentVolume; see volumeTopology.
+func (d *Driver) createVolumeResponse(ctx context.Context, llog klog.Logger, in *csi.CreateVolumeRequest, vol *panapi.Volume) *csi.CreateVolumeResponse {
 	volumeContext := vol.VolumeContext()
+	secrets := in.GetSecrets()
 
 	mountAddress, err := d.panfs.GetMountAddress(ctx, secrets)
 	switch {
@@ -180,11 +182,33 @@ func (d *Driver) createVolumeResponse(ctx context.Context, llog klog.Logger, vol
 
 	return &csi.CreateVolumeResponse{
 		Volume: &csi.Volume{
-			CapacityBytes: vol.SoftQuota(),
-			VolumeId:      vol.CSIID(),
-			VolumeContext: volumeContext,
+			CapacityBytes:      vol.SoftQuota(),
+			VolumeId:           vol.CSIID(),
+			VolumeContext:      volumeContext,
+			AccessibleTopology: volumeTopology(in.GetAccessibilityRequirements()),
 		},
 	}
+}
+
+// volumeTopology returns the topologies from which a new volume can be used: the requisite topologies of the
+// request, which are the allowedTopologies of the StorageClass. A PanFS volume is a network volume, so it can
+// be used from every node that the StorageClass allows, and all of them are returned. The external provisioner
+// writes them to the PersistentVolume as node affinity, and the scheduler then places every pod of the volume
+// on such a node. This is how the volumes of a tenant stay on the nodes of the tenant network.
+//
+// A topology that holds only the ready label of the node plugin is left out. The external provisioner sends
+// it for a StorageClass without allowedTopologies; it says where the driver runs, not where the volume can
+// be used, and a PersistentVolume must not be bound to it for its whole life.
+func volumeTopology(requirement *csi.TopologyRequirement) []*csi.Topology {
+	var topologies []*csi.Topology
+	for _, topology := range requirement.GetRequisite() {
+		segments := topology.GetSegments()
+		if _, ok := segments[NodeLabelKey]; len(segments) == 0 || (ok && len(segments) == 1) {
+			continue
+		}
+		topologies = append(topologies, topology)
+	}
+	return topologies
 }
 
 // grpcCode maps a PanAPI client error to the gRPC code the CSI call returns.

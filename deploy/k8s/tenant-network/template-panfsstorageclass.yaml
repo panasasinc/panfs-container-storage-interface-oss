@@ -1,0 +1,37 @@
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Ask the PanFS Tenant Network operator to create a StorageClass of the PanFS CSI driver.
+# The StorageClass gets the name of this resource. The operator fills in the provisioner, the references to
+# the realm Secret and allowedTopologies, and it lets the CSI controller read the Secret.
+apiVersion: panfs.vdura.com/v1alpha1
+kind: PanfsStorageClass
+metadata:
+  name: <STORAGE_CLASS_NAME>
+  namespace: <TENANT_NAMESPACE>
+spec:
+  # The TenantNetwork in the same namespace. The StorageClass uses its Secret, and every volume is bound
+  # to the nodes where the network of the tenant works.
+  tenantNetwork: <TENANT_NETWORK_NAME>
+
+  # For a realm that is reachable without a tenant network, remove tenantNetwork and name the Secret instead:
+  # realmSecretName: <SECRET_NAME>
+
+  # Everything below is optional. Remove what you do not need.
+
+  # PanFS parameters of new volumes. Without them the defaults of the driver apply.
+  parameters:
+    panfs.csi.vdura.com/layout: "raid6+"
+    panfs.csi.vdura.com/stripeunit: "64k"
+
+  # Delete (the default) or Retain
+  reclaimPolicy: Delete
+
+  # The default is true
+  allowVolumeExpansion: true
+
+  # Mount options of the volumes
+  mountOptions: []
+
+  # Make this StorageClass the default one of the cluster
+  default: false

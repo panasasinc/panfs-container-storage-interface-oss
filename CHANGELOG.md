@@ -30,6 +30,11 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
   Without the parameter, the driver uses the first storageset that is assigned to the tenant of the token.
 - `panfs.csi.vdura.com/user` and `panfs.csi.vdura.com/group` accept numeric ids only.
 - `kmm.encryptionSupport` defaults to `false` in `charts/panfs`.
+- **Breaking:** the driver reports topology (the plugin capability `VOLUME_ACCESSIBILITY_CONSTRAINTS`).
+  A StorageClass with `volumeBindingMode: WaitForFirstConsumer` and with `allowedTopologies` on a label that the
+  CSI node plugin does not report, for example the ready label of the tenant network, no longer provisions volumes.
+  Use a `PanfsStorageClass`, or `volumeBindingMode: Immediate`. A StorageClass without `allowedTopologies`,
+  or with the label `node.kubernetes.io/csi-driver.panfs.ready`, works as before.
 - The manifest check in CI, and so `make manifests`, uses Helm v4.3.2 (was v3.22.1).
 
 ### Added
@@ -45,6 +50,15 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
   reports the segment type of the subnet. The status of the resource lists the nodes,
   and the operator and the pods report changes as events on it.
   See the [operator documentation](charts/tenant-network-operator/Readme.md).
+- `PanfsStorageClass`, a second resource of the PanFS Tenant Network operator. From a name and the name of
+  a `TenantNetwork`, the operator creates a StorageClass: it fills in the provisioner, the Secret references and
+  `allowedTopologies`, and it lets the CSI controller read the Secret. `spec.realmSecretName` in place of
+  `spec.tenantNetwork` is for a realm without a tenant network. The template is
+  `deploy/k8s/tenant-network/template-panfsstorageclass.yaml`. The StorageClass chart and its manifests stay.
+  See the [operator documentation](charts/tenant-network-operator/Readme.md#panfsstorageclass).
+- PersistentVolume node affinity: the controller returns the `allowedTopologies` of the StorageClass as the
+  topology of a new volume. Every pod of a volume of a tenant is placed on a node where the tenant network works,
+  without a node selector in the workload.
 - PanFS Tenant chart (`charts/tenant`): one Helm release per tenant with the Secret of the realm connection
   and the `TenantNetwork`. It checks that the PanFS Tenant Network operator is installed before it creates anything.
 - The `Makefile` targets `build-tenant-network-image` and `manifest-tenant-network`.

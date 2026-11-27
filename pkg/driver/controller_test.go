@@ -832,3 +832,69 @@ func TestCreateVolumeMountAddress(t *testing.T) {
 		})
 	}
 }
+
+// TestCreateVolumeTopology tests that the controller returns the topologies of the StorageClass for a volume,
+// so that the PersistentVolume gets them as node affinity.
+func TestCreateVolumeTopology(t *testing.T) {
+	size := GB10Bytes
+	created := &panapi.Volume{ID: validVolumeIDNumber, Pathname: "/" + validVolumeName, SoftQuotaBytes: &size, HardQuotaBytes: &size}
+	tenant := &csi.Topology{Segments: map[string]string{"panfs.vdura.com/tenant-network": "tenant-ns"}}
+	zone := &csi.Topology{Segments: map[string]string{"topology.kubernetes.io/zone": "a", NodeLabelKey: "true"}}
+	driverOnly := &csi.Topology{Segments: map[string]string{NodeLabelKey: "true"}}
+
+	testCases := []struct {
+		name        string
+		requirement *csi.TopologyRequirement
+		existing    bool
+		want        []*csi.Topology
+	}{
+		{
+			name:        "the topology of the StorageClass is returned",
+			requirement: &csi.TopologyRequirement{Requisite: []*csi.Topology{tenant}, Preferred: []*csi.Topology{tenant}},
+			want:        []*csi.Topology{tenant},
+		},
+		{
+			name:        "an existing volume gets the topology too",
+			requirement: &csi.TopologyRequirement{Requisite: []*csi.Topology{tenant}},
+			existing:    true,
+			want:        []*csi.Topology{tenant},
+		},
+		{
+			name:        "every topology of the StorageClass is returned",
+			requirement: &csi.TopologyRequirement{Requisite: []*csi.Topology{tenant, zone}},
+			want:        []*csi.Topology{tenant, zone},
+		},
+		{
+			name:        "the ready label of the node plugin alone is not a topology of the volume",
+			requirement: &csi.TopologyRequirement{Requisite: []*csi.Topology{driverOnly}, Preferred: []*csi.Topology{driverOnly}},
+		},
+		{
+			name: "no requirement: no topology",
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			panapiMock := mock.NewMockStorageProviderClient(gomock.NewController(t))
+			driver := &Driver{Version: "testing", Name: DefaultDriverName, endpoint: "unix:///tmp/csi.sock", host: "localhost", panfs: panapiMock}
+
+			if tc.existing {
+				panapiMock.EXPECT().GetVolumeByName(gomock.Any(), validVolumeName, defaultSecrets).Return(created, nil)
+			} else {
+				panapiMock.EXPECT().GetVolumeByName(gomock.Any(), validVolumeName, defaultSecrets).Return(nil, panapi.ErrorNotFound)
+				panapiMock.EXPECT().CreateVolume(gomock.Any(), gomock.Any(), defaultSecrets).Return(created, nil)
+			}
+			panapiMock.EXPECT().GetMountAddress(gomock.Any(), defaultSecrets).Return("", nil)
+
+			response, err := driver.CreateVolume(t.Context(), &csi.CreateVolumeRequest{
+				Name:                      validVolumeName,
+				CapacityRange:             &csi.CapacityRange{RequiredBytes: GB10Bytes},
+				Secrets:                   defaultSecrets,
+				VolumeCapabilities:        mountCapabilities(),
+				AccessibilityRequirements: tc.requirement,
+			})
+			require.NoError(t, err)
+			assert.Equal(t, tc.want, response.GetVolume().GetAccessibleTopology())
+		})
+	}
+}

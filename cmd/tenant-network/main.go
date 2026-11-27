@@ -19,6 +19,7 @@
 //
 // With --operator the same program runs once per cluster instead: it watches the TenantNetwork resources
 // and creates, for each of them, a DaemonSet that runs this program on the nodes of the tenant.
+// It also watches the PanfsStorageClass resources and creates a StorageClass for each of them.
 package main
 
 import (
@@ -80,6 +81,9 @@ func main() {
 	flag.StringVar(&options.ClusterRole, "node-cluster-role", "",
 		"Operator: name of the ClusterRole that lets a pod read and patch nodes")
 	flag.StringVar(&options.PriorityClassName, "node-priority-class", "", "Operator: priority class of the pods")
+	flag.StringVar(&options.CSIDriverNamespace, "csi-driver-namespace", "",
+		"Operator: namespace of the PanFS CSI driver, for the StorageClasses the operator creates; "+
+			"the default is the namespace that the CSIDriver object names")
 	resync := flag.Duration("resync", 15*time.Second, "Operator: time between two passes over the TenantNetwork resources")
 	flag.Parse()
 	defer klog.Flush()

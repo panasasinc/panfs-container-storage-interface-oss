@@ -111,7 +111,7 @@ A volume of a tenant is reachable only from the network of that tenant.
 Deploy the tenant network when the worker nodes are not on that network yet.
 
 - **Operator manifest:** `tenant-network/panfs-tenant-network-operator.yaml`, once per cluster.
-  It holds the `TenantNetwork` resource definition and the operator, for the namespace `panfs-tenant-network`.
+  It holds the resource definitions of `TenantNetwork` and `PanfsStorageClass` and the operator, for the namespace `panfs-tenant-network`.
 - **Tenant manifest:** `tenant-network/template-tenantnetwork.yaml`, once per tenant.
   - Replace `<NAME>` with a name for the resource
   - Replace `<TENANT_NAMESPACE>` with the namespace of the Secret that holds the PanAPI address and the token of the tenant
@@ -134,15 +134,21 @@ kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
 ```
 
 A ready node has the label `panfs.vdura.com/tenant-network=<TENANT_NAMESPACE>`.
-To provision volumes only for the ready nodes, add this block to the StorageClass manifest of the tenant:
 
-```yaml
-allowedTopologies:
-  - matchLabelExpressions:
-      - key: panfs.vdura.com/tenant-network
-        values:
-          - "<TENANT_NAMESPACE>"
+- **StorageClass manifest:** `tenant-network/template-panfsstorageclass.yaml`, once per StorageClass of the tenant.
+  The operator creates the StorageClass from it and binds every volume to the ready nodes.
+  - Replace `<STORAGE_CLASS_NAME>` with the name of the StorageClass
+  - Replace `<TENANT_NAMESPACE>` with the namespace of the `TenantNetwork`
+  - Replace `<TENANT_NETWORK_NAME>` with the name of the `TenantNetwork`
+  - Remove the optional fields that you do not need
+
+```bash
+kubectl apply -f tenant-network/template-panfsstorageclass.yaml
+kubectl get panfsstorageclasses -A
 ```
+
+A StorageClass that you write yourself with `allowedTopologies` on the ready label must have
+`volumeBindingMode: Immediate`. With `WaitForFirstConsumer` no volume is provisioned.
 
 To take a node off the tenant network, remove its label. The pod of the node then removes the tenant interface
 and detaches the node from the subnet in the realm:

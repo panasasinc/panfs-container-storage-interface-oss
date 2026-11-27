@@ -92,6 +92,7 @@ The driver exposes advanced PanFS features through CSI:
   * **Multiple Volume Layouts**: Provisioning support for various PanFS layouts (e.g., `raid6+`, `raid5+`, `raid10+`).
   * **Robust Operation**: Includes extensive parameter validation, unit conversion (e.g., GB/bytes), and mapping of PanAPI errors to CSI-compliant error codes.
   * **Static Provisioning**: A PersistentVolume can name an existing PanFS volume, or a directory inside it.
+  * **Volume Topology**: A new volume gets the `allowedTopologies` of its StorageClass as node affinity, so the pods of a tenant volume run only on nodes of the tenant network.
 
 The driver manages volumes through **PanAPI**, the REST API of the PanFS realm, with a service account token.
 Volume encryption is not supported with PanAPI.
@@ -392,24 +393,27 @@ and the events say what happened on each node. A ready node has the label
 
 ##### 4.4 Keep volumes on the ready nodes
 
-Add the ready label to the StorageClass of the tenant, so that a new volume is provisioned only for a pod
-on a node where the tenant network works. `allowedTopologies` can be added to an existing StorageClass:
+Create the StorageClass of the tenant through the operator, with a `PanfsStorageClass` in the namespace of the
+`TenantNetwork`. Only a name and the name of the `TenantNetwork` are required:
 
-```yaml
-allowedTopologies:
-  - matchLabelExpressions:
-      - key: panfs.vdura.com/tenant-network
-        values:
-          - "<TENANT_NAMESPACE>"
+```bash
+# In deploy/k8s/tenant-network/template-panfsstorageclass.yaml, replace <STORAGE_CLASS_NAME>, <TENANT_NAMESPACE>
+# and <TENANT_NETWORK_NAME> first, and remove the optional fields that you do not need.
+kubectl apply -f deploy/k8s/tenant-network/template-panfsstorageclass.yaml
+kubectl get panfsstorageclasses -A
 ```
 
-Kubernetes checks `allowedTopologies` when it places the first pod that uses a new volume.
-For every other pod that uses the volume, add a node selector to the workload:
+The operator creates a StorageClass with the name of the resource. It fills in the provisioner, the Secret of the
+`TenantNetwork` and `allowedTopologies`, and it lets the CSI controller read the Secret. Every volume of this
+StorageClass is bound to the nodes where the tenant network works, so Kubernetes places every pod that uses
+the volume on a ready node. A workload needs no node selector.
 
-```yaml
-nodeSelector:
-  panfs.vdura.com/tenant-network: "<TENANT_NAMESPACE>"
-```
+This replaces the StorageClass of step 3 for the tenant; the Secret of step 3 stays in use.
+The fields, the status and the migration from the StorageClass chart are described in the
+[operator documentation](./charts/tenant-network-operator/Readme.md#panfsstorageclass).
+
+> **Note:** a StorageClass that you write yourself with `allowedTopologies` on the ready label must have
+> `volumeBindingMode: Immediate`. With `WaitForFirstConsumer` no volume is provisioned.
 
 ##### With Helm
 
