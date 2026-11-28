@@ -13,6 +13,9 @@ For more details on specific topics, refer to the following documents:
 |:------------------------------------------------------------|:----------------------------------------------------------------------------------------------------------------------------------------|
 | [Overview](./docs/Overview.md)                              | Architecture of the driver: controller and node services, sidecars, KMM integration, and operational workflow                           |
 | [Usage Guide](./docs/Usage-Guide.md)                        | Deploying workloads with PanFS volumes: RWX/RWO deployments, StatefulSets, and static provisioning examples                             |
+| [Tenant Operator Guide](./docs/Tenant-Operator-Guide.md)    | Installing, checking and troubleshooting the PanFS Tenant operator, with diagrams of how the charts fit together                        |
+| [Tenant Guide](./docs/Tenant-Guide.md)                      | Putting nodes on the network of a PanFS tenant: deployment, checks, and troubleshooting of `TenantNetwork`                              |
+| [StorageClass Guide](./docs/StorageClass-Guide.md)          | Creating a StorageClass with `PanfsStorageClass`: deployment, checks, and troubleshooting from the claim to the mount                   |
 | [Tenant Operator](./charts/panfs-tenant-operator/Readme.md) | The operator of the `TenantNetwork` and `PanfsStorageClass` resources: tenant networks (VXLAN, VLAN), StorageClasses, status and events |
 | [Tenant Chart](./charts/tenant/Readme.md)                   | Setting up one PanFS tenant with Helm: the Secret with the realm connection and the `TenantNetwork` in one release                      |
 | [StorageClass Chart](./charts/storageclass/Readme.md)       | Creating a StorageClass with Helm: one `PanfsStorageClass` per release, and the PanFS volume parameters                                 |

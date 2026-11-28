@@ -126,6 +126,46 @@ for sc in $(kubectl get storageclass -o name | cut -d/ -f2); do
     fi
 done
 
+# PanFS Tenant operator: tenant networks and PanFS StorageClasses
+# The operator serves the custom resources TenantNetwork and PanfsStorageClass. It is optional: a cluster
+# without it has no such resource definitions, and this section collects only that fact.
+echo "Collecting PanFS Tenant operator information..."
+run_cmd "kubectl get crd tenantnetworks.panfs.vdura.com panfsstorageclasses.panfs.vdura.com" "60-tenant-operator-crds.txt" "Tenant operator resource definitions"
+if kubectl get crd tenantnetworks.panfs.vdura.com >/dev/null 2>&1; then
+    # The operator can run in any namespace under any release name: find it by its image.
+    kubectl get deployments -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{" "}{.spec.template.spec.containers[0].image}{"\n"}{end}' 2>/dev/null |
+        awk '$2 ~ /panfs-tenant-operator/ {print $1}' | while read -r deployment; do
+        op_ns=$(echo "${deployment}" | cut -d/ -f1)
+        op_name=$(echo "${deployment}" | cut -d/ -f2)
+        run_cmd "kubectl describe deployment ${op_name} -n ${op_ns}" "61-tenant-operator-${op_name}-describe.txt" "Tenant operator deployment ${op_ns}/${op_name}"
+        run_cmd "kubectl logs deployment/${op_name} -n ${op_ns} --tail=2000" "62-tenant-operator-${op_name}-logs.txt" "Tenant operator logs"
+        run_cmd "kubectl logs deployment/${op_name} -n ${op_ns} --previous --tail=1000" "63-tenant-operator-${op_name}-previous-logs.txt" "Tenant operator previous logs"
+    done
+
+    run_cmd "kubectl get tenantnetworks -A -o wide" "64-tenantnetworks.txt" "Tenant networks"
+    run_cmd "kubectl get nodes --label-columns panfs.vdura.com/tenant,panfs.vdura.com/tenant-network" "65-nodes-tenant-labels.txt" "Node tenant labels (ready label: panfs.vdura.com/tenant-network)"
+    run_cmd "kubectl get ds calico-node -n kube-system -o jsonpath='{.spec.template.spec.containers[0].env}'" "66-calico-env.txt" "Calico environment (IP_AUTODETECTION_METHOD must not follow the tenant interface)"
+
+    for tn in $(kubectl get tenantnetworks -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+        tn_ns=$(echo "${tn}" | cut -d/ -f1)
+        tn_name=$(echo "${tn}" | cut -d/ -f2)
+        run_cmd "kubectl describe tenantnetwork ${tn_name} -n ${tn_ns}" "67-tenantnetwork-${tn_ns}-${tn_name}-describe.txt" "TenantNetwork ${tn_ns}/${tn_name} (status, nodes and events)"
+        run_cmd "kubectl get tenantnetwork ${tn_name} -n ${tn_ns} -o yaml" "68-tenantnetwork-${tn_ns}-${tn_name}.yaml" "TenantNetwork ${tn_ns}/${tn_name} YAML"
+        run_cmd "kubectl get daemonset,pods -n ${tn_ns} -l panfs.vdura.com/tenant-network-name=${tn_name} -o wide" "69-tenantnetwork-${tn_ns}-${tn_name}-pods.txt" "Node pods of TenantNetwork ${tn_ns}/${tn_name}"
+        run_cmd "kubectl logs -n ${tn_ns} -l panfs.vdura.com/tenant-network-name=${tn_name} --all-containers --prefix --tail=300" "70-tenantnetwork-${tn_ns}-${tn_name}-pod-logs.txt" "Node pod logs of TenantNetwork ${tn_ns}/${tn_name}"
+        run_cmd "kubectl get events -n ${tn_ns} --sort-by='.lastTimestamp'" "71-namespace-${tn_ns}-events.txt" "Events in tenant namespace ${tn_ns}"
+    done
+
+    run_cmd "kubectl get panfsstorageclasses -A -o wide" "72-panfsstorageclasses.txt" "PanFS StorageClasses"
+    for psc in $(kubectl get panfsstorageclasses -A -o jsonpath='{range .items[*]}{.metadata.namespace}{"/"}{.metadata.name}{"\n"}{end}' 2>/dev/null); do
+        psc_ns=$(echo "${psc}" | cut -d/ -f1)
+        psc_name=$(echo "${psc}" | cut -d/ -f2)
+        run_cmd "kubectl describe panfsstorageclass ${psc_name} -n ${psc_ns}" "73-panfsstorageclass-${psc_ns}-${psc_name}-describe.txt" "PanfsStorageClass ${psc_ns}/${psc_name} (status and events)"
+        run_cmd "kubectl get panfsstorageclass ${psc_name} -n ${psc_ns} -o yaml" "74-panfsstorageclass-${psc_ns}-${psc_name}.yaml" "PanfsStorageClass ${psc_ns}/${psc_name} YAML"
+        run_cmd "kubectl get role,rolebinding panfs-storage-class-${psc_name} -n ${psc_ns} -o wide" "75-panfsstorageclass-${psc_ns}-${psc_name}-secret-reader.txt" "Secret reader Role and RoleBinding of ${psc_ns}/${psc_name}"
+    done
+fi
+
 # Check for specific node module loading
 echo "Collecting node-specific module information..."
 NODE_COUNT=0
@@ -215,6 +255,9 @@ Key Files:
 - 44-47-*: Failed workload pod details, logs, and events
 - 47-52-*: Namespace security and configuration details
 - 53-56-*: Security policies and admission controllers
+- 60-63-*: PanFS Tenant operator: resource definitions, deployment and logs
+- 64-71-*: Tenant networks: status, node labels, Calico setting, node pods, their logs and events
+- 72-75-*: PanFS StorageClasses: status, events and the Role that lets the CSI controller read the Secret
 
 Instructions for Support Team:
 1. Review the summary files first (01-08)
@@ -225,6 +268,8 @@ Instructions for Support Team:
 6. Review node-specific information if module loading issues (38-39)
 7. Analyze failed workload pods and their logs (43-46)
 8. Review namespace security and policies (47-56)
+9. With tenant networks: check the phase of every TenantNetwork and PanfsStorageClass and the
+   NodeNotReady events (64, 67, 72-73); see docs/Tenant-Guide.md and docs/StorageClass-Guide.md
 
 Please include this entire directory when submitting support requests.
 EOF
