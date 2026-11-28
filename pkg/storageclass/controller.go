@@ -70,7 +70,7 @@ const (
 	reservedParameterPrefix = "csi.storage.k8s.io/"
 
 	// componentName names the operator as the writer of its events.
-	componentName = "panfs-storageclass-operator"
+	componentName = "panfs-tenant-operator"
 	// productLabelValue is the value of the label "product" on the objects of the operator.
 	productLabelValue = "com.vdura.csi.panfs"
 )
@@ -417,12 +417,12 @@ func setBindingMode(spec *PanfsStorageClassSpec, source classSource) error {
 }
 
 // tenantNetworkOf returns the TenantNetwork of a namespace, or nil when the namespace has none. A namespace holds
-// the network of one tenant: when it has several TenantNetworks, the tenant network operator serves one of them
+// the network of one tenant: when it has several TenantNetworks, the operator serves one of them
 // and refuses the others, and the one with a DaemonSet is the one that is served.
 func (c *Controller) tenantNetworkOf(ctx context.Context, namespace string) (*unstructured.Unstructured, error) {
 	list, err := c.Dynamic.Resource(tenantnet.TenantNetworkGVR).Namespace(namespace).List(ctx, metav1.ListOptions{})
 	if apierrors.IsNotFound(err) {
-		// The cluster has no tenant network operator, so it has no such resource.
+		// The resource definition of the TenantNetwork is not installed, so the cluster has no such resource.
 		return nil, nil
 	}
 	if err != nil {

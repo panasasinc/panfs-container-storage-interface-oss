@@ -20,7 +20,7 @@ inputs:
     default: 'dev'
     required: false
   build-target:
-    description: "What to build: plugin (CSI driver), tests (sanity test tools), tenant-network (PanFS Tenant Network) or storageclass-operator (PanFS StorageClass Operator)"
+    description: "What to build: plugin (CSI driver), tests (sanity test tools) or tenant-operator (PanFS Tenant Operator)"
     default: 'plugin'
     required: false
   github-token:
@@ -82,8 +82,7 @@ runs:
         APP_VERSION: "${{ inputs.app-version }}"
         CSI_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
         TEST_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
-        TENANT_NETWORK_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
-        STORAGECLASS_OPERATOR_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
+        TENANT_OPERATOR_IMAGE: "${{ inputs.repo-url }}/${{ inputs.image-name }}:${{ steps.vars.outputs.sha_short }}"
         REGISTRY: "${{ inputs.repo-url }}"
       shell: bash
       run: |
@@ -95,11 +94,8 @@ runs:
           tests) 
             make build-test-image
             ;;
-          tenant-network)
-            make build-tenant-network-image
-            ;;
-          storageclass-operator)
-            make build-storageclass-operator-image
+          tenant-operator)
+            make build-tenant-operator-image
             ;;
           *)
             echo "::error::Unknown build target '${{ inputs.build-target }}'"

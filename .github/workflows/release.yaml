@@ -37,7 +37,7 @@ jobs:
       push: true
     secrets: inherit
 
-  tenant-network-image-ghcr:
+  tenant-operator-image-ghcr:
     permissions:
       contents: read
       packages: write
@@ -46,26 +46,8 @@ jobs:
     with:
       runner-label: "ubuntu-latest"
       app-version: "${{ github.ref_name }}"
-      build-target: "tenant-network"
-      image-name: "panfs-tenant-network"
-      image-tags: "${{ github.ref_name }}"
-      repo-url: "ghcr.io/${{ github.repository }}"
-      ref: "${{ github.ref }}"
-      trivy-scan: false
-      push: true
-    secrets: inherit
-
-  storageclass-operator-image-ghcr:
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    uses: ./.github/workflows/build-reusable.yaml
-    with:
-      runner-label: "ubuntu-latest"
-      app-version: "${{ github.ref_name }}"
-      build-target: "storageclass-operator"
-      image-name: "panfs-storageclass-operator"
+      build-target: "tenant-operator"
+      image-name: "panfs-tenant-operator"
       image-tags: "${{ github.ref_name }}"
       repo-url: "ghcr.io/${{ github.repository }}"
       ref: "${{ github.ref }}"

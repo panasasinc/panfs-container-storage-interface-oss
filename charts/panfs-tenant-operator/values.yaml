@@ -1,0 +1,82 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# -- Image of the PanFS Tenant operator. The operator and the pods it creates on the nodes of a tenant network use the same image.
+# @default -- `...`
+image: ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-tenant-operator:{{ .Chart.AppVersion }}
+
+# -- Image pull policy
+pullPolicy: IfNotPresent
+
+# -- List of image pull secrets for private registries. Each Secret must exist in the namespace of the operator
+# and in the namespace of every TenantNetwork, because the operator creates the node pods there.
+imagePullSecrets: []
+
+# -- Time between two passes of the operator over the TenantNetwork and the PanfsStorageClass resources
+resync: 15s
+
+# -- Namespace of the PanFS CSI driver: the CSI controller in that namespace gets the permission to read the realm Secret
+# of a StorageClass. Leave it empty to read the namespace from the CSIDriver object `com.vdura.csi.panfs`,
+# where the driver chart writes it.
+csiDriverNamespace: ""
+
+# -- ServiceAccount of the CSI controller in that namespace. Leave it empty to use the name that the driver chart
+# gives it: `<namespace of the driver>-controller`, for example `csi-panfs-controller`.
+csiControllerServiceAccount: ""
+
+# -- Default time between two checks of the tenant network on a node
+interval: 30s
+
+# -- Default firewalld zone that the tenant interface is moved to on nodes that run firewalld.
+# The realm opens connections to the PanFS client, and the default zone usually drops them.
+# Set it to an empty string to leave firewalld alone.
+firewalldZone: trusted
+
+# -- Only for a realm that places subnets on VLAN segments: default name of the interface of the nodes
+# that carries the VLAN. An empty value means the interface with the underlay address of the node.
+vlanParentInterface: ""
+
+# -- Default for what a node pod does when its node leaves the tenant: the label `panfs.vdura.com/tenant` is removed
+# from the node, or the TenantNetwork is deleted. With `true`, the pod removes the tenant interface and detaches the node
+# from the subnet in the realm. With `false`, both stay. A restart or an upgrade of the pods never detaches a node.
+detachOnRemoval: true
+
+# -- Stop the install when the PanFS CSI driver is not installed: the CSIDriver object `com.vdura.csi.panfs`
+# is missing. Set it to `false` to install the operator before the driver.
+checkDriver: true
+
+# The test of `helm test <release>`: a health check of the operator. Read its report with `--logs`.
+test:
+  # -- Create the ServiceAccount and the read-only permissions of the test pod with the release.
+  # The pod runs the operator image with `--check`. With `false`, `helm test` has no test.
+  enabled: true
+  # -- How long the check waits for the operator to be available and to process every resource
+  timeout: 120s
+
+# -- Log verbosity (klog level) of the operator and of the node pods
+logLevel: 2
+
+# -- Labels for the operator Deployment and its pod
+labels: {}
+
+# -- Priority class of the node pods
+nodePriorityClassName: ""
+
+# -- Resource requests and limits of the operator container
+resources: {}
+  # requests:
+  #   cpu: 10m
+  #   memory: 32Mi
+  # limits:
+  #   memory: 128Mi

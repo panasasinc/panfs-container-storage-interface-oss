@@ -1,0 +1,510 @@
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# PanfsStorageClass asks the PanFS Tenant operator to create a StorageClass of the PanFS CSI driver.
+# The operator fills in the provisioner, the references to the realm Secret and, with a tenant network, allowedTopologies.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: panfsstorageclasses.panfs.vdura.com
+  labels:
+    product: com.vdura.csi.panfs
+spec:
+  group: panfs.vdura.com
+  scope: Namespaced
+  names:
+    kind: PanfsStorageClass
+    listKind: PanfsStorageClassList
+    plural: panfsstorageclasses
+    singular: panfsstorageclass
+    shortNames:
+      - psc
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: StorageClass
+          type: string
+          jsonPath: .status.storageClass
+        - name: Tenant-Network
+          type: string
+          jsonPath: .status.tenantNetwork
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Message
+          type: string
+          jsonPath: .status.message
+          priority: 1
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              description: >-
+                Optional. In a namespace with a TenantNetwork no field is needed: the operator finds the TenantNetwork
+                of the namespace, the StorageClass uses its Secret, and the volumes are bound to the nodes where
+                the network of the tenant works.
+              type: object
+              properties:
+                realmSecretName:
+                  description: >-
+                    Only for a realm that is reachable without a tenant network: name of a Secret in the namespace of
+                    this resource with the keys api (PanAPI address of the realm), token (PanAPI service account token)
+                    and, optionally, ca_cert. It is required in a namespace without a TenantNetwork,
+                    and refused in a namespace that has one.
+                  type: string
+                  minLength: 1
+                parameters:
+                  description: >-
+                    Optional. PanFS parameters of new volumes, for example panfs.csi.vdura.com/layout. They reach the
+                    StorageClass unchanged; without them the defaults of the driver apply. The parameters that start
+                    with csi.storage.k8s.io/ are set by the operator. They cannot change after the StorageClass was created.
+                  type: object
+                  additionalProperties:
+                    x-kubernetes-int-or-string: true
+                allowVolumeExpansion:
+                  description: Optional. Whether a volume can be expanded. The default is true.
+                  type: boolean
+                reclaimPolicy:
+                  description: >-
+                    Optional. What happens to a volume when its PersistentVolumeClaim is deleted: Delete (the default)
+                    or Retain. It cannot change after the StorageClass was created.
+                  type: string
+                  enum: ["Delete", "Retain"]
+                volumeBindingMode:
+                  description: >-
+                    Optional. Immediate or WaitForFirstConsumer. With a tenant network it is always Immediate: the volume
+                    is created at once and bound to the nodes of the tenant network. With realmSecretName the default
+                    is WaitForFirstConsumer. It cannot change after the StorageClass was created.
+                  type: string
+                  enum: ["Immediate", "WaitForFirstConsumer"]
+                mountOptions:
+                  description: Optional. Mount options of the volumes.
+                  type: array
+                  items:
+                    type: string
+                default:
+                  description: Optional. Whether the StorageClass is the default one of the cluster. The default is false.
+                  type: boolean
+            status:
+              type: object
+              properties:
+                phase:
+                  description: >-
+                    Ready: the StorageClass is in place. Pending: the operator waits for the TenantNetwork.
+                    Error: the message says what is wrong.
+                  type: string
+                message:
+                  type: string
+                storageClass:
+                  description: Name of the StorageClass that the operator created for this resource. It is the name of the resource.
+                  type: string
+                tenantNetwork:
+                  description: Name of the TenantNetwork of the namespace, which the StorageClass uses. Empty without a tenant network.
+                  type: string
+                observedGeneration:
+                  type: integer
+                  format: int64
+
+---
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# TenantNetwork asks the PanFS Tenant operator to put the nodes of one PanFS tenant on the network of that tenant.
+apiVersion: apiextensions.k8s.io/v1
+kind: CustomResourceDefinition
+metadata:
+  name: tenantnetworks.panfs.vdura.com
+  labels:
+    product: com.vdura.csi.panfs
+spec:
+  group: panfs.vdura.com
+  scope: Namespaced
+  names:
+    kind: TenantNetwork
+    listKind: TenantNetworkList
+    plural: tenantnetworks
+    singular: tenantnetwork
+    shortNames:
+      - ptn
+  versions:
+    - name: v1alpha1
+      served: true
+      storage: true
+      subresources:
+        status: {}
+      additionalPrinterColumns:
+        - name: Tenant
+          type: string
+          jsonPath: .status.tenant
+        - name: Nodes
+          type: integer
+          jsonPath: .status.desiredNodes
+        - name: Ready
+          type: integer
+          jsonPath: .status.readyNodes
+        - name: Phase
+          type: string
+          jsonPath: .status.phase
+        - name: Topology-Key
+          type: string
+          jsonPath: .status.managedTopology.key
+          priority: 1
+        - name: Topology-Value
+          type: string
+          jsonPath: .status.managedTopology.value
+          priority: 1
+        - name: Message
+          type: string
+          jsonPath: .status.message
+          priority: 1
+        - name: Age
+          type: date
+          jsonPath: .metadata.creationTimestamp
+      schema:
+        openAPIV3Schema:
+          type: object
+          required: ["spec"]
+          properties:
+            spec:
+              type: object
+              required: ["realmSecretName"]
+              properties:
+                realmSecretName:
+                  description: >-
+                    Name of a Secret in the namespace of this resource with the keys api (PanAPI address of the realm),
+                    token (PanAPI service account token of the tenant) and, optionally, ca_cert.
+                    The tenant is the one the token belongs to.
+                  type: string
+                  minLength: 1
+                nodeSelector:
+                  description: >-
+                    Optional. Labels that select the nodes of the tenant. Without it, they are all nodes of the cluster.
+                    A node must match one TenantNetwork only.
+                  type: object
+                  additionalProperties:
+                    type: string
+                vlanParentInterface:
+                  description: >-
+                    Optional. Only for a realm that places subnets on VLAN segments: the interface of the nodes that
+                    carries the VLAN. Without it, the interface with the underlay address of the node is used.
+                  type: string
+                  maxLength: 15
+                  pattern: "^[A-Za-z0-9][A-Za-z0-9_.:-]*$"
+                interval:
+                  description: Optional. Time between two checks of the tenant network on a node, for example 30s.
+                  type: string
+                firewalldZone:
+                  description: >-
+                    Optional. firewalld zone of the tenant interface on nodes that run firewalld.
+                    An empty string leaves firewalld alone.
+                  type: string
+                  maxLength: 17
+                  pattern: "^[A-Za-z0-9_-]*$"
+                detachOnRemoval:
+                  description: >-
+                    Optional. Whether a pod removes the tenant interface and detaches its node from the subnet
+                    when the node leaves the tenant.
+                  type: boolean
+            status:
+              type: object
+              properties:
+                phase:
+                  description: Ready, Pending, Error or Removing.
+                  type: string
+                message:
+                  type: string
+                tenant:
+                  description: Name of the tenant the token belongs to.
+                  type: string
+                managedTopology:
+                  description: >-
+                    The node label that the pods set on a node where the network of the tenant works.
+                    Use it in allowedTopologies of a StorageClass and in the node selector of a workload.
+                  type: object
+                  required: ["key", "value"]
+                  properties:
+                    key:
+                      description: Key of the label; panfs.vdura.com/tenant-network.
+                      type: string
+                    value:
+                      description: Value of the label; the namespace of this resource.
+                      type: string
+                daemonSet:
+                  description: Name of the DaemonSet the operator created in this namespace.
+                  type: string
+                desiredNodes:
+                  description: Number of nodes that the node selector matches.
+                  type: integer
+                  format: int64
+                readyNodes:
+                  description: Number of nodes where the tenant network works.
+                  type: integer
+                  format: int64
+                observedGeneration:
+                  type: integer
+                  format: int64
+                interface:
+                  description: >-
+                    Name of the tenant interface on the nodes: vxlan<id> on a VXLAN segment, vlan<id> on a VLAN segment.
+                  type: string
+                nodes:
+                  description: State of every node that the node selector matches, by node name.
+                  type: object
+                  additionalProperties:
+                    type: object
+                    required: ["state"]
+                    properties:
+                      state:
+                        description: Ready or NotReady.
+                        type: string
+                      overlayIP:
+                        description: Address of the node on the tenant network.
+                        type: string
+                      message:
+                        description: Why the node is not ready.
+                        type: string
+
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ServiceAccount of the PanFS Tenant operator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: panfs-tenant-operator
+  namespace: csi-panfs
+  labels:
+    app: panfs-tenant-operator
+    product: com.vdura.csi.panfs
+
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ClusterRole of the node pods of a tenant network: read a node and patch its labels.
+# The operator binds it to the ServiceAccount it creates for every TenantNetwork.
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-panfs-tenant-operator-node
+  labels:
+    app: panfs-tenant-operator
+    product: com.vdura.csi.panfs
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "patch"]
+
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ClusterRole of the operator. TenantNetworks and PanfsStorageClasses can be in any namespace, and a StorageClass
+# has no namespace, so the permissions are cluster-wide.
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-panfs-tenant-operator
+  labels:
+    app: panfs-tenant-operator
+    product: com.vdura.csi.panfs
+rules:
+  # Read the TenantNetworks, hold them with a finalizer, and report their status
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["tenantnetworks"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["tenantnetworks/status", "tenantnetworks/finalizers"]
+    verbs: ["update", "patch"]
+
+  # Read the PanfsStorageClasses, hold them with a finalizer, and report their status
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses/status", "panfsstorageclasses/finalizers"]
+    verbs: ["update", "patch"]
+
+  # Read the Secret a TenantNetwork names: the operator asks PanAPI which tenant its token belongs to.
+  # The operator also checks that the Secret of a PanfsStorageClass exists, and it gives the CSI controller
+  # the permission to read that Secret. It can give only a permission that it holds itself
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+
+  # Read the state that the node pods report on their nodes, for the status of a TenantNetwork.
+  # Patch: remove the ready label that the pods of a deleted TenantNetwork could not remove themselves
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list", "patch"]
+
+  # Report changes as events on a TenantNetwork or a PanfsStorageClass;
+  # the node pods get the same permission in their namespace
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+
+  # The DaemonSet of the node pods of a tenant
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "create", "update", "delete"]
+
+  # The ServiceAccount of the node pods and its permissions.
+  # Roles and RoleBindings: also the pair that lets the CSI controller read the Secret of a PanfsStorageClass,
+  # which the operator deletes when nothing needs it any more
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "create", "update", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterrolebindings"]
+    verbs: ["get", "create", "delete"]
+
+  # The StorageClass of a PanfsStorageClass
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "create", "update", "delete"]
+
+  # Read the namespace of the PanFS CSI driver from its CSIDriver object
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csidrivers"]
+    resourceNames: ["com.vdura.csi.panfs"]
+    verbs: ["get"]
+
+  # Find out whether a deleted PanfsStorageClass left volumes that still need its Secret
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["list"]
+
+  # Allow binding the ClusterRole of the node pods, and nothing else
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["csi-panfs-panfs-tenant-operator-node"]
+    verbs: ["bind"]
+
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Bind the ClusterRole to the ServiceAccount of the operator
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: csi-panfs-panfs-tenant-operator
+  labels:
+    app: panfs-tenant-operator
+    product: com.vdura.csi.panfs
+subjects:
+  - kind: ServiceAccount
+    name: panfs-tenant-operator
+    namespace: csi-panfs
+roleRef:
+  kind: ClusterRole
+  name: csi-panfs-panfs-tenant-operator
+  apiGroup: rbac.authorization.k8s.io
+
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Deployment of the PanFS Tenant operator: one pod that watches the TenantNetwork and the PanfsStorageClass resources.
+# The operator itself creates the node pods later, as one DaemonSet per TenantNetwork, in the namespace of that resource.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: panfs-tenant-operator
+  namespace: csi-panfs
+  labels:
+    app: panfs-tenant-operator
+    product: com.vdura.csi.panfs
+spec:
+  replicas: 1
+
+  # Never two operators at one time
+  strategy:
+    type: Recreate
+
+  selector:
+    matchLabels:
+      app: panfs-tenant-operator
+
+  template:
+    metadata:
+      labels:
+        app: panfs-tenant-operator
+        product: com.vdura.csi.panfs
+
+    spec:
+      serviceAccountName: panfs-tenant-operator
+
+      containers:
+        - name: operator
+          image: &image ghcr.io/panasasinc/panfs-container-storage-interface-oss/panfs-tenant-operator:2.0.0
+          imagePullPolicy: IfNotPresent
+          args:
+            - "--operator"
+            - "--v=2"
+            - "--resync=15s"
+            - "--node-image-pull-policy=IfNotPresent"
+            - "--node-image-pull-secrets="
+            - "--node-cluster-role=csi-panfs-panfs-tenant-operator-node"
+            - "--node-priority-class="
+            - "--interval=30s"
+            - "--firewalld-zone=trusted"
+            - "--detach-on-removal=true"
+            - "--vlan-parent="
+            - "--csi-driver-namespace="
+            - "--csi-controller-service-account="
+          env:
+            # The node pods run the same image as the operator
+            - name: NODE_IMAGE
+              value: *image
+
+          # The operator only talks to the Kubernetes API and to PanAPI
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 65534
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]

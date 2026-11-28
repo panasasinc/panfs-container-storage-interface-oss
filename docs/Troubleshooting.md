@@ -340,7 +340,7 @@ kubectl get secret -n $NAMESPACE $SECRET_NAME
   kubectl debug node/<node-name> -it --image=nicolaka/netshoot -- ping -c 3 <mount-address>
   ```
   - If the address does not answer, attach the node to the network of the tenant. The driver does not do this;
-    the [PanFS Tenant Network operator](../charts/tenant-network-operator/Readme.md) does.
+    the [PanFS Tenant operator](../charts/panfs-tenant-operator/Readme.md) does.
     With the operator, check the resource of the tenant; its status lists the nodes, and its events say what happened:
     ```bash
     kubectl get tenantnetworks -A -o wide
@@ -419,6 +419,11 @@ kubectl top nodes
   ```
 
 #### 6. Storage Class Issues
+
+> **Note:** with the PanFS Tenant operator, a StorageClass comes from a `PanfsStorageClass` resource, and the nodes of
+> a tenant are put on its network by a `TenantNetwork`. Their problems are covered in the
+> [StorageClass Guide](./StorageClass-Guide.md#troubleshooting), the [Tenant Guide](./Tenant-Guide.md#troubleshooting)
+> and the [Tenant Operator Guide](./Tenant-Operator-Guide.md#troubleshooting).
 
 **Problem**: StorageClass configuration errors
 
@@ -542,3 +547,5 @@ kubectl logs -n csi-panfs -l app=csi-panfs-node --all-containers
 - **Additional Resources**:
   - [KMM.md](./KMM.md): KMM configuration details
   - [Usage-Guide.md](./Usage-Guide.md): Workload deployment examples
+  - [Tenant-Operator-Guide.md](./Tenant-Operator-Guide.md), [Tenant-Guide.md](./Tenant-Guide.md) and
+    [StorageClass-Guide.md](./StorageClass-Guide.md): the PanFS Tenant operator, tenant networks and PanFS StorageClasses

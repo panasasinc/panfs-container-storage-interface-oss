@@ -21,9 +21,16 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 - **Breaking:** the StorageClass Secret has the keys `api` and `token`, and an optional `ca_cert`.
   The keys of the SSH backend are not read, and a Secret without the new keys is refused.
   Create the Secret and the StorageClass again; see the [upgrade guide](docs/Upgrade.md#migration-from-the-ssh-backend-to-panapi).
-- **Breaking:** the chart values `realm.api`, `realm.token` and `realm.caCert` replace the SSH values of `charts/storageclass`.
-  The `Makefile` variables `REALM_API`, `REALM_TOKEN`, `REALM_CA_CERT` and `STORAGESET`, and the inputs
+- **Breaking:** the chart in `charts/storageclass` (now `panfs-storageclass`, was `csi-panfs-storageclass`) creates
+  a `PanfsStorageClass` resource, and the PanFS Tenant operator creates the StorageClass from it. The chart no longer
+  creates the StorageClass, the Secret, the `Role` and the `RoleBinding` itself, and its values changed: the `realm.*`,
+  `csiPanFSDriver.namespace`, `allowedTopologies`, `setAsDefaultStorageClass` and `volumeReclaimPolicy` values are gone.
+  The Secret comes from the `TenantNetwork` of the namespace (chart `charts/tenant`) or, with `realmSecretName`,
+  from a Secret that you create. A StorageClass of an earlier version keeps working; see
+  [Moving a StorageClass of the old StorageClass chart](charts/panfs-tenant-operator/Readme.md#moving-a-storageclass-of-the-old-storageclass-chart).
+- **Breaking:** the `Makefile` variables `REALM_API`, `REALM_TOKEN`, `REALM_CA_CERT` and `STORAGESET`, and the inputs
   `realm_api`, `realm_token` and `storageset` of the deploy workflow, replace the SSH ones.
+  `make deploy-storageclass` creates the realm Secret and a `PanfsStorageClass`, so it needs `make deploy-tenant-operator` first.
 - The CSI volume ID of a new volume is the PanAPI volume id. The volume name goes to the node in the volume context.
   A PersistentVolume of an earlier version, whose volume ID is the volume name, still works.
 - `panfs.csi.vdura.com/storageset` is optional. A number is the id of the storageset and other text is its name.
@@ -39,34 +46,47 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 
 ### Added
 
-- PanFS Tenant Network operator: the new chart `charts/tenant-network-operator`, the manifests in `deploy/k8s/tenant-network`,
-  and the image `panfs-tenant-network`. Install it once per cluster. A `TenantNetwork` resource names the Secret
-  of a tenant and selects its nodes; the operator reads the tenant of the token from PanAPI and runs a pod on every
-  selected node. A pod attaches its node to the subnet of the tenant through PanAPI, builds the tenant interface,
-  sets the firewalld zone, and sets the node label `panfs.vdura.com/tenant-network=<namespace>` while a director
-  of the realm answers. When a node no longer matches the selector, or the `TenantNetwork` is deleted,
-  the pod removes the interface and detaches the node. A ready label that the pods could not remove,
-  for example because the whole namespace was deleted, is removed by the operator. The pod builds a VXLAN or a VLAN interface, as the realm
-  reports the segment type of the subnet. The status of the resource lists the nodes,
-  and the operator and the pods report changes as events on it.
-  See the [operator documentation](charts/tenant-network-operator/Readme.md).
-- PanFS StorageClass operator: the new chart `charts/storageclass-operator`, the manifests in
-  `deploy/k8s/storageclass-operator`, and the image `panfs-storageclass-operator`. Install it once per cluster.
-  It is a workload of its own, apart from the CSI driver and the PanFS Tenant Network operator.
-  It serves the new resource `PanfsStorageClass`. From a name alone, in the namespace of
-  a `TenantNetwork`, the operator creates a StorageClass: it finds the `TenantNetwork`, fills in the provisioner,
-  the Secret references and `allowedTopologies`, and it lets the CSI controller read the Secret.
-  `spec.realmSecretName` is for a realm without a tenant network. The template is
-  `deploy/k8s/storageclass-operator/template-panfsstorageclass.yaml`. The StorageClass chart and its manifests stay.
-  See the [operator documentation](charts/storageclass-operator/Readme.md).
-- PanFS Tenant StorageClass chart (`charts/tenant-storageclass`): one Helm release per StorageClass of a tenant.
-  It creates the `PanfsStorageClass`, and it checks that the PanFS StorageClass operator is installed first.
+- PanFS Tenant operator: the new chart `charts/panfs-tenant-operator`, the manifest
+  `deploy/k8s/tenant-operator/panfs-tenant-operator.yaml`, and the image `panfs-tenant-operator`.
+  Install it once per cluster, in the namespace of the driver. It is one workload that serves two new resources
+  of the group `panfs.vdura.com/v1alpha1`. See the [operator documentation](charts/panfs-tenant-operator/Readme.md).
+  - `TenantNetwork` names the Secret of a tenant and selects its nodes; the operator reads the tenant of the token
+    from PanAPI and runs a pod on every selected node. A pod attaches its node to the subnet of the tenant through
+    PanAPI, builds the tenant interface, sets the firewalld zone, and sets the node label
+    `panfs.vdura.com/tenant-network=<namespace>` while a director of the realm answers. When a node no longer
+    matches the selector, or the `TenantNetwork` is deleted, the pod removes the interface and detaches the node.
+    A ready label that the pods could not remove, for example because the whole namespace was deleted, is removed
+    by the operator. The pod builds a VXLAN or a VLAN interface, as the realm reports the segment type of the subnet.
+    The status of the resource lists the nodes, and the operator and the pods report changes as events on it.
+    The template is `deploy/k8s/tenant-operator/template-tenantnetwork.yaml`.
+  - `PanfsStorageClass` asks for a StorageClass. From a name alone, in the namespace of a `TenantNetwork`,
+    the operator creates the StorageClass: it finds the `TenantNetwork`, fills in the provisioner, the Secret
+    references and `allowedTopologies`, and it lets the CSI controller read the Secret.
+    `spec.realmSecretName` is for a realm without a tenant network; such a cluster installs the same operator.
+    The template is `deploy/k8s/storage-class/template-panfsstorageclass.yaml`.
+- The charts check the cluster before they create anything, and the install stops with a message otherwise:
+  - StorageClass chart: the `TenantNetwork` of the namespace is there and `Ready`, or `realmSecretName` is set and
+    the namespace has none; the Secret has the keys `api` and `token`; no other StorageClass has the name of the release.
+  - Tenant chart: the namespace has no `TenantNetwork` of another release; the Secret of `existingSecret` exists
+    with the keys `api` and `token`.
+  - Operator chart: the CSI driver is installed.
+
+  The chart values `checkNamespace=false` and, for the operator chart, `checkDriver=false` switch the checks off.
+- `helm test <release>` for the StorageClass chart and the tenant chart: a test pod waits until the
+  `PanfsStorageClass` or the `TenantNetwork` of the release is `Ready`, and the command fails when it is not.
+  The chart values `test.*` set the image and the timeout.
+- `helm test <release> --logs` for the operator chart: a health check that can run at any time. It reports whether the
+  operator is available, its resource definitions are established and every resource is processed, and it lists the
+  resources that are not ready. The operator program runs it with the new flag `--check`.
 - PersistentVolume node affinity: the controller returns the `allowedTopologies` of the StorageClass as the
   topology of a new volume. Every pod of a volume of a tenant is placed on a node where the tenant network works,
   without a node selector in the workload.
 - PanFS Tenant chart (`charts/tenant`): one Helm release per tenant with the Secret of the realm connection
-  and the `TenantNetwork`. It checks that the PanFS Tenant Network operator is installed before it creates anything.
-- The `Makefile` targets `build-tenant-network-image` and `manifest-tenant-network`.
+  and the `TenantNetwork`. It checks that the PanFS Tenant operator is installed before it creates anything.
+- The `Makefile` targets `build-tenant-operator-image`, `deploy-tenant-operator`, `uninstall-tenant-operator`
+  and `manifest-tenant-operator`, and the variable `TENANT_OPERATOR_IMAGE`.
+- The GitHub workflows build, scan, release and clean up the image `panfs-tenant-operator` next to the driver image,
+  and the deploy workflow installs the operator before it creates the StorageClass.
 - The controller reads the mount address (`rmlist`) of the tenant network from PanAPI and passes it to the node.
   The node mounts `panfs://<first address>/<volume>` with the mount option `rmlist=(...)`.
   Without a mount address, it mounts from the host of the `api` address.
@@ -83,6 +103,9 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 - The parameters `panfs.csi.vdura.com/description` and `panfs.csi.vdura.com/recovery`. The driver rejects them;
   use `panfs.csi.vdura.com/recoverypriority` in place of `recovery`.
 - The SSH client of the driver, and `openssh-client` in the sanity test image.
+- **Breaking:** the plain StorageClass manifests `deploy/k8s/storage-class/example-csi-panfs-storage-class.yaml`,
+  `template-secret-in-dedicated-ns.yaml` and `template-secret-in-driver-ns.yaml`, and the `Makefile` target
+  `manifest-storageclass`. Use `deploy/k8s/storage-class/template-panfsstorageclass.yaml`.
 
 ## [1.2.6] - 2026-11-18
 

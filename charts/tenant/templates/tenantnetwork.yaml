@@ -14,17 +14,44 @@
   # limitations under the License.
 */}}
 {{- /*
-  A TenantNetwork can be created only when the PanFS Tenant Network operator has installed its resource definition.
+  A TenantNetwork can be created only when the PanFS Tenant operator has installed its resource definition.
   Stop here with a clear message, before anything is created. "helm template" has no cluster: pass
   --api-versions panfs.vdura.com/v1alpha1/TenantNetwork there. "helm lint" cannot take that flag: set checkOperator=false.
 */}}
 {{- if and .Values.checkOperator (not (.Capabilities.APIVersions.Has "panfs.vdura.com/v1alpha1/TenantNetwork")) }}
-{{- fail "The PanFS Tenant Network operator is not installed in this cluster: the resource kind TenantNetwork (panfs.vdura.com/v1alpha1) is unknown. Install the chart panfs-tenant-network-operator first. To render the chart without a cluster, pass --api-versions panfs.vdura.com/v1alpha1/TenantNetwork or set checkOperator=false." }}
+{{- fail "The PanFS Tenant operator is not installed in this cluster: the resource kind TenantNetwork (panfs.vdura.com/v1alpha1) is unknown. Install the chart panfs-tenant-operator first. To render the chart without a cluster, pass --api-versions panfs.vdura.com/v1alpha1/TenantNetwork or set checkOperator=false." }}
+{{- end }}
+{{- /*
+  Check the namespace before anything is created, with the rules of the operator. Without this check the install
+  succeeds and only the operator reports the problem, in the status of the resource. Helm reads the cluster with
+  the permissions of the user who installs. "helm template" and a client-side dry run have no cluster: "lookup"
+  finds nothing there, not even the namespace kube-system, and the check is skipped.
+*/}}
+{{- if and .Values.checkNamespace (lookup "v1" "Namespace" "" "kube-system") }}
+{{- $ns := .Release.Namespace }}
+{{- if .Capabilities.APIVersions.Has "panfs.vdura.com/v1alpha1/TenantNetwork" }}
+  {{- range (lookup "panfs.vdura.com/v1alpha1" "TenantNetwork" $ns "").items | default list }}
+    {{- if ne .metadata.name $.Release.Name }}
+    {{- fail (printf "Namespace %q has the TenantNetwork %q already. A namespace holds the network of one tenant, and the operator refuses a second one: use another namespace, or upgrade the release that owns %q. To skip this check, set checkNamespace=false." $ns .metadata.name .metadata.name) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
+{{- if .Values.existingSecret }}
+  {{- $secret := lookup "v1" "Secret" $ns .Values.existingSecret }}
+  {{- if not $secret }}
+  {{- fail (printf "The Secret %q, which the value existingSecret names, does not exist in namespace %q. Create it with the keys api and token. To skip this check, set checkNamespace=false." .Values.existingSecret $ns) }}
+  {{- end }}
+  {{- range (list "api" "token") }}
+    {{- if not (hasKey ($secret.data | default dict) .) }}
+    {{- fail (printf "The Secret %q in namespace %q has no key %q. It needs the keys api and token. To skip this check, set checkNamespace=false." $.Values.existingSecret $ns .) }}
+    {{- end }}
+  {{- end }}
+{{- end }}
 {{- end }}
 # SPDX-License-Identifier: Apache-2.0
 # Copyright 2025 VDURA Inc.
 
-# Ask the PanFS Tenant Network operator to put the nodes of the tenant on the tenant network.
+# Ask the PanFS Tenant operator to put the nodes of the tenant on the tenant network.
 # The operator reads the tenant from the token in the Secret, and it runs a pod on every selected node.
 # A pod sets the label panfs.vdura.com/tenant-network={{ .Release.Namespace }} on its node when the network works.
 apiVersion: panfs.vdura.com/v1alpha1

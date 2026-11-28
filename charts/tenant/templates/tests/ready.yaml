@@ -1,0 +1,117 @@
+{{/*
+  # Copyright 2025 VDURA Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+*/}}
+{{- /*
+  "helm test <release>" runs the pod below: it waits until the TenantNetwork of the release is Ready.
+  The pod is a test hook, so the install does not start it. Its ServiceAccount and its permission are plain
+  resources of the release: a hook resource is not removed by "helm uninstall", and these three must not stay behind.
+*/}}
+{{- if .Values.test.enabled }}
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ServiceAccount of the test pod of "helm test"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-test
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# The test pod may read the TenantNetwork of this release, and nothing else
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-test
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+rules:
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["tenantnetworks"]
+    resourceNames: ["{{ .Release.Name }}"]
+    verbs: ["get", "list", "watch"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-test
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-test
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Release.Name }}-test
+  apiGroup: rbac.authorization.k8s.io
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Test pod: passes when the TenantNetwork {{ .Release.Name }} reaches the phase Ready in time.
+# A pod that passed is deleted; a pod that failed stays until the next test, so that its log can be read.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-test
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  serviceAccountName: {{ .Release.Name }}-test
+  {{- if .Values.test.imagePullSecrets }}
+  imagePullSecrets:
+    {{- range .Values.test.imagePullSecrets }}
+    - name: {{ . }}
+    {{- end }}
+  {{- end }}
+  containers:
+    - name: wait-for-ready
+      image: {{ .Values.test.image }}
+      command:
+        - kubectl
+        - wait
+        - --namespace={{ .Release.Namespace }}
+        - tenantnetwork/{{ .Release.Name }}
+        - --for=jsonpath={.status.phase}=Ready
+        - --timeout={{ .Values.test.timeout }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+{{- end }}

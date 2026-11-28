@@ -1,0 +1,104 @@
+{{/*
+  # Copyright 2025 VDURA Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+{{- /*
+  A PanfsStorageClass can be created only when the PanFS Tenant operator has installed its resource definition.
+  Stop here with a clear message, before anything is created. "helm template" has no cluster: pass
+  --api-versions panfs.vdura.com/v1alpha1/PanfsStorageClass there. "helm lint" cannot take that flag: set checkOperator=false.
+*/}}
+{{- if and .Values.checkOperator (not (.Capabilities.APIVersions.Has "panfs.vdura.com/v1alpha1/PanfsStorageClass")) }}
+{{- fail "The PanFS Tenant operator is not installed in this cluster: the resource kind PanfsStorageClass (panfs.vdura.com/v1alpha1) is unknown. Install the chart panfs-tenant-operator first. To render the chart without a cluster, pass --api-versions panfs.vdura.com/v1alpha1/PanfsStorageClass or set checkOperator=false." }}
+{{- end }}
+{{- /*
+  Check the namespace before anything is created: the TenantNetwork and the Secret that the StorageClass needs.
+  Without this check the install succeeds and only the operator reports the problem, in the status of the resource.
+  The rules are the rules of the operator. Helm reads the cluster with the permissions of the user who installs.
+  "helm template" and a client-side dry run have no cluster: "lookup" finds nothing there, not even the
+  namespace kube-system, and the check is skipped.
+*/}}
+{{- if and .Values.checkNamespace (lookup "v1" "Namespace" "" "kube-system") }}
+{{- $ns := .Release.Namespace }}
+{{- $networks := list }}
+{{- if .Capabilities.APIVersions.Has "panfs.vdura.com/v1alpha1/TenantNetwork" }}
+{{- $networks = (lookup "panfs.vdura.com/v1alpha1" "TenantNetwork" $ns "").items | default list }}
+{{- end }}
+{{- $secretName := .Values.realmSecretName }}
+{{- $secretOwner := "the value realmSecretName" }}
+{{- if .Values.realmSecretName }}
+  {{- if $networks }}
+  {{- fail (printf "Namespace %q has the TenantNetwork %q, so realmSecretName must not be set: the volumes would not be bound to the nodes of the tenant. Remove realmSecretName, or use a namespace without a TenantNetwork. To skip this check, set checkNamespace=false." $ns (first $networks).metadata.name) }}
+  {{- end }}
+{{- else }}
+  {{- if not $networks }}
+  {{- fail (printf "Namespace %q has no TenantNetwork. Install the chart panfs-tenant in this namespace first, or pass --namespace with the namespace of the tenant. For a realm that is reachable without a tenant network, set realmSecretName. To skip this check, set checkNamespace=false." $ns) }}
+  {{- end }}
+  {{- /* A namespace holds the network of one tenant. Among several, the one that is Ready is the one that is served. */}}
+  {{- $network := first $networks }}
+  {{- range $networks }}
+    {{- if eq (dig "status" "phase" "" .) "Ready" }}{{ $network = . }}{{ end }}
+  {{- end }}
+  {{- $phase := dig "status" "phase" "" $network }}
+  {{- /* The state of the network counts only for a new release: an upgrade must not fail while a node restarts. */}}
+  {{- if and $.Release.IsInstall (ne $phase "Ready") }}
+  {{- fail (printf "The TenantNetwork %q in namespace %q is not ready: phase %q, message %q. Wait until it is Ready (kubectl -n %s get tenantnetwork %s), then install again. To skip this check, set checkNamespace=false." $network.metadata.name $ns ($phase | default "none") (dig "status" "message" "" $network) $ns $network.metadata.name) }}
+  {{- end }}
+  {{- $secretName = dig "spec" "realmSecretName" "" $network }}
+  {{- $secretOwner = printf "the TenantNetwork %q" $network.metadata.name }}
+{{- end }}
+{{- $secret := lookup "v1" "Secret" $ns $secretName }}
+{{- if not $secret }}
+{{- fail (printf "The Secret %q, which %s names, does not exist in namespace %q. Create it with the keys api and token. To skip this check, set checkNamespace=false." $secretName $secretOwner $ns) }}
+{{- end }}
+{{- range (list "api" "token") }}
+  {{- if not (hasKey ($secret.data | default dict) .) }}
+  {{- fail (printf "The Secret %q in namespace %q has no key %q. It needs the keys api and token. To skip this check, set checkNamespace=false." $secretName $ns .) }}
+  {{- end }}
+{{- end }}
+{{- /*
+  A StorageClass has no namespace and takes the name of the release. The operator never takes over a StorageClass
+  that it did not create for this resource; it marks its own with the annotation below.
+*/}}
+{{- $class := lookup "storage.k8s.io/v1" "StorageClass" "" .Release.Name }}
+{{- if $class }}
+  {{- $owner := dig "metadata" "annotations" "panfs.vdura.com/storage-class-owner" "" $class }}
+  {{- if ne $owner (printf "%s/%s" $ns .Release.Name) }}
+  {{- fail (printf "A StorageClass with the name %q exists already (%s). The name of a StorageClass is unique in the cluster: choose another release name. To skip this check, set checkNamespace=false." .Release.Name (ternary (printf "it belongs to the PanfsStorageClass %s" $owner) "the PanFS Tenant operator did not create it" (ne $owner ""))) }}
+  {{- end }}
+{{- end }}
+{{- end }}
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Ask the PanFS Tenant operator for a StorageClass with the name {{ .Release.Name }}.
+# In the namespace of a TenantNetwork, the operator takes the Secret and the nodes of the tenant from that TenantNetwork.
+apiVersion: panfs.vdura.com/v1alpha1
+kind: PanfsStorageClass
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+{{- $spec := dict }}
+{{- if .Values.realmSecretName }}{{ $_ := set $spec "realmSecretName" .Values.realmSecretName }}{{ end }}
+{{- if .Values.parameters }}{{ $_ := set $spec "parameters" .Values.parameters }}{{ end }}
+{{- if .Values.reclaimPolicy }}{{ $_ := set $spec "reclaimPolicy" .Values.reclaimPolicy }}{{ end }}
+{{- if not (kindIs "invalid" .Values.allowVolumeExpansion) }}{{ $_ := set $spec "allowVolumeExpansion" .Values.allowVolumeExpansion }}{{ end }}
+{{- if .Values.volumeBindingMode }}{{ $_ := set $spec "volumeBindingMode" .Values.volumeBindingMode }}{{ end }}
+{{- if .Values.mountOptions }}{{ $_ := set $spec "mountOptions" .Values.mountOptions }}{{ end }}
+{{- if .Values.default }}{{ $_ := set $spec "default" true }}{{ end }}
+{{- if $spec }}
+spec:
+  {{- toYaml $spec | nindent 2 }}
+{{- end }}

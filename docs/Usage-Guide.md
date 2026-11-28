@@ -34,7 +34,7 @@ Ensure the following are in place before proceeding:
 - **PanFS CSI Driver**: Deployed and operational in the `csi-panfs` namespace
 - **PanFS StorageClass**: Configured with the PanAPI address and the service account token of the PanFS realm
 - **Tenant network**: Worker nodes are attached to the network of the tenant, so they can mount its volumes.
-  The [PanFS Tenant Network operator](../charts/tenant-network-operator/Readme.md) does this for the nodes that you label
+  The [PanFS Tenant operator](../charts/panfs-tenant-operator/Readme.md) does this for the nodes that you label
 - **kubectl**: Installed for interacting with the Kubernetes cluster
 
 > **Tip**: Refer to the [README](../README.md) for setup instructions and the [Architecture Overview](./Overview.md) for design details.

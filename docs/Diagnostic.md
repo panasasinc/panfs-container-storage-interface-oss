@@ -376,6 +376,26 @@ kubectl get events -n default --sort-by='.lastTimestamp'
 kubectl get events --all-namespaces --sort-by='.lastTimestamp' | tail -100
 ```
 
+### 15. PanFS Tenant Operator, Tenant Networks and PanFS StorageClasses
+
+Only on a cluster with the PanFS Tenant operator. The script collects the same in its files 60 to 75.
+
+```bash
+# Resource definitions, the operator and its log
+kubectl get crd tenantnetworks.panfs.vdura.com panfsstorageclasses.panfs.vdura.com
+kubectl -n csi-panfs logs deployment/panfs-tenant-operator --tail=2000
+
+# Tenant networks: phase, nodes, events, and the logs of the node pods
+kubectl get tenantnetworks -A -o wide
+kubectl -n <TENANT_NAMESPACE> describe tenantnetwork <NAME>
+kubectl -n <TENANT_NAMESPACE> logs -l panfs.vdura.com/tenant-network-name=<NAME> --prefix --tail=300
+kubectl get nodes --label-columns panfs.vdura.com/tenant,panfs.vdura.com/tenant-network
+
+# PanFS StorageClasses: phase and events
+kubectl get panfsstorageclasses -A -o wide
+kubectl -n <NAMESPACE> describe panfsstorageclass <NAME>
+```
+
 ## Network Connectivity Testing (Optional)
 
 These commands can help test network connectivity to the PanFS realm but should only be run if network issues are suspected:

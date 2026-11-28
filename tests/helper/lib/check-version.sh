@@ -27,8 +27,7 @@ set -euo pipefail
 
 readonly DRIVER_CHART="charts/panfs/Chart.yaml"
 readonly IMAGE_NAME="panfs-csi-driver"
-readonly TENANT_NETWORK_IMAGE_NAME="panfs-tenant-network"
-readonly STORAGECLASS_OPERATOR_IMAGE_NAME="panfs-storageclass-operator"
+readonly TENANT_OPERATOR_IMAGE_NAME="panfs-tenant-operator"
 
 errors=0
 
@@ -91,30 +90,23 @@ readonly version_re="${version//./\\.}"
 printf 'Checking that everything uses driver version %s\n' "$version"
 
 check_chart "$DRIVER_CHART"
+check_chart "charts/panfs-tenant-operator/Chart.yaml"
 check_chart "charts/storageclass/Chart.yaml"
-check_chart "charts/tenant-network-operator/Chart.yaml"
 check_chart "charts/tenant/Chart.yaml"
-check_chart "charts/storageclass-operator/Chart.yaml"
-check_chart "charts/tenant-storageclass/Chart.yaml"
 
 for manifest in deploy/k8s/csi-driver/*.yaml examples/k8s/base/csi-panfs-driver.yaml; do
     check_image_tags "$manifest"
 done
 
-check_image_tags "deploy/k8s/tenant-network/panfs-tenant-network-operator.yaml" "$TENANT_NETWORK_IMAGE_NAME"
-check_image_tags "deploy/k8s/storageclass-operator/panfs-storageclass-operator.yaml" "$STORAGECLASS_OPERATOR_IMAGE_NAME"
+check_image_tags "deploy/k8s/tenant-operator/panfs-tenant-operator.yaml" "$TENANT_OPERATOR_IMAGE_NAME"
 
-check_contains "Makefile" "^TENANT_NETWORK_IMAGE[[:space:]]*\?=.*/${TENANT_NETWORK_IMAGE_NAME}:${version_re}\$" \
-    "the default TENANT_NETWORK_IMAGE is not '${TENANT_NETWORK_IMAGE_NAME}:${version}'"
-
-check_contains "Makefile" "^STORAGECLASS_OPERATOR_IMAGE[[:space:]]*\?=.*/${STORAGECLASS_OPERATOR_IMAGE_NAME}:${version_re}\$" \
-    "the default STORAGECLASS_OPERATOR_IMAGE is not '${STORAGECLASS_OPERATOR_IMAGE_NAME}:${version}'"
+check_contains "Makefile" "^TENANT_OPERATOR_IMAGE[[:space:]]*\?=.*/${TENANT_OPERATOR_IMAGE_NAME}:${version_re}\$" \
+    "the default TENANT_OPERATOR_IMAGE is not '${TENANT_OPERATOR_IMAGE_NAME}:${version}'"
 
 check_contains "Makefile" "^CSI_IMAGE[[:space:]]*\?=.*/${IMAGE_NAME}:${version_re}\$" \
     "the default CSI_IMAGE is not '${IMAGE_NAME}:${version}'"
 
-for readme in charts/panfs/Readme.md charts/storageclass/Readme.md charts/tenant-network-operator/Readme.md charts/tenant/Readme.md \
-    charts/storageclass-operator/Readme.md charts/tenant-storageclass/Readme.md; do
+for readme in charts/panfs/Readme.md charts/panfs-tenant-operator/Readme.md charts/storageclass/Readme.md charts/tenant/Readme.md; do
     check_contains "$readme" "Version: ${version_re}\]" "no 'Version: ${version}' badge; run 'make manifests'"
     check_contains "$readme" "AppVersion: ${version_re}\]" "no 'AppVersion: ${version}' badge; run 'make manifests'"
 done

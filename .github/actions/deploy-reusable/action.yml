@@ -27,6 +27,10 @@ inputs:
     default: ""
     description: Docker image URL for the driver
     type: string
+  tenant-operator-image-url:
+    default: ""
+    description: Docker image URL for the PanFS Tenant Operator, which creates the StorageClass
+    type: string
   dfc-image-registry:
     description: DFC Image Registry
     type: string
@@ -114,6 +118,17 @@ runs:
       run: |
         echo "::group::Validating installation"
         make verify
+        echo "::endgroup::"
+
+    - name: Deploy Tenant Operator
+      if: ${{ inputs.deployment-target == 'all' || inputs.deployment-target == 'storageclass' }}
+      env:
+        USE_HELM: "${{ inputs.driver-installation-type == 'helm' }}"
+        TENANT_OPERATOR_IMAGE: "${{ inputs.tenant-operator-image-url }}"
+      shell: bash
+      run: |
+        echo "::group::Installing PanFS Tenant Operator"
+        make deploy-tenant-operator
         echo "::endgroup::"
 
     - name: Deploy Storage Class

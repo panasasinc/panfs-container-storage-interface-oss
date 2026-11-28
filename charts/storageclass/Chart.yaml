@@ -14,7 +14,7 @@
 
 # Chart.yaml
 apiVersion: v2
-name: csi-panfs-storageclass
-description: PanFS Realm Storage Class Chart
+name: panfs-storageclass
+description: PanFS StorageClass Chart
 version: "2.0.0"
 appVersion: "2.0.0"

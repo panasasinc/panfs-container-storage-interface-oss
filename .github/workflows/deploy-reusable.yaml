@@ -29,6 +29,10 @@ on:
         description: CSI Driver Image URL
         type: string
         default: ""
+      tenant-operator-image-url:
+        description: PanFS Tenant Operator Image URL
+        type: string
+        default: ""
       dfc-image-registry:
         description: DFC Image Registry
         type: string
@@ -93,6 +97,15 @@ jobs:
           docker pull ${{ inputs.driver-image-url }}
           echo "::endgroup::"
 
+      - name: Pull and Load Tenant Operator Image into Kind Cluster
+        if: ${{ inputs.runner-label == 'ubuntu-latest' }}
+        shell: bash
+        run: |
+          echo "::group::Pull and load Tenant Operator Image"
+          docker pull ${{ inputs.tenant-operator-image-url }}
+          kind load docker-image ${{ inputs.tenant-operator-image-url }} --name=${{ steps.kind.outputs.cluster-name }}
+          echo "::endgroup::"
+
       - name: Build Stub DFC Image
         if: ${{ inputs.dfc-version == 'stub' }}
         shell: bash
@@ -129,6 +142,7 @@ jobs:
         with:
           deployment-target: storageclass
           driver-installation-type: "${{ inputs.driver-installation-type }}"
+          tenant-operator-image-url: "${{ inputs.tenant-operator-image-url }}"
           realm_api: "${{ inputs.realm_api }}"
           realm_token: "${{ inputs.realm_token }}"
           storageset: "${{ inputs.storageset }}"

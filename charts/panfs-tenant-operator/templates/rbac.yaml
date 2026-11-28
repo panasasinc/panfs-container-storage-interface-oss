@@ -1,0 +1,163 @@
+{{/*
+  # Copyright 2025 VDURA Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+*/}}
+{{- if eq .Release.Namespace "default" }}
+{{- fail "Installation into the 'default' namespace is not permitted. Use --namespace <namespace>." }}
+{{- end }}
+{{- /*
+  The operator serves the PanFS CSI driver, and its StorageClass part reads the namespace of the driver from the
+  CSIDriver object. Stop with a clear message when the driver is not installed. "helm template" and a client-side
+  dry run have no cluster: "lookup" finds nothing there, not even the namespace kube-system, and the check is skipped.
+*/}}
+{{- if and .Values.checkDriver (lookup "v1" "Namespace" "" "kube-system") (not (lookup "storage.k8s.io/v1" "CSIDriver" "" "com.vdura.csi.panfs")) }}
+{{- fail "The PanFS CSI driver is not installed in this cluster: the CSIDriver object com.vdura.csi.panfs does not exist. Install the chart csi-panfs first. To skip this check, set checkDriver=false." }}
+{{- end }}
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ServiceAccount of the PanFS Tenant operator
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ClusterRole of the node pods of a tenant network: read a node and patch its labels.
+# The operator binds it to the ServiceAccount it creates for every TenantNetwork.
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-node
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+rules:
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["get", "patch"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ClusterRole of the operator. TenantNetworks and PanfsStorageClasses can be in any namespace, and a StorageClass
+# has no namespace, so the permissions are cluster-wide.
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+rules:
+  # Read the TenantNetworks, hold them with a finalizer, and report their status
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["tenantnetworks"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["tenantnetworks/status", "tenantnetworks/finalizers"]
+    verbs: ["update", "patch"]
+
+  # Read the PanfsStorageClasses, hold them with a finalizer, and report their status
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses"]
+    verbs: ["get", "list", "watch", "update", "patch"]
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["panfsstorageclasses/status", "panfsstorageclasses/finalizers"]
+    verbs: ["update", "patch"]
+
+  # Read the Secret a TenantNetwork names: the operator asks PanAPI which tenant its token belongs to.
+  # The operator also checks that the Secret of a PanfsStorageClass exists, and it gives the CSI controller
+  # the permission to read that Secret. It can give only a permission that it holds itself
+  - apiGroups: [""]
+    resources: ["secrets"]
+    verbs: ["get"]
+
+  # Read the state that the node pods report on their nodes, for the status of a TenantNetwork.
+  # Patch: remove the ready label that the pods of a deleted TenantNetwork could not remove themselves
+  - apiGroups: [""]
+    resources: ["nodes"]
+    verbs: ["list", "patch"]
+
+  # Report changes as events on a TenantNetwork or a PanfsStorageClass;
+  # the node pods get the same permission in their namespace
+  - apiGroups: [""]
+    resources: ["events"]
+    verbs: ["create"]
+
+  # The DaemonSet of the node pods of a tenant
+  - apiGroups: ["apps"]
+    resources: ["daemonsets"]
+    verbs: ["get", "create", "update", "delete"]
+
+  # The ServiceAccount of the node pods and its permissions.
+  # Roles and RoleBindings: also the pair that lets the CSI controller read the Secret of a PanfsStorageClass,
+  # which the operator deletes when nothing needs it any more
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "create"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "create", "update", "delete"]
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterrolebindings"]
+    verbs: ["get", "create", "delete"]
+
+  # The StorageClass of a PanfsStorageClass
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["storageclasses"]
+    verbs: ["get", "create", "update", "delete"]
+
+  # Read the namespace of the PanFS CSI driver from its CSIDriver object
+  - apiGroups: ["storage.k8s.io"]
+    resources: ["csidrivers"]
+    resourceNames: ["com.vdura.csi.panfs"]
+    verbs: ["get"]
+
+  # Find out whether a deleted PanfsStorageClass left volumes that still need its Secret
+  - apiGroups: [""]
+    resources: ["persistentvolumes"]
+    verbs: ["list"]
+
+  # Allow binding the ClusterRole of the node pods, and nothing else
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["clusterroles"]
+    resourceNames: ["{{ .Release.Namespace }}-{{ .Release.Name }}-node"]
+    verbs: ["bind"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Bind the ClusterRole to the ServiceAccount of the operator
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}
+  apiGroup: rbac.authorization.k8s.io

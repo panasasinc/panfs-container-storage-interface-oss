@@ -14,271 +14,216 @@
   # limitations under the License.
 -->
 
-# csi-panfs-storageclass
+# panfs-storageclass
 
-PanFS Realm Storage Class Chart
+PanFS StorageClass Chart
 
 ![Version: 2.0.0](https://img.shields.io/badge/Version-2.0.0-informational?style=flat-square) ![AppVersion: 2.0.0](https://img.shields.io/badge/AppVersion-2.0.0-informational?style=flat-square)
 
-## What PanFS CSI StorageClass is
+## What the PanFS StorageClass chart is
 
-The PanFS CSI StorageClass Helm chart deploys a Kubernetes StorageClass resource that leverages the PanFS Container Storage Interface (CSI) driver to provision and manage persistent storage volumes on a PanFS backend. The chart enables you to configure parameters such as the PanFS realm API address, the service account token, and volume options.
+The chart creates one `PanfsStorageClass` resource as a Helm release. The
+[PanFS Tenant operator](../panfs-tenant-operator/Readme.md) then creates the StorageClass of the PanFS CSI driver from it.
 
-> **Note:** Installation into the `default` namespace is not permitted. You must specify a non-default namespace using the `--namespace <namespace>` option during installation.
+The name of the release is the name of the `PanfsStorageClass` and of the StorageClass.
+The namespace of the release is the namespace of the tenant, or of the realm Secret.
+
+> **Note:** before version 2.0.0 this chart created a StorageClass and a Secret itself, without an operator.
+> It now needs the PanFS Tenant operator. To move a StorageClass of the old chart, see
+> [Moving a StorageClass of the old StorageClass chart](../panfs-tenant-operator/Readme.md#moving-a-storageclass-of-the-old-storageclass-chart).
 
 ### Resources Created by the Helm Chart
 
-- A `StorageClass` resource that uses the PanFS CSI driver to provision and manage persistent storage volumes on a PanFS backend.
-- A `Secret` resource containing the PanFS realm API address and the service account token.
-- If the PanFS realm credentials secret resides in a different namespace than the PanFS CSI driver, the chart creates a `Role` and `RoleBinding` to allow the CSI driver to access the secret.
+- A `PanfsStorageClass` with the name of the release.
+- A `ServiceAccount`, a `Role` and a `RoleBinding` named `<release>-test`, for the pod of `helm test`;
+  see [Testing the release](#testing-the-release).
 
-## Requirements on the PanFS realm
+The operator then creates the StorageClass, and a `Role` and a `RoleBinding` in the same namespace;
+see the [operator documentation](../panfs-tenant-operator/Readme.md#resources-created-by-the-operator).
 
-- `realm.api` is the PanAPI address of the realm, and `realm.token` is the token of a PanAPI service account.
-- A storageset must be assigned to the tenant of the token.
-- The token needs these permissions for its own tenant: read the tenant and its storageset assignments;
-  list, read, create, update and delete volumes; list the subnets and read the mount recipe of a subnet.
-- The worker nodes must be attached to the network of the tenant. The driver does not attach them;
-  the [PanFS Tenant Network operator](../tenant-network-operator/Readme.md) does. For a tenant network, prefer a
-  [PanfsStorageClass](../storageclass-operator/Readme.md#panfsstorageclass) of the PanFS StorageClass operator
-  to this chart: it fills in the Secret references and `allowedTopologies`, and it keeps the volumes on the nodes
-  where the tenant network works.
-- With `allowedTopologies` on the ready label of the tenant network, set `volumeBindingMode` to `Immediate`.
-  With `WaitForFirstConsumer` no volume is provisioned.
-- If the realm certificate is signed by a private CA, set `realm.caCert` to the PEM certificate of that CA,
-  for example with `--set-file realm.caCert=ca.pem`. For a self-signed certificate, use that certificate itself.
-- For a test realm whose certificate cannot be verified, set `realm.insecureSkipTLSVerify=true`.
-  The driver then does not verify the realm certificate, so a host that poses as the realm can read the token.
+## Requirements
+
+- **The PanFS Tenant operator is installed** (chart [`panfs-tenant-operator`](../panfs-tenant-operator/Readme.md)).
+  The chart checks this before it creates anything, and it stops with a message when the operator is missing.
+  The check looks for the resource kind `PanfsStorageClass`, so it proves that the operator chart is installed,
+  not that the operator pod runs at this moment.
+- **The namespace has a `TenantNetwork`**, for example from the [tenant chart](../tenant/Readme.md).
+  The operator finds it: a namespace holds the network of one tenant. For a realm that is reachable without
+  a tenant network, set `realmSecretName` instead; see [Realm without a tenant network](#realm-without-a-tenant-network).
+- **The chart checks the namespace before it creates anything**, with the rules of the operator, and it stops
+  with a message when one fails:
+
+| The namespace has  | `realmSecretName` | The install                                                        |
+|:-------------------|:------------------|:-------------------------------------------------------------------|
+| a `TenantNetwork`  | not set           | goes on when the `TenantNetwork` is `Ready` and its Secret exists  |
+| a `TenantNetwork`  | set               | stops: the volumes would not be bound to the nodes of the tenant   |
+| no `TenantNetwork` | set               | goes on when that Secret exists                                    |
+| no `TenantNetwork` | not set           | stops: install the tenant chart first, or pass the right namespace |
+
+  The Secret must have the keys `api` and `token`. The phase of the `TenantNetwork` counts only for a new release:
+  an upgrade does not stop while a node of the tenant restarts. Helm reads these objects with your permissions,
+  so you need to read the `TenantNetwork` resources and that Secret in the namespace.
+  Set `checkNamespace=false` to install first and let the operator report the state in the status of the resource.
+- **The name of the release is free:** a StorageClass has no namespace, so its name must be unique in the cluster.
+  The chart checks this too: the install stops when a StorageClass with that name exists and the operator
+  did not create it for this release.
 
 ## Usage
 
-To use this chart, ensure your Kubernetes cluster has the PanFS CSI driver installed. You can then create a StorageClass resource that uses the CSI driver.
+### 1. Install a release in the namespace of the tenant
 
-### Examples
-
-### 1. Creating a StorageClass with default parameters
-
-Install the chart **in the same namespace** as the PanFS CSI driver.
+No value is needed in the namespace of a `TenantNetwork`:
 
 ```bash
-# Getting the namespace where the PanFS CSI Driver is installed
-PANFS_CSI_DRIVER_NAMESPACE="$(kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o jsonpath='{.metadata.annotations.csi-driver-namespace}')"
-
-# Installing chart into PanFS CSI Driver namespace
-helm upgrade --install <STORAGE_CLASS_NAME> ./ \
-    --namespace "${PANFS_CSI_DRIVER_NAMESPACE}" \
-    --set realm.api=panfs-realm.example.com \
-    --set realm.token="<service account token>" \
-    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1'
+helm upgrade --install acme-storage ./ --namespace acme
 ```
 
-> Note: The `--create-namespace` flag is not required when installing in an existing namespace.
+It is the same as this manifest:
+
+```yaml
+apiVersion: panfs.vdura.com/v1alpha1
+kind: PanfsStorageClass
+metadata:
+  name: acme-storage
+  namespace: acme
+```
 
 #### Using Helm overrides:
 
-You can also use a YAML file to provide the necessary overrides. Below is an example of such a file:
 ```yaml
 # overrides.yaml
-realm:
-  api: "panfs-realm.example.com"
-  token: "<service account token>"
-
 parameters:
-  panfs.csi.vdura.com/storageset: "1"
+  panfs.csi.vdura.com/layout: "raid6+"
+  panfs.csi.vdura.com/stripeunit: "64k"
+
+reclaimPolicy: Retain
 ```
-
-Install the chart using the overrides file:
-```bash
-helm upgrade --install <STORAGE_CLASS_NAME> ./ \
-    --namespace "${PANFS_CSI_DRIVER_NAMESPACE}" \
-    --values path/to/your/overrides.yaml
-```
-
-### 2. Creating a StorageClass with custom parameters
-
-Install the chart **in a different namespace** than the PanFS CSI driver.
 
 ```bash
-# Getting the namespace where the PanFS CSI Driver is installed
-PANFS_CSI_DRIVER_NAMESPACE="$(kubectl get csidrivers.storage.k8s.io com.vdura.csi.panfs -o jsonpath='{.metadata.annotations.csi-driver-namespace}')"
-
-helm upgrade --install <STORAGE_CLASS_NAME> ./ \
-    --namespace <REALM_SECRET_NAMESPACE> \
-    --create-namespace \
-    --set setAsDefaultStorageClass="true" \
-    --set realm.api="panfs-realm.example.com" \
-    --set realm.token="<service account token>" \
-    --set-string 'parameters.panfs\.csi\.vdura\.com/storageset=1' \
-    --set csiPanFSDriver.namespace="${PANFS_CSI_DRIVER_NAMESPACE}"
+helm upgrade --install acme-storage ./ \
+    --namespace acme \
+    --values overrides.yaml
 ```
 
-> Note:
-> - The `--create-namespace` flag is required when installing into a new namespace.
-> - The option `setAsDefaultStorageClass=true` is used to set this storage class as the default in your Kubernetes cluster
-> - A new namespace is used for keeping the Helm release state, the PanFS realm credentials secret, and the Role/RoleBinding that lets the CSI Driver read it from its namespace
-> - You can choose any suitable name for `<REALM_SECRET_NAMESPACE>`, but we advise setting it equal to `<STORAGE_CLASS_NAME>`
+The parameters, the reclaim policy and the volume binding mode cannot change after the StorageClass was created;
+see [Changing a PanfsStorageClass](../panfs-tenant-operator/Readme.md#changing-a-panfsstorageclass).
 
-#### Using Helm overrides:
+#### Realm without a tenant network
 
-You can also use a YAML file to provide the necessary overrides. Below is an example of such a file:
-```yaml
-# overrides.yaml
-realm:
-  api: "panfs-realm.example.com"
-  token: "<service account token>"
-
-parameters:
-  panfs.csi.vdura.com/storageset: "1"
-
-setAsDefaultStorageClass: "true"
-
-csiPanFSDriver:
-  namespace: csi-panfs
-```
-
-Install the chart using the overrides file:
-```bash
-helm upgrade --install <STORAGE_CLASS_NAME> ./ \
-    --namespace <REALM_SECRET_NAMESPACE> \
-    --create-namespace \
-    --values path/to/your/overrides.yaml
-```
-
-### Verifying the installation
-
-#### 1. Checking the StorageClass
-
-Use the provided command to list StorageClasses.
+When the nodes reach the realm without a tenant network, the namespace has no `TenantNetwork`.
+The chart does not create the Secret. Create it first, with the keys `api` and `token`, and optionally `ca_cert`:
 
 ```bash
-kubectl get sc -l product=com.vdura.csi.panfs
+kubectl create namespace <NAMESPACE>
+kubectl -n <NAMESPACE> create secret generic <SECRET_NAME> \
+    --from-literal=api=<REALM_API> \
+    --from-literal=token=<REALM_TOKEN>
 ```
 
-#### 2. Deploying a Sample Workload
-
-A sample manifest is provided to demonstrate usage.
-
-```yaml
-# Sample Pod that uses the PVC to mount the PanFS volume
-apiVersion: v1
-kind: Pod
-metadata:
-  name: single-pod
-spec:
-  containers:
-    - name: main-container
-      image: ubuntu:latest
-      command:
-        - sh
-        - -c
-        - |
-          mount | grep /data
-          sleep infinity
-      volumeMounts:
-        - mountPath: "/data"
-          name: panfs-volume
-      resources:
-        limits:
-          memory: 1G
-          cpu: "100m"
-  volumes:
-    - name: panfs-volume
-      persistentVolumeClaim:
-        claimName: csi-pvc-single-pod
----
-# Sample PVC that uses the StorageClass created by this Helm chart
-apiVersion: v1
-kind: PersistentVolumeClaim
-metadata:
-  name: csi-pvc-single-pod
-spec:
-  accessModes:
-    - ReadWriteOnce
-  resources:
-    requests:
-      storage: 5Gi
-  storageClassName: <STORAGE_CLASS_NAME>
-```
-
-Check the status of pods, PVCs, and PVs using the provided command.
+Then name the Secret:
 
 ```bash
-kubectl get po,pvc,pv
+helm upgrade --install realm-storage ./ \
+    --namespace <NAMESPACE> \
+    --set realmSecretName=<SECRET_NAME>
 ```
 
-### Troubleshooting Pod Creation and Runtime Errors
+The PanFS Tenant operator must be installed for this case too. Its tenant network part then has nothing to do.
 
-If you encounter errors when creating or running workload Pods, follow these steps to diagnose and resolve common issues:
+### 2. Check the result
 
-- Verify the realm credentials in the StorageClass secret.
-  ```bash
-  # Getting the secret name and its namespace from the StorageClass
-  kubectl get sc <STORAGE_CLASS_NAME> -o yaml | grep csi.storage.k8s.io
+```bash
+kubectl -n acme get panfsstorageclass acme-storage
+kubectl -n acme describe panfsstorageclass acme-storage
+kubectl get storageclass acme-storage
+```
 
-  # Checking the secret content
-  # If you installed the chart in a dedicated namespace, the secret name, its namespace, and the StorageClass name will match the chart release name.
-  # If you installed the chart in the same namespace as the CSI driver, the secret name and StorageClass name will match the chart release name, and the secret will reside in the CSI driver's namespace.
-  kubectl get secret -n <REALM_SECRET_NAMESPACE> <REALM_SECRET_NAME> -o jsonpath='{.data.api}' | base64 -d
-  ```
-- Check the logs of the CSI driver:
-  - For controller issues (volume provisioning), review the controller logs:
-    ```bash
-    CSI_DRIVER_NAMESPACE=$(kubectl get csidriver com.vdura.csi.panfs -o yaml | grep csi-driver-namespace | awk '{print $2}')
-    kubectl logs -n $CSI_DRIVER_NAMESPACE -l app=csi-panfs-controller --all-pods -c csi-panfs-plugin
-    ```
-  - For node issues (volume mounting), review the node logs:
-    ```bash
-    CSI_DRIVER_NAMESPACE=$(kubectl get csidriver com.vdura.csi.panfs -o yaml | grep csi-driver-namespace | awk '{print $2}')
-    kubectl logs -n $CSI_DRIVER_NAMESPACE -l app=csi-panfs-node --all-pods -c csi-panfs-plugin
-    ```
+The phase must become `Ready`. The phase `Pending` means that the `TenantNetwork` is not ready yet.
+The status and the events are described in the [operator documentation](../panfs-tenant-operator/Readme.md#status).
+
+### Testing the release
+
+The chart checks the namespace before the install, but the install does not wait for the operator:
+it succeeds as soon as the `PanfsStorageClass` is created.
+`helm test` checks the result: it runs a pod that waits until the resource has the phase `Ready`.
+
+```bash
+helm test acme-storage --namespace acme
+```
+
+The command fails when the phase is not `Ready` after `test.timeout` (120 seconds by default), for example when
+the name of the StorageClass is taken. The status of the resource then says why:
+`kubectl -n acme describe panfsstorageclass acme-storage`.
+
+- The test pod uses the image `test.image`, which must have `kubectl`. For a private registry, set `test.image`
+  and `test.imagePullSecrets`.
+- The release holds a `ServiceAccount`, a `Role` and a `RoleBinding` named `<release>-test` for the pod.
+  The `Role` allows reading the `PanfsStorageClass` of the release, and nothing else.
+  Set `test.enabled=false` to leave them out; `helm test` then has no test.
+- A test pod that passed is deleted. A pod that failed stays, so that its log can be read, and `helm uninstall`
+  does not remove it: `kubectl -n acme delete pod acme-storage-test`.
+
+### Rendering the chart without a cluster
+
+`helm template` has no cluster to ask, so the check for the operator fails there, and the check of the namespace
+is skipped. Tell Helm that the kind exists:
+
+```bash
+helm template acme-storage ./ --namespace acme \
+    --api-versions panfs.vdura.com/v1alpha1/PanfsStorageClass
+```
+
+`helm lint` cannot take that flag; switch the check off there with `--set checkOperator=false`.
 
 ### Uninstalling the chart
 
-Use the provided command to uninstall the chart from the specified namespace.
-
 ```bash
-helm uninstall <STORAGE_CLASS_NAME> \
-    --namespace=<NAMESPACE>
+helm uninstall acme-storage --namespace acme
 ```
+
+The uninstall deletes the `PanfsStorageClass`, and the operator deletes the StorageClass. Existing volumes keep working;
+see [Deleting a PanfsStorageClass](../panfs-tenant-operator/Readme.md#deleting-a-panfsstorageclass).
 
 ## Values
 
 | Key | Type | Default | Description |
 |-----|------|---------|-------------|
-| allowVolumeExpansion | bool | `true` | Allow expansion of provisioned volumes |
-| allowedTopologies | object | `{}` | Allowed topologies for volume provisioning This can be used to restrict volume provisioning to specific nodes or zones based on node labels. Uncomment and modify the example below as needed. If left empty, no topology constraints will be applied. |
-| csiPanFSDriver.namespace | string | `"csi-panfs"` | Namespace where the PanFS CSI driver is deployed |
-| mountOptions | list | `[]` |  |
-| parameters | object | `{...}` | Storage class parameters. All of them are optional; a parameter with an empty value is left out. |
-| realm.api | string | `""` | PanAPI address of the PanFS realm: a host name or IP address (HTTPS is used), or a full `https://` or `http://` URL. The nodes mount volumes from the host of this address, unless PanAPI names another mount address for the tenant. |
-| realm.caCert | string | `""` | Optional PEM certificate of the CA that signed the realm certificate. Leave empty to use the system trust store. |
-| realm.insecureSkipTLSVerify | bool | `false` | Do not verify the realm certificate. Use it only for a test realm whose certificate cannot be verified: a host that poses as the realm can then read the token. Prefer `realm.caCert`. |
-| realm.token | string | `""` | PanAPI service account token. Its tenant must have a storageset assigned. |
-| setAsDefaultStorageClass | bool | `false` | Whether to set this storage class as the default for the cluster |
-| volumeBindingMode | string | `"WaitForFirstConsumer"` | Default volume binding mode |
-| volumeReclaimPolicy | string | `Delete` | Default reclaim policy for volumes |
+| allowVolumeExpansion | bool | `nil` | Whether a volume can be expanded. Empty means the default of the operator: `true`. |
+| checkNamespace | bool | `true` | Check the cluster before anything is created: the namespace has a `TenantNetwork` that is `Ready` (for a new release), or `realmSecretName` is set and it has none; the Secret exists with the keys `api` and `token`; and no other StorageClass has the name of the release. The install stops with a message otherwise. Helm reads these objects with your permissions. Set it to `false` to install first and let the operator report the state in the status of the resource. |
+| checkOperator | bool | `true` | Check that the PanFS Tenant operator is installed before anything is created. Set it to `false` only to render or lint the chart without a cluster. |
+| default | bool | `false` | Make the StorageClass the default one of the cluster |
+| mountOptions | list | `[]` | Mount options of the volumes |
+| parameters | object | `{}` | PanFS parameters of new volumes, for example `panfs.csi.vdura.com/layout`. Without them the defaults of the driver apply. They cannot change after the StorageClass was created. |
+| realmSecretName | string | `""` | Only for a realm that is reachable without a tenant network, in a namespace without a `TenantNetwork`: name of a Secret in the namespace of the release with the keys `api` and `token`, and optionally `ca_cert`. Leave it empty in the namespace of a `TenantNetwork`: the operator uses the Secret of the `TenantNetwork`. |
+| reclaimPolicy | string | `""` | `Delete` or `Retain`. Empty means the default of the operator: `Delete`. It cannot change after the StorageClass was created. |
+| test.enabled | bool | `true` | Create the ServiceAccount, the Role and the RoleBinding of the test pod with the release. The Role allows reading the PanfsStorageClass of the release only. With `false`, `helm test` has no test. |
+| test.image | string | `"registry.k8s.io/kubectl:v1.33.1"` | Image of the test pod. It must have `kubectl` |
+| test.imagePullSecrets | list | `[]` | List of image pull secrets of the test pod, for an image in a private registry |
+| test.timeout | string | `"120s"` | How long the test waits for the phase `Ready` |
+| volumeBindingMode | string | `""` | `Immediate` or `WaitForFirstConsumer`. Empty means the default of the operator: `Immediate` with a tenant network, `WaitForFirstConsumer` without one. It cannot change after the StorageClass was created. |
 
 ### PanFS Specific Volume Parameters
 
-The driver passes the following parameters to the realm when it creates a volume:
+The driver passes the following keys of `parameters` to the realm when it creates a volume.
+Without a key, the default of the driver or of the realm applies.
 
-| Key | Type | Default | Description |
-|-----|------|---------|-------------|
-| parameters."panfs.csi.vdura.com/storageset" | string | `""` | Storageset that holds the volumes: its id (a number) or its name. Optional: without it, the first storageset assigned to the tenant is used |
-| parameters."panfs.csi.vdura.com/recoverypriority" | string | `"50"` | Recovery priority for the realm volumes |
-| parameters."panfs.csi.vdura.com/efsa" | string | `"retry"` | EFSA volume mode |
-| parameters."panfs.csi.vdura.com/layout" | string | `"raid6+"` | Default layout for the realm volumes |
-| parameters."panfs.csi.vdura.com/maxwidth" | int | 3 | Maximum number of storages to stripe over |
-| parameters."panfs.csi.vdura.com/stripeunit" | string | `"64k"` | Stripe unit for the realm volumes |
-| parameters."panfs.csi.vdura.com/rgwidth" | int | 3 | Number of storage nodes to stripe over in a single RAID group |
-| parameters."panfs.csi.vdura.com/rgdepth" | int | 2 | Number of stripes written to a RAID parity group before advancing to the next parity group |
-| parameters."panfs.csi.vdura.com/volservice" | string |  | Volume service id for the realm volumes |
-| parameters."panfs.csi.vdura.com/user" | string |  | Numeric id of the owner user |
-| parameters."panfs.csi.vdura.com/group" | string |  | Numeric id of the owner group |
-| parameters."panfs.csi.vdura.com/uperm" | string |  | User permissions |
-| parameters."panfs.csi.vdura.com/gperm" | string |  | Group permissions |
-| parameters."panfs.csi.vdura.com/operm" | string | `"all"` | Other permissions |
+| Key                                    | Example    | Description                                                                             |
+|:---------------------------------------|:-----------|:----------------------------------------------------------------------------------------|
+| `panfs.csi.vdura.com/storageset`       | `"1"`      | Storageset that holds the volumes: its id or its name; default: the first of the tenant |
+| `panfs.csi.vdura.com/recoverypriority` | `"50"`     | Recovery priority of the volumes                                                        |
+| `panfs.csi.vdura.com/efsa`             | `"retry"`  | EFSA volume mode                                                                        |
+| `panfs.csi.vdura.com/layout`           | `"raid6+"` | Layout of the volumes                                                                   |
+| `panfs.csi.vdura.com/maxwidth`         | `"3"`      | Maximum number of storages to stripe over                                               |
+| `panfs.csi.vdura.com/stripeunit`       | `"64k"`    | Stripe unit of the volumes                                                              |
+| `panfs.csi.vdura.com/rgwidth`          | `"3"`      | Number of storage nodes to stripe over in a single RAID group                           |
+| `panfs.csi.vdura.com/rgdepth`          | `"2"`      | Number of stripes written to a RAID parity group before advancing to the next group     |
+| `panfs.csi.vdura.com/volservice`       |            | Volume service id of the volumes                                                        |
+| `panfs.csi.vdura.com/user`             | `"1001"`   | Numeric id of the owner user                                                            |
+| `panfs.csi.vdura.com/group`            | `"100"`    | Numeric id of the owner group                                                           |
+| `panfs.csi.vdura.com/uperm`            | `"all"`    | User permissions                                                                        |
+| `panfs.csi.vdura.com/gperm`            | `"all"`    | Group permissions                                                                       |
+| `panfs.csi.vdura.com/operm`            | `"all"`    | Other permissions                                                                       |
 
+The values are strings: quote the numbers, or pass them with `--set-string`.
 The driver rejects the parameters `description`, `encryption` and `recovery` of earlier driver versions.
 Use `recoverypriority` in place of `recovery`. Volume encryption is not supported.
-

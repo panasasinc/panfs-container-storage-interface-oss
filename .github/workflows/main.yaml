@@ -48,7 +48,7 @@ jobs:
       push: true
     secrets: inherit
 
-  tenant-network-image:
+  tenant-operator-image:
     permissions:
       contents: read
       packages: write
@@ -57,26 +57,8 @@ jobs:
     with:
       runner-label: "ubuntu-latest"
       app-version: "${{ github.ref_name }}"
-      build-target: "tenant-network"
-      image-name: "panfs-tenant-network"
-      image-tags: "latest"
-      repo-url: "ghcr.io/${{ github.repository }}"
-      ref: "${{ github.ref }}"
-      trivy-scan: false
-      push: true
-    secrets: inherit
-
-  storageclass-operator-image:
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
-    uses: ./.github/workflows/build-reusable.yaml
-    with:
-      runner-label: "ubuntu-latest"
-      app-version: "${{ github.ref_name }}"
-      build-target: "storageclass-operator"
-      image-name: "panfs-storageclass-operator"
+      build-target: "tenant-operator"
+      image-name: "panfs-tenant-operator"
       image-tags: "latest"
       repo-url: "ghcr.io/${{ github.repository }}"
       ref: "${{ github.ref }}"
@@ -89,11 +71,12 @@ jobs:
       id-token: write
       packages: read
       contents: read
-    needs: csi-driver-image
+    needs: [csi-driver-image, tenant-operator-image]
     uses: ./.github/workflows/deploy-reusable.yaml
     with:
       driver-installation-type: "helm"
       driver-image-url: "${{ needs.csi-driver-image.outputs.image-url }}:${{ needs.csi-driver-image.outputs.tag0 }}"
+      tenant-operator-image-url: "${{ needs.tenant-operator-image.outputs.image-url }}:${{ needs.tenant-operator-image.outputs.tag0 }}"
       runner-label: "ubuntu-latest"
       ref: ${{ github.ref }}
     secrets: inherit

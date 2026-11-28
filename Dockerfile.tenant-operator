@@ -1,0 +1,66 @@
+# Copyright 2025 VDURA Inc.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Image of panfs-tenant-operator: the PanFS tenant operator, which serves the TenantNetwork and the PanfsStorageClass
+# resources. The pods that it creates on the nodes of a tenant network run the same image.
+
+# Set the Go version to use (default: 1.27)
+ARG GOLANG_VERSION=1.27
+
+# MARK: Stage 1: Download Go modules for caching
+FROM golang:${GOLANG_VERSION} AS modules
+
+COPY go.mod go.sum /modules/
+WORKDIR /modules
+RUN go mod download
+
+# MARK: Stage 2: Build the Go binary
+FROM golang:${GOLANG_VERSION} AS builder
+ARG APP_VERSION="dev"
+
+COPY --from=modules /go/pkg /go/pkg
+
+WORKDIR /app
+
+COPY pkg/ pkg/
+COPY cmd/ cmd/
+COPY go.mod go.sum ./
+
+# Build the binary for Linux amd64, statically linked
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "-X main.version=${APP_VERSION}" \
+    -o /bin/panfs-tenant-operator ./cmd/tenant-operator
+
+# MARK: Stage 3: Create the final image
+FROM alpine:3.24 AS tenant-operator
+
+ARG BUILD_DATE
+ARG VERSION
+ARG GIT_COMMIT
+
+# OCI labels for Open Container Initiative compliance
+LABEL org.opencontainers.image.title="PanFS Tenant Operator" \
+      org.opencontainers.image.description="Serves the TenantNetwork and PanfsStorageClass resources and puts Kubernetes nodes on the network of a PanFS tenant" \
+      org.opencontainers.image.version="${VERSION}" \
+      org.opencontainers.image.created="${BUILD_DATE}" \
+      org.opencontainers.image.revision="${GIT_COMMIT}" \
+      org.opencontainers.image.vendor="PanFS CSI Team"
+
+# The node pods need these tools; the operator itself only talks to the Kubernetes API.
+# iproute2 gives ip and bridge, which build the tenant interface.
+# dbus gives dbus-send, which talks to firewalld on the host. ping comes with the base image.
+RUN apk update && apk upgrade && apk add --no-cache iproute2 dbus && rm -rf /var/cache/apk/*
+
+COPY --from=builder /bin/panfs-tenant-operator /panfs-tenant-operator
+
+ENTRYPOINT ["/panfs-tenant-operator"]
