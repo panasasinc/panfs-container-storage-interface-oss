@@ -428,7 +428,7 @@ manifest-tenant-operator: ## Generate manifests for the PanFS Tenant Operator
 	@printf "$(BOLD)Generating manifests for the PanFS Tenant Operator...$(RESET)\n"
 	@mkdir -p deploy/k8s/tenant-operator/
 	helm template panfs-tenant-operator charts/panfs-tenant-operator --include-crds \
-		--namespace csi-panfs | \
+		--namespace csi-panfs --set test.enabled=false | \
 		grep -v '^# Source:' > deploy/k8s/tenant-operator/panfs-tenant-operator.yaml
 	@printf "$(GREEN)Successfully generated manifests for the PanFS Tenant Operator$(RESET)\n\n"
 

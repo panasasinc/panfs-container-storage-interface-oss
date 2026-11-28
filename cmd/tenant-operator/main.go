@@ -27,6 +27,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"os"
 	"os/signal"
 	"strings"
@@ -93,8 +94,17 @@ func main() {
 			"the default is <namespace of the driver>-controller")
 	resync := flag.Duration("resync", 15*time.Second,
 		"Operator: time between two passes over the TenantNetwork and the PanfsStorageClass resources")
+	check := flag.Bool("check", false,
+		"Check the health of the operator and exit: the Deployment --check-deployment in --namespace is available, "+
+			"both resource definitions are established, and every resource is processed. Used by \"helm test\"")
+	checkDeployment := flag.String("check-deployment", "panfs-tenant-operator", "Check: name of the operator Deployment")
+	checkTimeout := flag.Duration("check-timeout", 2*time.Minute, "Check: how long the check may wait for the operator")
 	flag.Parse()
 	defer klog.Flush()
+
+	if *check {
+		os.Exit(runCheck(cfg.Namespace, *checkDeployment, *checkTimeout))
+	}
 
 	log := klog.NewKlogr()
 	log.Info("starting panfs-tenant-operator", "version", version, "operator", *operator, "tenant", cfg.Tenant, "node", cfg.NodeName,
@@ -187,4 +197,34 @@ func main() {
 	}
 
 	reconciler.Loop(ctx)
+}
+
+// runCheck runs the health check of the operator with the in-cluster configuration and returns the exit code.
+func runCheck(namespace, deployment string, timeout time.Duration) int {
+	kubeConfig, err := rest.InClusterConfig()
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "cannot read the in-cluster configuration: %v\n", err)
+		return 2
+	}
+	kube, err := kubernetes.NewForConfig(kubeConfig)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "cannot create the Kubernetes client: %v\n", err)
+		return 2
+	}
+	dynamicClient, err := dynamic.NewForConfig(kubeConfig)
+	if err != nil {
+		_, _ = fmt.Fprintf(os.Stderr, "cannot create the dynamic Kubernetes client: %v\n", err)
+		return 2
+	}
+	ctx, stop := signal.NotifyContext(context.Background(), syscall.SIGTERM, syscall.SIGINT)
+	defer stop()
+	health := &HealthCheck{
+		Kube: kube, Dynamic: dynamicClient, Namespace: namespace, Deployment: deployment,
+		Timeout: timeout, Interval: 5 * time.Second, Out: os.Stdout,
+	}
+	if err := health.Run(ctx); err != nil {
+		_, _ = fmt.Fprintln(os.Stdout, err)
+		return 1
+	}
+	return 0
 }

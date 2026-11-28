@@ -1,0 +1,157 @@
+{{/*
+  # Copyright 2025 VDURA Inc.
+  #
+  # Licensed under the Apache License, Version 2.0 (the "License");
+  # you may not use this file except in compliance with the License.
+  # You may obtain a copy of the License at
+  #
+  #     http://www.apache.org/licenses/LICENSE-2.0
+  #
+  # Unless required by applicable law or agreed to in writing, software
+  # distributed under the License is distributed on an "AS IS" BASIS,
+  # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  # See the License for the specific language governing permissions and
+  # limitations under the License.
+*/}}
+{{- /*
+  "helm test <release>" runs the pod below: a health check of the operator. It passes when the operator Deployment
+  is available, both resource definitions are established, and the operator has processed every TenantNetwork and
+  every PanfsStorageClass. It lists the resources that are not ready, without failing for them.
+  The pod runs the operator image with --check, so the test needs no other image. Its ServiceAccount and its
+  permissions are plain resources of the release: a hook resource is not removed by "helm uninstall".
+*/}}
+{{- if .Values.test.enabled }}
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# ServiceAccount of the test pod of "helm test"
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Release.Name }}-test
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# The test pod may read the two resource definitions and the two resource kinds, and nothing else
+kind: ClusterRole
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-test
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+rules:
+  - apiGroups: ["apiextensions.k8s.io"]
+    resources: ["customresourcedefinitions"]
+    resourceNames: ["tenantnetworks.panfs.vdura.com", "panfsstorageclasses.panfs.vdura.com"]
+    verbs: ["get"]
+  - apiGroups: ["panfs.vdura.com"]
+    resources: ["tenantnetworks", "panfsstorageclasses"]
+    verbs: ["list"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+kind: ClusterRoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-test
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-test
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: ClusterRole
+  name: {{ .Release.Namespace }}-{{ .Release.Name }}-test
+  apiGroup: rbac.authorization.k8s.io
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# The test pod may read the operator Deployment of this release, and nothing else in this namespace
+kind: Role
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-test
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    resourceNames: ["{{ .Release.Name }}"]
+    verbs: ["get"]
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+kind: RoleBinding
+apiVersion: rbac.authorization.k8s.io/v1
+metadata:
+  name: {{ .Release.Name }}-test
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Release.Name }}-test
+    namespace: {{ .Release.Namespace }}
+roleRef:
+  kind: Role
+  name: {{ .Release.Name }}-test
+  apiGroup: rbac.authorization.k8s.io
+---
+# SPDX-License-Identifier: Apache-2.0
+# Copyright 2025 VDURA Inc.
+
+# Test pod: the health check of the operator. Read its report with "helm test <release> --logs".
+# A pod that passed is deleted; a pod that failed stays until the next test, so that its log can be read.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ .Release.Name }}-test
+  namespace: {{ .Release.Namespace }}
+  labels:
+    app: {{ .Release.Name }}
+    product: com.vdura.csi.panfs
+  annotations:
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  serviceAccountName: {{ .Release.Name }}-test
+  {{- if .Values.imagePullSecrets }}
+  imagePullSecrets:
+    {{- range .Values.imagePullSecrets }}
+    - name: {{ . }}
+    {{- end }}
+  {{- end }}
+  containers:
+    - name: health-check
+      image: {{ .Values.image | replace "{{ .Chart.AppVersion }}" .Chart.AppVersion }}
+      imagePullPolicy: {{ .Values.pullPolicy }}
+      args:
+        - "--check"
+        - "--namespace={{ .Release.Namespace }}"
+        - "--check-deployment={{ .Release.Name }}"
+        - "--check-timeout={{ .Values.test.timeout }}"
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 65534
+        allowPrivilegeEscalation: false
+        readOnlyRootFilesystem: true
+        capabilities:
+          drop: ["ALL"]
+        seccompProfile:
+          type: RuntimeDefault
+{{- end }}

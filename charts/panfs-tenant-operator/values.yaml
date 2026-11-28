@@ -56,6 +56,14 @@ detachOnRemoval: true
 # is missing. Set it to `false` to install the operator before the driver.
 checkDriver: true
 
+# The test of `helm test <release>`: a health check of the operator. Read its report with `--logs`.
+test:
+  # -- Create the ServiceAccount and the read-only permissions of the test pod with the release.
+  # The pod runs the operator image with `--check`. With `false`, `helm test` has no test.
+  enabled: true
+  # -- How long the check waits for the operator to be available and to process every resource
+  timeout: 120s
+
 # -- Log verbosity (klog level) of the operator and of the node pods
 logLevel: 2
 

@@ -257,6 +257,16 @@ helm upgrade --install panfs-tenant-operator ./ \
     --wait
 ```
 
+#### Health check
+
+```bash
+helm test panfs-tenant-operator --namespace csi-panfs --logs
+```
+
+The test pod runs the operator image with `--check`. It passes when the operator is available, both resource
+definitions are established, and the operator has processed every resource; it lists the resources that are not
+ready. It can run at any time; see the [Tenant Operator Guide](../../docs/Tenant-Operator-Guide.md#check-the-installation).
+
 ### 2. Label the nodes of the tenant
 
 Any label works; the `TenantNetwork` selects the nodes by it. Skip this step to use all nodes of the cluster:
@@ -683,4 +693,6 @@ kubectl -n <NAMESPACE> patch panfsstorageclass <STORAGE_CLASS_NAME> --type merge
 | pullPolicy | string | `"IfNotPresent"` | Image pull policy |
 | resources | object | `{}` | Resource requests and limits of the operator container |
 | resync | string | `"15s"` | Time between two passes of the operator over the TenantNetwork and the PanfsStorageClass resources |
+| test.enabled | bool | `true` | Create the ServiceAccount and the read-only permissions of the test pod with the release. The pod runs the operator image with `--check`. With `false`, `helm test` has no test. |
+| test.timeout | string | `"120s"` | How long the check waits for the operator to be available and to process every resource |
 | vlanParentInterface | string | `""` | Only for a realm that places subnets on VLAN segments: default name of the interface of the nodes that carries the VLAN. An empty value means the interface with the underlay address of the node. |

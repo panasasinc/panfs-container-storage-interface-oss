@@ -75,6 +75,9 @@ the [compatibility matrix](README.md#compatibility) lists them, but this reposit
 - `helm test <release>` for the StorageClass chart and the tenant chart: a test pod waits until the
   `PanfsStorageClass` or the `TenantNetwork` of the release is `Ready`, and the command fails when it is not.
   The chart values `test.*` set the image and the timeout.
+- `helm test <release> --logs` for the operator chart: a health check that can run at any time. It reports whether the
+  operator is available, its resource definitions are established and every resource is processed, and it lists the
+  resources that are not ready. The operator program runs it with the new flag `--check`.
 - PersistentVolume node affinity: the controller returns the `allowedTopologies` of the StorageClass as the
   topology of a new volume. Every pod of a volume of a tenant is placed on a node where the tenant network works,
   without a node selector in the workload.

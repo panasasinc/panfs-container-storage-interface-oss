@@ -127,13 +127,14 @@ helm upgrade --install panfs-tenant-operator charts/panfs-tenant-operator \
 
 The most used values are below; the [chart readme](../charts/panfs-tenant-operator/Readme.md#values) lists all.
 
-| Value              | Default            | Use it to                                                  |
-|:-------------------|:-------------------|:-----------------------------------------------------------|
-| `image`            | the released image | run another image, for example a development build         |
-| `imagePullSecrets` | none               | pull from a private registry                               |
-| `resync`           | `15s`              | change the time between two passes of the operator         |
-| `logLevel`         | `2`                | get more detail in the logs (`5` shows every step)         |
-| `checkDriver`      | `true`             | install the operator before the driver (set it to `false`) |
+| Value              | Default            | Use it to                                                     |
+|:-------------------|:-------------------|:--------------------------------------------------------------|
+| `image`            | the released image | run another image, for example a development build            |
+| `imagePullSecrets` | none               | pull from a private registry                                  |
+| `resync`           | `15s`              | change the time between two passes of the operator            |
+| `logLevel`         | `2`                | get more detail in the logs (`5` shows every step)            |
+| `checkDriver`      | `true`             | install the operator before the driver (set it to `false`)    |
+| `test.enabled`     | `true`             | leave out the health check of `helm test` (set it to `false`) |
 
 ### Without Helm
 
@@ -158,6 +159,26 @@ and the image of `TENANT_OPERATOR_IMAGE`.
 | `ClusterRole`                          | `<namespace>-panfs-tenant-operator-node` | the permissions of the node pods: read and label a node |
 
 ## Check the installation
+
+The fastest check is the health check of the chart. It runs a pod with the operator image and prints a report:
+
+```bash
+helm test panfs-tenant-operator --namespace csi-panfs --logs
+```
+
+```text
+PanFS Tenant operator health check (Deployment csi-panfs/panfs-tenant-operator)
+OK: the operator is available, both resource definitions are established, and it has processed all 3 resource(s).
+Resources that are not ready (their status says why; this does not fail the check):
+  - PanfsStorageClass default/sc-2: phase Error: namespace "default" has no TenantNetwork; ...
+```
+
+The check fails when the operator Deployment is not available, when a resource definition is missing or not
+established, or when the operator has not processed a resource within `test.timeout` (120 seconds by default). A
+resource that the operator processed and found wrong does not fail the check: it is listed, because its cause is in
+the resource. You can run the check at any time, not only after an install; it changes nothing in the cluster.
+
+The same checks by hand:
 
 ```bash
 # The operator pod runs
@@ -205,9 +226,10 @@ kubectl delete crd tenantnetworks.panfs.vdura.com panfsstorageclasses.panfs.vdur
 
 ## Troubleshooting
 
-Start with these four commands. They answer most questions.
+Start with the health check and these four commands. They answer most questions.
 
 ```bash
+helm test panfs-tenant-operator --namespace csi-panfs --logs
 kubectl -n csi-panfs get pods -l app=panfs-tenant-operator
 kubectl -n csi-panfs logs deployment/panfs-tenant-operator --tail=50
 kubectl get tenantnetworks,panfsstorageclasses --all-namespaces
@@ -246,6 +268,12 @@ kubectl -n csi-panfs describe pod -l app=panfs-tenant-operator
 | `ErrImagePull` or `ImagePullBackOff`  | wrong image name, or no pull secret: set `image` and `imagePullSecrets`                                                   |
 | `FailedCreate` with `forbidden`       | the namespace refuses the pod; the operator pod needs no special Pod Security level, so check the policies of the cluster |
 | `CrashLoopBackOff`                    | read `kubectl -n csi-panfs logs deployment/panfs-tenant-operator --previous`                                              |
+
+### The health check reports "the operator has not processed generation N"
+
+The operator runs, but it did not handle a resource in time. Read the operator log for that resource: a `forbidden`
+error means a permission of the operator is missing; a crash loop or a long PanAPI timeout delays every pass. If the
+resource was changed a moment ago, run the check again: the operator handles a change in its next pass.
 
 ### A resource has no status at all
 
