@@ -40,9 +40,11 @@ const (
 )
 
 func operatorDeployment(available corev1.ConditionStatus) *appsv1.Deployment {
+	replicas := int32(1)
 	return &appsv1.Deployment{
 		ObjectMeta: metav1.ObjectMeta{Name: testOperatorName, Namespace: testOperatorNamespace},
-		Status: appsv1.DeploymentStatus{Conditions: []appsv1.DeploymentCondition{
+		Spec:       appsv1.DeploymentSpec{Replicas: &replicas},
+		Status: appsv1.DeploymentStatus{AvailableReplicas: 1, Conditions: []appsv1.DeploymentCondition{
 			{Type: appsv1.DeploymentAvailable, Status: available, Message: "minimum replicas"},
 		}},
 	}
@@ -138,6 +140,18 @@ func TestHealthCheckFailsWhenTheDeploymentIsNotAvailable(t *testing.T) {
 
 	require.Error(t, health.Run(context.Background()))
 	assert.Contains(t, out.String(), "the Deployment csi-panfs/panfs-tenant-operator is not available: minimum replicas")
+}
+
+func TestHealthCheckFailsWhenTheDeploymentIsScaledToZero(t *testing.T) {
+	// Kubernetes reports a Deployment with zero replicas as Available; the operator does not run then.
+	deployment := operatorDeployment(corev1.ConditionTrue)
+	zero := int32(0)
+	deployment.Spec.Replicas = &zero
+	deployment.Status.AvailableReplicas = 0
+	health, out := newHealthCheck(deployment, definitions()...)
+
+	require.Error(t, health.Run(context.Background()))
+	assert.Contains(t, out.String(), "the Deployment csi-panfs/panfs-tenant-operator has no available replica (0 of 0 desired)")
 }
 
 func TestHealthCheckFailsWhenTheDeploymentIsMissing(t *testing.T) {

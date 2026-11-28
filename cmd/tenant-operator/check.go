@@ -133,6 +133,12 @@ func (h *HealthCheck) checkDeployment(ctx context.Context) string {
 	if err != nil {
 		return fmt.Sprintf("cannot read the Deployment %s/%s: %v", h.Namespace, h.Deployment, err)
 	}
+	// A Deployment scaled to zero reports the condition Available, because zero of zero replicas meets its
+	// minimum. The operator then does not run, so the check needs one available replica too.
+	if deployment.Status.AvailableReplicas < 1 {
+		return fmt.Sprintf("the Deployment %s/%s has no available replica (%d of %d desired)", h.Namespace, h.Deployment,
+			deployment.Status.AvailableReplicas, replicasOf(deployment))
+	}
 	for _, condition := range deployment.Status.Conditions {
 		if condition.Type == appsv1.DeploymentAvailable {
 			if condition.Status == corev1.ConditionTrue {
@@ -185,4 +191,12 @@ func (h *HealthCheck) report(result checkResult) {
 // leaves nothing to report to, so the error is not checked.
 func (h *HealthCheck) printf(format string, args ...any) {
 	_, _ = fmt.Fprintf(h.Out, format, args...)
+}
+
+// replicasOf returns the desired number of replicas of a Deployment; Kubernetes uses 1 when it is not set.
+func replicasOf(deployment *appsv1.Deployment) int32 {
+	if deployment.Spec.Replicas == nil {
+		return 1
+	}
+	return *deployment.Spec.Replicas
 }
